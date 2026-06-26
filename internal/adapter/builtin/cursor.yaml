@@ -4,3 +4,8 @@ launch: agent
 outputs:
   - path: AGENTS.md
     template: default
+context:
+  mode: native
+  file: ""
+skills:
+  target: ""

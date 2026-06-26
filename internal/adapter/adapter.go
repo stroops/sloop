@@ -19,11 +19,22 @@ type Output struct {
 	Template string `yaml:"template"`
 }
 
+type ContextSpec struct {
+	Mode string `yaml:"mode"` // "pointer" | "native"
+	File string `yaml:"file"` // pointer mode only
+}
+
+type SkillsSpec struct {
+	Target string `yaml:"target"` // dir to link .sloop/skills into; empty = none
+}
+
 type Manifest struct {
-	Name    string   `yaml:"name"`
-	Detect  string   `yaml:"detect"`
-	Launch  string   `yaml:"launch"`
-	Outputs []Output `yaml:"outputs"`
+	Name    string      `yaml:"name"`
+	Detect  string      `yaml:"detect"`
+	Launch  string      `yaml:"launch"`
+	Outputs []Output    `yaml:"outputs"`
+	Context ContextSpec `yaml:"context"`
+	Skills  SkillsSpec  `yaml:"skills"`
 }
 
 func LoadBuiltin() (map[string]Manifest, error) {
