@@ -1,76 +1,93 @@
-# Sloop Backlog & Future Phases
+# Sloop Backlog
 
-This document tracks future features and phases for Sloop, moving beyond the core session management (Plan 1 & 2) into advanced multi-agent orchestration, two-way synchronization, and AI-driven workspace intelligence.
+> Rewritten 2026-06-26 to match the validated direction. The old phase list (full-copy sync,
+> two-way engine, grand LLM foundation) was retired — see **Dropped** at the bottom for what and why.
 
----
+## North star
 
-## Phase 3: Zero-Copy Sync & Two-Way Synchronization
+Sloop is a **local-first, AI-aware orchestration layer over AI coding CLIs**. It does two things:
 
-### 1. Symlink Strategy (Zero-copy Sync) — ✅ DONE (Sync v2 / Model B)
-- **Problem:** AI tools like Antigravity read entire directories (`.agents/skills/`). One-way push syncing is redundant and risks state drift.
-- **Solution:** Extend adapter YAML schema with a new `symlinks` output type (e.g., source: `.sloop/skills/` -> target: `.agents/skills/`).
-- **Benefit:** Real-time, zero-copy access to the Sloop canonical knowledge base. Any AI agent creating a skill instantly updates Sloop.
-- **Shipped as:** `context{mode,file}` + `skills{target}` adapter manifests and the `internal/sync` delivery layer. See `docs/superpowers/specs/2026-06-26-sloop-sync-v2-design.md`. Remaining hardening (relative symlinks, `sync --all`, `sync --repair`) is tracked in `docs/superpowers/specs/2026-06-26-sloop-sync-v2-hardening-design.md`.
+1. **Context, once** — `AGENTS.md` is canonical; tools read it natively or via a thin pointer;
+   `.sloop/skills` is symlinked into each tool. (Largely *done* — and commoditizing as tools adopt
+   `AGENTS.md` natively, so not where the moat is.)
+2. **Fleet, aware** — manage the many concurrent AI sessions you run: see what each agent is doing,
+   jump fast, run them side-by-side. **This is the moat** — it needs local context tmux can't have,
+   and it's the founding pain ("too many windows").
 
-### 2. Two-Way Sync Engine (Pull, Push, Diff, Undo) — ⛔ SUPERSEDED by Model B
-> **This sub-phase was written for the v1 full-copy model and is no longer planned.** Under Sync v2
-> (Model B), the reasons for a pull/diff/undo engine are gone: skills are **symlinked** (already
-> two-way, zero-copy) and `AGENTS.md` is the **canonical, hand-authored** context (no duplicate to
-> reconcile, no markers to extract). See `2026-06-26-sloop-sync-v2-design.md` §10. The small, safe
-> remainder (recover a foreign/occupied target without data loss) is replaced by the non-destructive
-> `sloop sync --repair` in the hardening spec — not a general two-way engine. The one theoretical
-> residual case (skills delivered by **copy fallback** on symlink-incapable hosts) is recorded as a
-> known limitation there, not built.
->
-> _Original v1-era proposal, kept for history:_
-- **`sloop sync pull <tool>` (Ingest):** Parse changes made directly in native files (e.g., `CLAUDE.md`) using Sloop-generated Markdown delimiters, and extract them back into `.sloop/` contexts or skills.
-- **`sloop sync diff/validate`:** Hash the native file or compare against the last known state. Detect state drift (conflicts) before pushing/pulling to prevent data loss.
-- **`sloop sync undo`:** Maintain a local `.cache/history` to rollback destructive sync operations safely.
+**Hard rule:** AI-awareness must **never violate the AI provider** — use the provider's own
+hooks/notifications, or non-invasive observation of *your own* terminal (`tmux capture-pane`,
+activity, pane state). Never intercept its API, inject into its process, or read private internals.
 
 ---
 
-## Phase 4: Hooks & Event System
+## Done (shipped)
 
-### 1. Lifecycle Hooks
-- **Concept:** Provide a hook system (e.g., `.sloop/hooks/pre-run.sh`, `post-sync.sh`) that triggers automatically during Sloop commands.
-- **Use Cases:**
-  - `pre-run`: Automatically lint code, pull latest git changes, or fetch secrets from a vault before an AI agent launches.
-  - `post-sync`: Format the generated `CLAUDE.md` or trigger a webhook.
+**Context delivery (Model B / sync v2 + hardening)**
+- `AGENTS.md` canonical; pointer files (`CLAUDE.md`/`GEMINI.md`) create-if-missing, never overwrite;
+  native tools read `AGENTS.md` directly.
+- `.sloop/skills` **relative** symlink into each tool's skills dir (survives repo moves), copy
+  fallback, self-heal, `broken` state.
+- `sloop sync --all`, `sloop sync --repair` (non-destructive backup), `sloop status` delivery line.
+- `sloop run … -- <args>` passthrough. README aligned to Model B.
 
----
-
-## Phase 5: AI-Driven Workspace Intelligence
-
-### 1. AI-Driven `sloop doctor`
-- **Concept:** Upgrade the `doctor` command to evaluate the workspace context using an LLM.
-- **Features:** Scan `.sloop/context/` and `.sloop/skills/` for redundant rules, missing architectural guidelines, or conflicting prompts, and suggest improvements.
-
-### 2. Auto-Improvement (Self-learning Workflow & Free LLMs)
-- **Concept:** Use Sloop as a Meta-Agent. When Sloop detects that a developer had to manually fix code generated by an AI CLI, Sloop triggers an LLM to generate a "Lesson Learned" and automatically adds it to `.sloop/skills/`.
-- **Cost Optimization:** For background tasks like self-improvement, workspace evaluation, and RAG embeddings, Sloop will prioritize configuring and routing requests to **Free-tier LLMs** (like Gemini API free tier, local Ollama, etc.) to keep automated workflow costs at $0.
+**Orchestration prototype (the moat — being validated)**
+- `sloop ps` — live fleet of running AI sessions across workspaces.
+- `sloop ps <#>` — semantic jump (switch-client when inside tmux).
+- `sloop run --split <tools…>` — side-by-side tmux panes on one repo.
+- **glance** — each session's last terminal line in `ps` (non-invasive awareness).
 
 ---
 
-## Phase 6: 2nd Brain Vault & R&D
+## Now — validating
 
-### 1. External Vault Plugins (Obsidian / Tolaria)
-- **Concept:** Instead of Sloop acting as the sole editor of the Vault, Sloop can integrate directly with existing 2nd brain tools like **Obsidian** or **Tolaria**.
-- **Implementation:** Build a plugin system where `.sloop/vault` is just a symlink or an API bridge to the user's Obsidian vault. This allows developers to use their favorite markdown tools to manage AI knowledge seamlessly.
-
-### 2. Storage & Vector DB RAG (Keeping it Pure-Go)
-- **Architecture Note:** We will keep `modernc.org/sqlite` to preserve the lightweight, cross-platform nature of the CLI.
-- **Semantic Search (RAG):** Instead of using C-based extensions like `sqlite-vss`, we will store vector embeddings as binary `BLOB` types in SQLite. Cosine Similarity calculations will be done entirely in Go memory. Given the size of a typical project's skills/context, in-memory Go calculation will be sub-millisecond and keep the binary 100% CGO-free. This specific "In-memory Go Vector RAG" architecture should eventually be formalized into a `docs/architecture/vector-rag.md` spec when development begins.
+Dogfood the orchestration prototype (`docs/USAGE.md`). The decision it answers: does
+`ps` + glance + `--split` triage "which agent needs me" across repos faster than raw tmux? If yes,
+double down (Next §1–3). If not, learn cheaply and reconsider the moat.
 
 ---
 
-## Phase 7: Cross-Platform & Terminal DX
+## Next actions (post-dogfood, prioritized)
 
-### 1. Windows OS Multiplexer (`psmux` / `wt`)
-- **Problem:** `tmux` is natively built for Unix. On Windows, users rely on Windows Terminal (`wt.exe`) or `psmux`.
-- **Solution:** Expand `internal/detect` to check the `runtime.GOOS`. If Windows, auto-detect `psmux` or Windows Terminal tabs and map the `sloop run` launch commands to use them instead of `tmux`.
+1. **Precise agent status via the provider's own hooks** ⭐ — e.g. Claude Code `Stop`/`Notification`
+   hooks write a status crumb sloop reads, so `ps` shows **⏸ waiting-for-you / ● working / ✓ done**
+   instead of guessing from the glance. The cleanest, fully-sanctioned signal; glance stays the
+   universal fallback for tools without hooks.
+2. **Popup HUD** — a tmux `display-popup` keybinding (e.g. `Ctrl-b S`) opens `sloop ps` over the
+   current pane to jump, then closes. Removes the "return to sloop" friction; makes sloop an overlay,
+   not a competing window layer.
+3. **`sloop ps --watch`** — auto-refreshing live dashboard of the fleet.
+4. **`sloop init --scan`** — heuristic, no-LLM codebase scan → pre-filled `AGENTS.md`. Spec + plan
+   ready: `docs/superpowers/{specs,plans}/2026-06-26-sloop-init-scan*`. Improves onboarding
+   (codebase-first reality).
 
-### 2. Markdown CLI Rendering
-- **Problem:** Reading `.sloop/skills/*.md` or `CLAUDE.md` raw in the terminal is difficult and ugly.
-- **Solution:** Integrate or recommend a Markdown CLI renderer. 
-  - *Option A:* Leverage tools like `glow` or `bat` if detected on the user's system (`sloop show skill-name`).
-  - *Option B:* Embed a pure-Go markdown renderer (like `charmbracelet/glamour`) directly into Sloop so `sloop view <context>` outputs beautiful, syntax-highlighted text natively without external dependencies.
+---
+
+## Later / parked (good ideas, not now)
+
+- **Windows multiplexer** — map orchestration onto Windows Terminal (`wt.exe`) / `psmux` so `ps` and
+  `--split` work off tmux. Required only if Windows users matter; the runner already abstracts launch.
+- **AI `sloop doctor`** — LLM reviews `AGENTS.md` + `.sloop/skills` for gaps/redundancy/conflicts.
+  When built, add a **minimal** `Complete(prompt)` client inside it (one provider, key/model config) —
+  **not** a standalone multi-provider "LLM foundation".
+- **Auto-improvement (meta-agent)** — detect a manual fix to AI-generated code → generate a
+  "lesson learned" skill. Fuzziest item; needs change-detection; depends on the hooks work above.
+- **Lifecycle hooks** — `.sloop/hooks/{pre-run,post-sync}.sh` triggered by sloop commands.
+- **2nd-brain / RAG (pure-Go)** — keep `modernc.org/sqlite`; store embeddings as BLOBs, cosine
+  similarity in Go memory (no cgo, no `sqlite-vss`). Formalize in `docs/architecture/vector-rag.md`
+  when started. External vault bridge (Obsidian) as a symlink/API.
+- **Markdown rendering** — `sloop view <skill|context>` via `glow`/`bat` if present, or embed
+  `charmbracelet/glamour`.
+
+---
+
+## Dropped (with rationale — don't resurrect without revisiting these)
+
+- **Two-way sync engine (`sync pull` / `diff` / `undo`, managed-region markers)** — written for the
+  old v1 full-copy model. Under Model B it's unnecessary: skills are symlinked (already two-way),
+  `AGENTS.md` is canonical (nothing to reconcile). The only safe remainder shipped as
+  `sync --repair`. The one theoretical residual (copy-fallback edits not flowing back, on
+  symlink-incapable hosts) is a noted limitation, not a feature.
+- **Standalone "LLM provider foundation"** (multi-provider routing, free-tier optimization, key
+  abstraction, Ollama) — over-engineering ahead of any consumer. Build the client minimally inside
+  the first feature that needs it; generalize only when a 2nd caller (RAG) appears.
+- **Daemon / gRPC / socket IPC** — contradicted "lightweight, local-first"; removed at MVP.
