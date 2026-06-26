@@ -57,13 +57,13 @@ brews:
     ids:
       - sloop
     repository:
-      owner: mulstroops
+      owner: stroops
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/stroops/sloop"
-    description: "sloop CLI - a local DX layer for AI coding tools"
+    description: "sloop CLI - a local-first developer workspace for AI coding workflows."
     license: "MIT"
     install: |
       bin.install "sloop"
