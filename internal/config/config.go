@@ -9,6 +9,11 @@ import (
 
 const SloopDirName = ".sloop"
 
+const (
+	ModeAsk  = "ask"
+	ModeAuto = "auto"
+)
+
 func GlobalDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -33,10 +38,62 @@ func UserAdaptersDir() (string, error) {
 	return filepath.Join(d, "adapters"), nil
 }
 
+// Global is the machine-local config at ~/.sloop/config.yaml.
+type Global struct {
+	Mode string `yaml:"mode"`
+}
+
+func GlobalConfigPath() (string, error) {
+	d, err := GlobalDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(d, "config.yaml"), nil
+}
+
+func LoadGlobal() (*Global, error) {
+	path, err := GlobalConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return &Global{Mode: ModeAsk}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var g Global
+	if err := yaml.Unmarshal(b, &g); err != nil {
+		return nil, err
+	}
+	if g.Mode == "" {
+		g.Mode = ModeAsk
+	}
+	return &g, nil
+}
+
+func SaveGlobal(g *Global) error {
+	dir, err := GlobalDir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "config.yaml")
+	b, err := yaml.Marshal(g)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o644)
+}
+
 // Project is the per-project config stored at <sloopDir>/config.yaml.
 type Project struct {
 	Tools       []string `yaml:"tools"`
 	DefaultTool string   `yaml:"default_tool"`
+	Mode        string   `yaml:"mode,omitempty"`
 }
 
 func LoadProject(sloopDir string) (*Project, error) {
