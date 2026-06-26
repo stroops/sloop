@@ -1,93 +1,86 @@
 # Sloop Backlog
 
-> Rewritten 2026-06-26 to match the validated direction. The old phase list (full-copy sync,
-> two-way engine, grand LLM foundation) was retired — see **Dropped** at the bottom for what and why.
+> Rewritten 2026-06-27 after competitive research. The wedge shifted: sloop owns **portable context
+> + cross-repo fleet**, and **cedes in-repo orchestration** to mature tools (see Landscape below).
 
 ## North star
 
-Sloop is a **local-first, AI-aware orchestration layer over AI coding CLIs**. It does two things:
+Sloop is the **local-first layer that makes your project context portable across AI CLIs and gives
+you a cross-repo view of all your agents.** It is *not* another in-repo multi-agent orchestrator —
+that lane is well served (ntm, Claude Squad). Sloop sits **above** those tools and complements them:
 
-1. **Context, once** — `AGENTS.md` is canonical; tools read it natively or via a thin pointer;
-   `.sloop/skills` is symlinked into each tool. (Largely *done* — and commoditizing as tools adopt
-   `AGENTS.md` natively, so not where the moat is.)
-2. **Fleet, aware** — manage the many concurrent AI sessions you run: see what each agent is doing,
-   jump fast, run them side-by-side. **This is the moat** — it needs local context tmux can't have,
-   and it's the founding pain ("too many windows").
+1. **Context, portable** — `AGENTS.md` is canonical; tools read it natively or via a thin pointer;
+   `.sloop/skills` is symlinked into each tool. One source, every tool, no duplication. _(shipped)_
+2. **Fleet, cross-repo** — see every running AI session **across all your repos** from anywhere,
+   glance at what each is doing, jump fast. The cross-repo span is the edge (orchestrators are
+   single-project). _(prototype shipped)_
 
-**Hard rule:** AI-awareness must **never violate the AI provider** — use the provider's own
-hooks/notifications, or non-invasive observation of *your own* terminal (`tmux capture-pane`,
-activity, pane state). Never intercept its API, inject into its process, or read private internals.
+**Hard rules:** never violate the AI provider (use its own hooks or non-invasive local signals,
+never intercept/inject); stay a single lightweight CGO-free Go binary, no daemon, no bundled LLM.
+
+## Landscape (why the wedge is here)
+
+- **ntm** (Go, ~40 cmds, conflict detection, TUI dashboard, REST API) and **Claude Squad** (Go,
+  ~7.9k★, git-worktree isolation, TUI) already own **in-repo** multi-agent orchestration. Don't
+  reinvent them.
+- **Neither** does **context-file sync** (AGENTS.md/skills) or **cross-repo/multi-workspace** — that
+  is sloop's open ground.
+- `sloop run --split` overlaps them and is less mature (no worktree isolation) → kept as a minor
+  convenience, **not** an investment area.
 
 ---
 
 ## Done (shipped)
 
-**Context delivery (Model B / sync v2 + hardening)**
-- `AGENTS.md` canonical; pointer files (`CLAUDE.md`/`GEMINI.md`) create-if-missing, never overwrite;
-  native tools read `AGENTS.md` directly.
-- `.sloop/skills` **relative** symlink into each tool's skills dir (survives repo moves), copy
-  fallback, self-heal, `broken` state.
-- `sloop sync --all`, `sloop sync --repair` (non-destructive backup), `sloop status` delivery line.
-- `sloop run … -- <args>` passthrough. README aligned to Model B.
-
-**Orchestration prototype (the moat — being validated)**
-- `sloop ps` — live fleet of running AI sessions across workspaces.
-- `sloop ps <#>` — semantic jump (switch-client when inside tmux).
-- `sloop run --split <tools…>` — side-by-side tmux panes on one repo.
-- **glance** — each session's last terminal line in `ps` (non-invasive awareness).
-
----
+- **Context delivery (Model B):** canonical `AGENTS.md`; pointer files create-if-missing;
+  relative skills symlink (move-safe, self-heal, copy fallback); `sync --all`, `sync --repair`,
+  `status`; `run … -- <args>`; README aligned.
+- **Cross-repo fleet prototype:** `sloop ps` (running sessions across workspaces) + glance (last
+  output line, non-invasive) + `ps <#>` jump; `run --split` (panes, minor convenience).
 
 ## Now — validating
 
-Dogfood the orchestration prototype (`docs/USAGE.md`). The decision it answers: does
-`ps` + glance + `--split` triage "which agent needs me" across repos faster than raw tmux? If yes,
-double down (Next §1–3). If not, learn cheaply and reconsider the moat.
+Dogfood (`docs/USAGE.md`). The question: does `sloop ps` across your repos let you triage "which
+agent needs me" in a way single-project tools (ntm/Squad) and raw tmux don't? That validates the
+cross-repo wedge specifically — not generic orchestration.
 
 ---
 
-## Next actions (post-dogfood, prioritized)
+## Next actions (post-dogfood, prioritized for the wedge)
 
-1. **Precise agent status via the provider's own hooks** ⭐ — e.g. Claude Code `Stop`/`Notification`
-   hooks write a status crumb sloop reads, so `ps` shows **⏸ waiting-for-you / ● working / ✓ done**
-   instead of guessing from the glance. The cleanest, fully-sanctioned signal; glance stays the
-   universal fallback for tools without hooks.
-2. **Popup HUD** — a tmux `display-popup` keybinding (e.g. `Ctrl-b S`) opens `sloop ps` over the
-   current pane to jump, then closes. Removes the "return to sloop" friction; makes sloop an overlay,
-   not a competing window layer.
-3. **`sloop ps --watch`** — auto-refreshing live dashboard of the fleet.
-4. **`sloop init --scan`** — heuristic, no-LLM codebase scan → pre-filled `AGENTS.md`. Spec + plan
-   ready: `docs/superpowers/{specs,plans}/2026-06-26-sloop-init-scan*`. Improves onboarding
-   (codebase-first reality).
-
----
-
-## Later / parked (good ideas, not now)
-
-- **Windows multiplexer** — map orchestration onto Windows Terminal (`wt.exe`) / `psmux` so `ps` and
-  `--split` work off tmux. Required only if Windows users matter; the runner already abstracts launch.
-- **AI `sloop doctor`** — LLM reviews `AGENTS.md` + `.sloop/skills` for gaps/redundancy/conflicts.
-  When built, add a **minimal** `Complete(prompt)` client inside it (one provider, key/model config) —
-  **not** a standalone multi-provider "LLM foundation".
-- **Auto-improvement (meta-agent)** — detect a manual fix to AI-generated code → generate a
-  "lesson learned" skill. Fuzziest item; needs change-detection; depends on the hooks work above.
-- **Lifecycle hooks** — `.sloop/hooks/{pre-run,post-sync}.sh` triggered by sloop commands.
-- **2nd-brain / RAG (pure-Go)** — keep `modernc.org/sqlite`; store embeddings as BLOBs, cosine
-  similarity in Go memory (no cgo, no `sqlite-vss`). Formalize in `docs/architecture/vector-rag.md`
-  when started. External vault bridge (Obsidian) as a symlink/API.
-- **Markdown rendering** — `sloop view <skill|context>` via `glow`/`bat` if present, or embed
-  `charmbracelet/glamour`.
+1. **`sloop init --scan`** ⭐ — heuristic, no-LLM codebase scan → pre-filled `AGENTS.md`. Core to the
+   context-portability wedge and the codebase-first onboarding reality. Spec/plan ready:
+   `docs/superpowers/{specs,plans}/2026-06-26-sloop-init-scan*`.
+2. **Cross-repo `ps` polish** — registry-aware (show known workspaces, not only live tmux), group by
+   workspace, show repo path, sort by "needs-attention". Make the cross-repo lens genuinely better
+   than `tmux list-sessions`.
+3. **Context-portability depth** — confirm/extend per-tool delivery (native vs pointer) for more
+   tools; skills authored once → everywhere; keep AGENTS.md the single canonical source.
+4. **Complementarity** — document/position sloop as working *alongside* ntm/Claude Squad (context +
+   cross-repo) rather than competing; explore a light integration if it helps.
 
 ---
 
-## Dropped (with rationale — don't resurrect without revisiting these)
+## Later / parked
 
-- **Two-way sync engine (`sync pull` / `diff` / `undo`, managed-region markers)** — written for the
-  old v1 full-copy model. Under Model B it's unnecessary: skills are symlinked (already two-way),
-  `AGENTS.md` is canonical (nothing to reconcile). The only safe remainder shipped as
-  `sync --repair`. The one theoretical residual (copy-fallback edits not flowing back, on
-  symlink-incapable hosts) is a noted limitation, not a feature.
-- **Standalone "LLM provider foundation"** (multi-provider routing, free-tier optimization, key
-  abstraction, Ollama) — over-engineering ahead of any consumer. Build the client minimally inside
-  the first feature that needs it; generalize only when a 2nd caller (RAG) appears.
-- **Daemon / gRPC / socket IPC** — contradicted "lightweight, local-first"; removed at MVP.
+- **Precise agent status via the provider's own hooks** (e.g. Claude `Stop`/`Notification`) — useful
+  for `ps` (⏸/●/✓) and provider-respecting; technique to borrow from tmuxai's "prepare mode" (shell
+  prompt markers). Parked unless the cross-repo `ps` proves valuable enough to deepen.
+- **`sloop init --scan` LLM enrichment** + **AI `sloop doctor`** — when reached, add a **minimal**
+  `Complete(prompt)` client inside the first feature, not a standalone "LLM foundation".
+- **Windows multiplexer** (`wt.exe`/`psmux`) — only if Windows users matter.
+- **2nd-brain / RAG (pure-Go)** — embeddings as SQLite BLOBs, cosine in Go (no cgo); Obsidian bridge.
+- **Markdown rendering** (`glow`/`glamour`), lifecycle hooks (`.sloop/hooks/*`).
+
+## Ceded to ntm / Claude Squad (do NOT build — they own it)
+
+- In-repo worktree isolation, TUI orchestration dashboard, file-conflict detection, broadcast-to-all,
+  popup-HUD-as-orchestrator, pipelines/work-graphs/checkpoints. Sloop's launch story is **cross-repo
+  `run -w`**, not in-repo swarm management.
+
+## Dropped (with rationale)
+
+- **Two-way sync engine** (`sync pull`/`diff`/`undo`, markers) — superseded by Model B; safe remainder
+  shipped as `sync --repair`.
+- **Standalone LLM provider "foundation"** — over-engineering ahead of any consumer.
+- **Daemon / gRPC / socket IPC** — contradicted lightweight/local-first; removed at MVP.
