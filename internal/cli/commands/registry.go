@@ -19,4 +19,5 @@ func init() {
 	add(RegisterNew)
 	add(RegisterInit)
 	add(RegisterSync)
+	add(RegisterRun)
 }
