@@ -6,7 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
+	"github.com/stroops/sloop/internal/detect"
 	"github.com/stroops/sloop/internal/profile"
 	"github.com/stroops/sloop/internal/session"
 )
@@ -29,9 +31,23 @@ func RunInit(dir string) error {
 		}
 	}
 
+	// Detect installed known tools; always ensure claude is usable.
+	manifests, err := adapter.Load()
+	if err != nil {
+		return err
+	}
+	enabled := detect.InstalledKeys(manifests)
+	if len(enabled) == 0 {
+		enabled = []string{"claude"}
+	}
+	defaultTool := "claude"
+	if !contains(enabled, "claude") {
+		defaultTool = enabled[0]
+	}
+
 	if err := config.SaveProject(sloopDir, &config.Project{
-		Tools:       []string{"claude"},
-		DefaultTool: "claude",
+		Tools:       enabled,
+		DefaultTool: defaultTool,
 	}); err != nil {
 		return err
 	}
@@ -44,12 +60,13 @@ func RunInit(dir string) error {
 		[]byte(sloopGitignore), 0o644); err != nil {
 		return err
 	}
-	if err := profile.Save(filepath.Join(sloopDir, "profiles", "claude.yaml"),
-		profile.Default("claude")); err != nil {
-		return err
+	for _, tool := range enabled {
+		if err := profile.Save(filepath.Join(sloopDir, "profiles", tool+".yaml"),
+			profile.Default(tool)); err != nil {
+			return err
+		}
 	}
 
-	// Register the workspace in the global DB (best-effort).
 	dbPath, err := config.GlobalDBPath()
 	if err != nil {
 		return err
@@ -84,3 +101,12 @@ var initCmd = &cobra.Command{
 }
 
 func RegisterInit(cmd *cobra.Command) { cmd.AddCommand(initCmd) }
+
+func contains(xs []string, x string) bool {
+	for _, v := range xs {
+		if v == x {
+			return true
+		}
+	}
+	return false
+}
