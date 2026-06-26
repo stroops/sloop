@@ -1,0 +1,6 @@
+name: Claude Code
+detect: claude
+launch: claude
+outputs:
+  - path: CLAUDE.md
+    template: default
