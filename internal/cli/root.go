@@ -66,6 +66,8 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: $HOME/.sloop/config.yaml)")
 	rootCmd.PersistentFlags().Bool("no-color", false, "disable colored output")
+	rootCmd.PersistentFlags().BoolP("auto", "y", false, "assume yes / run automatically without prompts")
+	rootCmd.PersistentFlags().Bool("no-input", false, "never prompt; fail instead of asking")
 
 	viper.BindPFlag("no_color", rootCmd.PersistentFlags().Lookup("no-color"))
 
