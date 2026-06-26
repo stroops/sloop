@@ -1,0 +1,6 @@
+name: Cursor CLI
+detect: agent
+launch: agent
+outputs:
+  - path: AGENTS.md
+    template: default
