@@ -48,11 +48,16 @@ AGENTS.md            # canonical context — YOU write this (the source of truth
   .gitignore
 ```
 
-Now edit `AGENTS.md` with your project guidance (overview, conventions, build/test commands).
-Commit `AGENTS.md` and `.sloop/` to git — they're shared with your team.
+Or let sloop pre-fill `AGENTS.md` from the existing codebase (language, build/test/lint commands —
+a `Makefile` target wins — project layout, and a README seed) instead of an empty starter:
 
-> _(planned, not yet built)_ `sloop init --scan` will pre-fill `AGENTS.md` from the codebase
-> (language, build/test commands, layout) instead of an empty starter.
+```sh
+sloop init --scan
+```
+
+Either way, then edit `AGENTS.md` with the rest of your guidance (overview, conventions). Commit
+`AGENTS.md` and `.sloop/` to git — they're shared with your team. `--scan` is heuristic and offline
+(no LLM, no API key); it never overwrites an existing `AGENTS.md`.
 
 ---
 

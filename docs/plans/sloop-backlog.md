@@ -35,6 +35,8 @@ never intercept/inject); stay a single lightweight CGO-free Go binary, no daemon
 - **Context delivery (Model B):** canonical `AGENTS.md`; pointer files create-if-missing;
   relative skills symlink (move-safe, self-heal, copy fallback); `sync --all`, `sync --repair`,
   `status`; `run … -- <args>`; README aligned.
+- **`sloop init --scan`:** heuristic, no-LLM codebase scan → pre-filled `AGENTS.md` (language,
+  build/test/lint commands with Makefile precedence, layout, README seed, Conventions placeholder).
 - **Cross-repo fleet prototype:** `sloop ps` (running sessions across workspaces) + glance (last
   output line, non-invasive) + `ps <#>` jump; `run --split` (panes, minor convenience).
 
@@ -48,14 +50,13 @@ cross-repo wedge specifically — not generic orchestration.
 
 ## Next actions (post-dogfood, prioritized for the wedge)
 
-1. **`sloop init --scan`** ⭐ — heuristic, no-LLM codebase scan → pre-filled `AGENTS.md`. Core to the
-   context-portability wedge and the codebase-first onboarding reality. Spec/plan ready:
-   `docs/superpowers/{specs,plans}/2026-06-26-sloop-init-scan*`.
-2. **Cross-repo `ps` polish** — registry-aware (show known workspaces, not only live tmux), group by
-   workspace, show repo path, sort by "needs-attention". Make the cross-repo lens genuinely better
+1. **Cross-repo `ps` polish** ⭐ — registry-aware (show known workspaces, not only live tmux), group
+   by workspace, show repo path, sort by "needs-attention". Make the cross-repo lens genuinely better
    than `tmux list-sessions`.
-3. **Context-portability depth** — confirm/extend per-tool delivery (native vs pointer) for more
+2. **Context-portability depth** — confirm/extend per-tool delivery (native vs pointer) for more
    tools; skills authored once → everywhere; keep AGENTS.md the single canonical source.
+3. **`init --scan` LLM enrichment** — reuse a minimal LLM client to turn the heuristic scaffold into
+   prose (Phase 5 Step C); only when a minimal client exists.
 4. **Complementarity** — document/position sloop as working *alongside* ntm/Claude Squad (context +
    cross-repo) rather than competing; explore a light integration if it helps.
 
