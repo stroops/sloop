@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
@@ -21,6 +22,7 @@ const (
 	ActionNone    Action = "none"
 	ActionBroken   Action = "broken"
 	ActionRelinked Action = "relinked"
+	ActionRepaired Action = "repaired"
 )
 
 // skillsPaths returns the link path, the absolute skills source, and the
@@ -141,6 +143,49 @@ func relink(link, rel string) error {
 		return err
 	}
 	return symlinkFunc(rel, link)
+}
+
+// backupAside renames an occupant to "<name>.sloopbak-<timestamp>" (never deletes).
+func backupAside(path string) error {
+	bak := fmt.Sprintf("%s.sloopbak-%s", path, time.Now().Format("20060102-150405"))
+	return os.Rename(path, bak)
+}
+
+func RepairContext(root string, m adapter.Manifest) (Action, error) {
+	if m.Context.Mode != "pointer" {
+		return ActionSkipped, nil
+	}
+	switch a, err := SyncContext(root, m); {
+	case err != nil:
+		return ActionSkipped, err
+	case a != ActionForeign: // created/skipped already correct → nothing to repair
+		return a, nil
+	}
+	path := filepath.Join(root, m.Context.File)
+	if err := backupAside(path); err != nil {
+		return ActionSkipped, err
+	}
+	if _, err := SyncContext(root, m); err != nil { // now writes the pointer (missing)
+		return ActionSkipped, err
+	}
+	return ActionRepaired, nil
+}
+
+func RepairSkills(root, sloopDir string, m adapter.Manifest) (Action, error) {
+	switch a, err := SyncSkills(root, sloopDir, m); {
+	case err != nil:
+		return ActionSkipped, err
+	case a != ActionForeign && a != ActionBroken:
+		return a, nil // none/linked/relinked/created/copied → already handled
+	}
+	link, _, _ := skillsPaths(root, sloopDir, m.Skills.Target)
+	if err := backupAside(link); err != nil {
+		return ActionSkipped, err
+	}
+	if _, err := SyncSkills(root, sloopDir, m); err != nil {
+		return ActionSkipped, err
+	}
+	return ActionRepaired, nil
 }
 
 func copyDir(src, dst string) error {

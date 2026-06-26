@@ -3,6 +3,7 @@ package sync
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stroops/sloop/internal/adapter"
@@ -152,5 +153,58 @@ func TestSyncSkillsHealsLegacyAbsoluteLink(t *testing.T) {
 	dst, _ := os.Readlink(link)
 	if dst != filepath.Join("..", ".sloop", "skills") {
 		t.Fatalf("want relative after heal, got %q", dst)
+	}
+}
+
+func TestRepairContextBacksUpForeign(t *testing.T) {
+	root := t.TempDir()
+	m := adapter.Manifest{Name: "Claude Code", Context: adapter.ContextSpec{Mode: "pointer", File: "CLAUDE.md"}}
+	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("MINE"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a, err := RepairContext(root, m)
+	if err != nil || a != ActionRepaired {
+		t.Fatalf("repair = %v, %v", a, err)
+	}
+	// Pointer now written.
+	b, _ := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+	if !strings.Contains(string(b), "AGENTS.md") {
+		t.Fatalf("pointer not written: %q", string(b))
+	}
+	// Original preserved under a *.sloopbak-* name.
+	matches, _ := filepath.Glob(filepath.Join(root, "CLAUDE.md.sloopbak-*"))
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 backup, got %v", matches)
+	}
+	if bk, _ := os.ReadFile(matches[0]); string(bk) != "MINE" {
+		t.Fatalf("backup content lost: %q", string(bk))
+	}
+}
+
+func TestRepairSkillsBacksUpPresentDir(t *testing.T) {
+	root := t.TempDir()
+	sloopDir := filepath.Join(root, ".sloop")
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A foreign real dir occupies the target.
+	if err := os.MkdirAll(filepath.Join(root, ".claude", "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".claude", "skills", "keep.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := adapter.Manifest{Skills: adapter.SkillsSpec{Target: ".claude/skills"}}
+	a, err := RepairSkills(root, sloopDir, m)
+	if err != nil || a != ActionRepaired {
+		t.Fatalf("repair = %v, %v", a, err)
+	}
+	fi, err := os.Lstat(filepath.Join(root, ".claude", "skills"))
+	if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("target should now be a symlink: %v", err)
+	}
+	matches, _ := filepath.Glob(filepath.Join(root, ".claude", "skills.sloopbak-*"))
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 skills backup, got %v", matches)
 	}
 }

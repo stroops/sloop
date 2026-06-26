@@ -15,7 +15,7 @@ func TestRunSyncWritesClaudeMd(t *testing.T) {
 	if err := RunInit(dir); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
-	written, err := RunSync(dir, "claude")
+	written, err := RunSync(dir, "claude", false)
 	if err != nil {
 		t.Fatalf("RunSync: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestRunSyncAllDeliversEnabledTools(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	lines, err := RunSyncAll(dir)
+	lines, err := RunSyncAll(dir, false)
 	if err != nil {
 		t.Fatalf("RunSyncAll: %v", err)
 	}

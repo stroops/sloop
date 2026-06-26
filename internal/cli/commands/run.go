@@ -37,7 +37,7 @@ func RunRun(startDir, target string, r runner.Runner) error {
 	}
 
 	// Sync native files before launch.
-	if _, err := RunSync(startDir, target); err != nil {
+	if _, err := RunSync(startDir, target, false); err != nil {
 		return err
 	}
 
