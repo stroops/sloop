@@ -16,7 +16,6 @@ func add(fn func(*cobra.Command)) {
 }
 
 func init() {
-	add(RegisterNew)
 	add(RegisterInit)
 	add(RegisterSync)
 	add(RegisterRun)

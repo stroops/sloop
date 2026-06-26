@@ -1,0 +1,6 @@
+name: Gemini CLI
+detect: gemini
+launch: gemini
+outputs:
+  - path: GEMINI.md
+    template: default

@@ -1,0 +1,6 @@
+name: OpenAI Codex CLI
+detect: codex
+launch: codex
+outputs:
+  - path: AGENTS.md
+    template: default
