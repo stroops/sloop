@@ -35,10 +35,22 @@ func TestRunPsEmptyAndPopulated(t *testing.T) {
 		t.Fatalf("empty output: %s", b.String())
 	}
 	b.Reset()
-	_ = RunPs(&b, []FleetRow{{Workspace: "svc", Tool: "claude", Name: "svc__claude", Windows: 1, Activity: time.Now()}})
+	_ = RunPs(&b, []FleetRow{{Workspace: "svc", Tool: "claude", Name: "svc__claude", Activity: time.Now(), Glance: "Waiting for your approval"}})
 	out := b.String()
 	if !strings.Contains(out, "svc") || !strings.Contains(out, "claude") || !strings.Contains(out, "1 running") {
 		t.Fatalf("populated output: %s", out)
+	}
+	if !strings.Contains(out, "Waiting for your approval") {
+		t.Fatalf("glance line missing: %s", out)
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	if got := truncate("short", 10); got != "short" {
+		t.Fatalf("got %q", got)
+	}
+	if got := truncate("abcdefghij", 5); got != "abcd…" {
+		t.Fatalf("got %q", got)
 	}
 }
 

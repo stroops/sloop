@@ -28,3 +28,12 @@ func TestBuildTmuxSwitchArgs(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+func TestLastNonEmptyLine(t *testing.T) {
+	if got := LastNonEmptyLine("first\nWaiting for input\n\n  \n"); got != "Waiting for input" {
+		t.Fatalf("got %q", got)
+	}
+	if got := LastNonEmptyLine("   \n\n"); got != "" {
+		t.Fatalf("want empty, got %q", got)
+	}
+}

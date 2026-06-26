@@ -23,6 +23,7 @@ type FleetRow struct {
 	Attached  bool
 	Windows   int
 	Activity  time.Time
+	Glance    string // last line of the session's own terminal output (best-effort)
 }
 
 // fleetRows keeps only sloop-named sessions (`<workspace>__<tool>`), splitting
@@ -62,20 +63,43 @@ func tmuxList() string {
 	return string(out)
 }
 
+// enrichGlances fills each row's Glance with the last line of its terminal
+// (best-effort; reads only your own panes, never the provider).
+func enrichGlances(rows []FleetRow) []FleetRow {
+	for i := range rows {
+		out, err := exec.Command("tmux", runner.BuildTmuxCaptureArgs(rows[i].Name)...).Output()
+		if err != nil {
+			continue
+		}
+		rows[i].Glance = truncate(runner.LastNonEmptyLine(string(out)), 72)
+	}
+	return rows
+}
+
+func truncate(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n-1]) + "…"
+}
+
 func RunPs(w io.Writer, rows []FleetRow) error {
 	if len(rows) == 0 {
 		fmt.Fprintln(w, "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
 		return nil
 	}
 	fmt.Fprintf(w, "⚓ AI fleet — %d running\n\n", len(rows))
-	fmt.Fprintf(w, "  %-3s %-18s %-9s %-4s %s\n", "#", "workspace", "tool", "win", "state")
 	for i, r := range rows {
 		state := "○ idle"
 		if r.Attached {
 			state = "● attached"
 		}
-		fmt.Fprintf(w, "  %-3d %-18s %-9s %-4d %s · %s\n",
-			i+1, r.Workspace, r.Tool, r.Windows, state, humanizeSince(r.Activity))
+		fmt.Fprintf(w, "  %-3d %-16s %-9s %s · %s\n",
+			i+1, r.Workspace, r.Tool, state, humanizeSince(r.Activity))
+		if r.Glance != "" {
+			fmt.Fprintf(w, "      └ %s\n", r.Glance)
+		}
 	}
 	fmt.Fprintln(w, "\njump: sloop ps <#>   (switches client if you're already in tmux)")
 	return nil
@@ -127,7 +151,7 @@ var psCmd = &cobra.Command{
 			}
 			return jumpToFleet(rows, n)
 		}
-		return RunPs(cmd.OutOrStdout(), rows)
+		return RunPs(cmd.OutOrStdout(), enrichGlances(rows))
 	},
 }
 

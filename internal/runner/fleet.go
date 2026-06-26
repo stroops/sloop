@@ -28,6 +28,25 @@ func BuildTmuxSwitchArgs(session string) []string {
 	return []string{"switch-client", "-t", session}
 }
 
+// BuildTmuxCaptureArgs reads the visible content of a session's active pane.
+// This only ever reads your own terminal output — never the provider's API or
+// internals — so it stays within what any AI tool's terms allow.
+func BuildTmuxCaptureArgs(session string) []string {
+	return []string{"capture-pane", "-p", "-t", session}
+}
+
+// LastNonEmptyLine returns the last non-blank, trimmed line of captured pane
+// text (the agent's most recent output), or "" if there is none.
+func LastNonEmptyLine(raw string) string {
+	lines := strings.Split(raw, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if s := strings.TrimSpace(lines[i]); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
 // ParseSessions parses tmuxListFormat output. Malformed lines are skipped.
 func ParseSessions(raw string) []TmuxSession {
 	var out []TmuxSession
