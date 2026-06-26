@@ -14,29 +14,31 @@ builds:
     goarch:
       - amd64
       - arm64
-
-  - id: sloopd
-    main: ./cmd/sloopd
-    binary: sloopd
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-    goarch:
-      - amd64
-      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
 
 archives:
   - id: sloop
-    builds: [sloop]
-    name_template: "sloop_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-  - id: sloopd
-    builds: [sloopd]
-    name_template: "sloopd_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}-cli-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+
+  # - id: sloopd
+  #   builds: [sloopd]
+  #   name_template: "sloopd_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
+
+checksum:
+  name_template: "checksums.txt"
 
 changelog:
   sort: asc
@@ -50,11 +52,20 @@ changelog:
       - Merge pull request
       - Merge branch
 
-homebrew_casks:
+brews:
   - name: sloop
-    homepage: "https://github.com/stroops/sloop"
-    description: "AI-native terminal workspace manager"
+    ids:
+      - sloop
     repository:
-      owner: stroops
-      name: homebrew-sloop
+      owner: mulstroops
+      name: homebrew-tap
+      branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/stroops/sloop"
+    description: "sloop CLI - a local DX layer for AI coding tools"
+    license: "MIT"
+    install: |
+      bin.install "sloop"
+    test: |
+      system "#{bin}/sloop", "version"

@@ -40,7 +40,7 @@ var (
 	date    string
 )
 
-// SetVersion được gọi từ main.go (ldflags)
+// SetVersion called from main.go (ldflags)
 func SetVersion(v, c, d string) {
 	version, commit, date = v, c, d
 }
@@ -66,10 +66,8 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: $HOME/.sloop/config.yaml)")
-	rootCmd.PersistentFlags().String("socket", filepath.Join(os.TempDir(), "sloop.sock"), "daemon socket path")
 	rootCmd.PersistentFlags().Bool("no-color", false, "disable colored output")
 
-	viper.BindPFlag("socket", rootCmd.PersistentFlags().Lookup("socket"))
 	viper.BindPFlag("no_color", rootCmd.PersistentFlags().Lookup("no-color"))
 
 	// Auto-register commands
@@ -88,7 +86,7 @@ func initConfig() {
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 
-		// Tạo ~/.sloop nếu chưa có
+		// create ~/.sloop if not exists
 		if _, err := os.Stat(configDir); os.IsNotExist(err) {
 			os.MkdirAll(configDir, 0755)
 		}
