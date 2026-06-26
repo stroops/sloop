@@ -30,7 +30,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/stroops/sloop/internal/cli/commands"
-	_ "github.com/stroops/sloop/internal/cli/commands"
 )
 
 var (
