@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -109,18 +110,50 @@ func selectRunner(workspace, tool string) runner.Runner {
 	return runner.ExecRunner{}
 }
 
-var runWorkspace string
+// RunSplit syncs each tool then launches them side-by-side as tmux panes in one
+// session, all rooted at the workspace. Requires tmux.
+func RunSplit(startDir string, tools []string) error {
+	ws, err := workspace.Resolve(startDir)
+	if err != nil {
+		return err
+	}
+	if !runner.TmuxAvailable() {
+		return fmt.Errorf("--split requires tmux (each pane is a tmux pane); plain `sloop run` works without it")
+	}
+	manifests, err := adapter.Load()
+	if err != nil {
+		return err
+	}
+	var cmds []string
+	for _, t := range tools {
+		m, ok := manifests[t]
+		if !ok {
+			return fmt.Errorf("unknown tool %q (no adapter)", t)
+		}
+		if _, err := RunSync(startDir, t, false); err != nil {
+			return err
+		}
+		cmds = append(cmds, m.Launch)
+	}
+	session := runner.TmuxSessionName(ws.Name, strings.Join(tools, "_"))
+	return runner.LaunchSplit(session, ws.Root, cmds)
+}
+
+var (
+	runWorkspace string
+	runSplit     bool
+)
 
 var runCmd = &cobra.Command{
-	Use:   "run [tool|profile] [-- <args>]",
-	Short: "Sync context and launch an AI tool in the workspace",
+	Use:   "run [tool|profile ...] [-- <args>]",
+	Short: "Sync context and launch an AI tool in the workspace (--split for side-by-side panes)",
 	Args: func(cmd *cobra.Command, args []string) error {
 		n := len(args)
 		if d := cmd.ArgsLenAtDash(); d >= 0 {
-			n = d // only the args before -- count as the tool/profile target
+			n = d // only the args before -- count as tool/profile targets
 		}
-		if n > 1 {
-			return fmt.Errorf("accepts at most 1 tool/profile argument before --, got %d", n)
+		if !runSplit && n > 1 {
+			return fmt.Errorf("accepts at most 1 tool/profile argument before -- (use --split for multiple)")
 		}
 		return nil
 	},
@@ -138,10 +171,6 @@ var runCmd = &cobra.Command{
 		if d := cmd.ArgsLenAtDash(); d >= 0 {
 			positional, passthrough = args[:d], args[d:]
 		}
-		target := ""
-		if len(positional) == 1 {
-			target = positional[0]
-		}
 		ws, err := workspace.Resolve(startDir)
 		if err != nil {
 			return err
@@ -149,6 +178,17 @@ var runCmd = &cobra.Command{
 		proj, err := config.LoadProject(ws.SloopDir())
 		if err != nil {
 			return err
+		}
+		if runSplit {
+			tools := positional
+			if len(tools) == 0 {
+				tools = []string{proj.DefaultTool}
+			}
+			return RunSplit(startDir, tools)
+		}
+		target := ""
+		if len(positional) == 1 {
+			target = positional[0]
 		}
 		if target == "" {
 			target = proj.DefaultTool
@@ -159,5 +199,6 @@ var runCmd = &cobra.Command{
 
 func RegisterRun(cmd *cobra.Command) {
 	runCmd.Flags().StringVarP(&runWorkspace, "workspace", "w", "", "target a registered workspace by name")
+	runCmd.Flags().BoolVar(&runSplit, "split", false, "launch multiple tools side-by-side as tmux panes")
 	cmd.AddCommand(runCmd)
 }
