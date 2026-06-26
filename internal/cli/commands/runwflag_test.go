@@ -10,7 +10,7 @@ import (
 func TestResolveStartDirFromRegistry(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir); err != nil {
+	if err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	// init registered the workspace under base(dir).

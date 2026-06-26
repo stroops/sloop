@@ -12,7 +12,7 @@ import (
 func TestRunSyncWritesClaudeMd(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir); err != nil {
+	if err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	written, err := RunSync(dir, "claude", false)
@@ -32,7 +32,7 @@ func TestRunSyncWritesClaudeMd(t *testing.T) {
 func TestRunSyncAllDeliversEnabledTools(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir); err != nil {
+	if err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	// Enable claude + cursor.

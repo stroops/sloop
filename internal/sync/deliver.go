@@ -14,12 +14,12 @@ import (
 type Action string
 
 const (
-	ActionCreated Action = "created"
-	ActionSkipped Action = "skipped"
-	ActionForeign Action = "foreign"
-	ActionLinked  Action = "linked"
-	ActionCopied  Action = "copied"
-	ActionNone    Action = "none"
+	ActionCreated  Action = "created"
+	ActionSkipped  Action = "skipped"
+	ActionForeign  Action = "foreign"
+	ActionLinked   Action = "linked"
+	ActionCopied   Action = "copied"
+	ActionNone     Action = "none"
 	ActionBroken   Action = "broken"
 	ActionRelinked Action = "relinked"
 	ActionRepaired Action = "repaired"
@@ -51,17 +51,23 @@ This is the canonical context; sloop points other tools (CLAUDE.md, GEMINI.md, .
 // symlinkFunc is a seam so the copy-fallback path is testable.
 var symlinkFunc = os.Symlink
 
-func EnsureAgents(root string) (Action, error) {
+// EnsureAgentsContent writes content to AGENTS.md if it is missing; it never
+// overwrites an existing one (create-if-missing).
+func EnsureAgentsContent(root, content string) (Action, error) {
 	path := filepath.Join(root, "AGENTS.md")
 	if _, err := os.Stat(path); err == nil {
 		return ActionSkipped, nil
 	} else if !os.IsNotExist(err) {
 		return ActionSkipped, err
 	}
-	if err := os.WriteFile(path, []byte(agentsStarter), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return ActionSkipped, err
 	}
 	return ActionCreated, nil
+}
+
+func EnsureAgents(root string) (Action, error) {
+	return EnsureAgentsContent(root, agentsStarter)
 }
 
 func PointerContent(toolName, file string) string {

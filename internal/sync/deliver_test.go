@@ -24,6 +24,22 @@ func TestEnsureAgentsCreatesThenSkips(t *testing.T) {
 	}
 }
 
+func TestEnsureAgentsContentCreatesThenSkips(t *testing.T) {
+	root := t.TempDir()
+	a, err := EnsureAgentsContent(root, "# AGENTS.md\nscanned\n")
+	if err != nil || a != ActionCreated {
+		t.Fatalf("create = %v, %v", a, err)
+	}
+	b, _ := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if string(b) != "# AGENTS.md\nscanned\n" {
+		t.Fatalf("content = %q", string(b))
+	}
+	a, _ = EnsureAgentsContent(root, "DIFFERENT")
+	if a != ActionSkipped {
+		t.Fatalf("second = %v, want skipped", a)
+	}
+}
+
 func TestSyncContextPointerCreateIdempotentForeign(t *testing.T) {
 	root := t.TempDir()
 	m := adapter.Manifest{Name: "Claude Code", Context: adapter.ContextSpec{Mode: "pointer", File: "CLAUDE.md"}}

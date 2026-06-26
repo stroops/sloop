@@ -10,17 +10,17 @@ import (
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/detect"
 	"github.com/stroops/sloop/internal/profile"
+	scanpkg "github.com/stroops/sloop/internal/scan"
 	"github.com/stroops/sloop/internal/session"
 	syncpkg "github.com/stroops/sloop/internal/sync"
 )
-
 
 const sloopGitignore = `# Local, machine-specific caches
 cache/
 *.local
 `
 
-func RunInit(dir string) error {
+func RunInit(dir string, scan bool) error {
 	sloopDir := filepath.Join(dir, config.SloopDirName)
 	for _, sub := range []string{"skills", "vault", "profiles"} {
 		if err := os.MkdirAll(filepath.Join(sloopDir, sub), 0o755); err != nil {
@@ -49,8 +49,14 @@ func RunInit(dir string) error {
 		return err
 	}
 
-	if _, err := syncpkg.EnsureAgents(dir); err != nil {
-		return err
+	if scan {
+		if _, err := syncpkg.EnsureAgentsContent(dir, scanpkg.Scan(dir).AgentsMarkdown()); err != nil {
+			return err
+		}
+	} else {
+		if _, err := syncpkg.EnsureAgents(dir); err != nil {
+			return err
+		}
 	}
 	if err := os.WriteFile(filepath.Join(sloopDir, ".gitignore"),
 		[]byte(sloopGitignore), 0o644); err != nil {
@@ -80,6 +86,8 @@ func RunInit(dir string) error {
 	return err
 }
 
+var initScan bool
+
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Scaffold a .sloop workspace in the current directory",
@@ -88,7 +96,7 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := RunInit(cwd); err != nil {
+		if err := RunInit(cwd, initScan); err != nil {
 			return err
 		}
 		cmd.Printf("⚓ Initialized sloop workspace in %s\n", filepath.Join(cwd, config.SloopDirName))
@@ -96,7 +104,10 @@ var initCmd = &cobra.Command{
 	},
 }
 
-func RegisterInit(cmd *cobra.Command) { cmd.AddCommand(initCmd) }
+func RegisterInit(cmd *cobra.Command) {
+	initCmd.Flags().BoolVar(&initScan, "scan", false, "scan the existing codebase to pre-fill AGENTS.md")
+	cmd.AddCommand(initCmd)
+}
 
 func contains(xs []string, x string) bool {
 	for _, v := range xs {

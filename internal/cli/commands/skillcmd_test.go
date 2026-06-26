@@ -9,7 +9,7 @@ import (
 func TestRunSkillNewCreatesFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir); err != nil {
+	if err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	path, err := RunSkillNew(dir, "review")
