@@ -6,12 +6,23 @@ This document tracks future features and phases for Sloop, moving beyond the cor
 
 ## Phase 3: Zero-Copy Sync & Two-Way Synchronization
 
-### 1. Symlink Strategy (Zero-copy Sync)
+### 1. Symlink Strategy (Zero-copy Sync) — ✅ DONE (Sync v2 / Model B)
 - **Problem:** AI tools like Antigravity read entire directories (`.agents/skills/`). One-way push syncing is redundant and risks state drift.
 - **Solution:** Extend adapter YAML schema with a new `symlinks` output type (e.g., source: `.sloop/skills/` -> target: `.agents/skills/`).
 - **Benefit:** Real-time, zero-copy access to the Sloop canonical knowledge base. Any AI agent creating a skill instantly updates Sloop.
+- **Shipped as:** `context{mode,file}` + `skills{target}` adapter manifests and the `internal/sync` delivery layer. See `docs/superpowers/specs/2026-06-26-sloop-sync-v2-design.md`. Remaining hardening (relative symlinks, `sync --all`, `sync --repair`) is tracked in `docs/superpowers/specs/2026-06-26-sloop-sync-v2-hardening-design.md`.
 
-### 2. Two-Way Sync Engine (Pull, Push, Diff, Undo)
+### 2. Two-Way Sync Engine (Pull, Push, Diff, Undo) — ⛔ SUPERSEDED by Model B
+> **This sub-phase was written for the v1 full-copy model and is no longer planned.** Under Sync v2
+> (Model B), the reasons for a pull/diff/undo engine are gone: skills are **symlinked** (already
+> two-way, zero-copy) and `AGENTS.md` is the **canonical, hand-authored** context (no duplicate to
+> reconcile, no markers to extract). See `2026-06-26-sloop-sync-v2-design.md` §10. The small, safe
+> remainder (recover a foreign/occupied target without data loss) is replaced by the non-destructive
+> `sloop sync --repair` in the hardening spec — not a general two-way engine. The one theoretical
+> residual case (skills delivered by **copy fallback** on symlink-incapable hosts) is recorded as a
+> known limitation there, not built.
+>
+> _Original v1-era proposal, kept for history:_
 - **`sloop sync pull <tool>` (Ingest):** Parse changes made directly in native files (e.g., `CLAUDE.md`) using Sloop-generated Markdown delimiters, and extract them back into `.sloop/` contexts or skills.
 - **`sloop sync diff/validate`:** Hash the native file or compare against the last known state. Detect state drift (conflicts) before pushing/pulling to prevent data loss.
 - **`sloop sync undo`:** Maintain a local `.cache/history` to rollback destructive sync operations safely.
