@@ -27,7 +27,7 @@ func RunRun(startDir, target string, r runner.Runner) error {
 	if err != nil {
 		return err
 	}
-	manifests, err := adapter.LoadBuiltin()
+	manifests, err := adapter.Load()
 	if err != nil {
 		return err
 	}

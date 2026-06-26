@@ -44,7 +44,7 @@ func RunSync(startDir, target string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	manifests, err := adapter.LoadBuiltin()
+	manifests, err := adapter.Load()
 	if err != nil {
 		return nil, err
 	}
