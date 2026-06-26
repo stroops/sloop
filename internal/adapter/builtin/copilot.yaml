@@ -1,9 +1,7 @@
 name: GitHub Copilot CLI
 detect: copilot
 launch: copilot
-outputs:
-  - path: AGENTS.md
-    template: default
+
 context:
   mode: native
   file: ""

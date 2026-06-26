@@ -19,7 +19,7 @@ func TestLoadIncludesBuiltinCursor(t *testing.T) {
 	if !ok {
 		t.Fatalf("cursor built-in missing")
 	}
-	if cursor.Launch != "agent" || len(cursor.Outputs) != 1 || cursor.Outputs[0].Path != "AGENTS.md" {
+	if cursor.Launch != "agent" {
 		t.Fatalf("unexpected cursor manifest: %+v", cursor)
 	}
 }
@@ -32,7 +32,7 @@ func TestLoadUserAdapterOverridesBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Override claude's launch command via a user manifest.
-	custom := "name: My Claude\ndetect: claude\nlaunch: claude-custom\noutputs:\n  - path: CLAUDE.md\n    template: default\n"
+	custom := "name: My Claude\ndetect: claude\nlaunch: claude-custom\n"
 	if err := os.WriteFile(filepath.Join(adaptersDir, "claude.yaml"), []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -14,11 +14,6 @@ import (
 //go:embed builtin/*.yaml
 var builtinFS embed.FS
 
-type Output struct {
-	Path     string `yaml:"path"`
-	Template string `yaml:"template"`
-}
-
 type ContextSpec struct {
 	Mode string `yaml:"mode"` // "pointer" | "native"
 	File string `yaml:"file"` // pointer mode only
@@ -32,7 +27,6 @@ type Manifest struct {
 	Name    string      `yaml:"name"`
 	Detect  string      `yaml:"detect"`
 	Launch  string      `yaml:"launch"`
-	Outputs []Output    `yaml:"outputs"`
 	Context ContextSpec `yaml:"context"`
 	Skills  SkillsSpec  `yaml:"skills"`
 }
@@ -97,15 +91,3 @@ func Load() (map[string]Manifest, error) {
 	return out, nil
 }
 
-// Render returns native-file path -> content. Only the "default" template is
-// supported in Plan 1; it emits the assembled context verbatim.
-func (m Manifest) Render(assembled string) map[string]string {
-	out := map[string]string{}
-	for _, o := range m.Outputs {
-		switch o.Template {
-		default: // "default" and unknown templates fall back to passthrough
-			out[o.Path] = assembled
-		}
-	}
-	return out
-}

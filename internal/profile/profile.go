@@ -8,14 +8,11 @@ import (
 )
 
 type Profile struct {
-	Tool    string   `yaml:"tool"`
-	Context string   `yaml:"context"` // "all" or explicit context filenames are honored in Plan 2
-	Skills  []string `yaml:"skills"`
-	Vault   []string `yaml:"vault"`
+	Tool string `yaml:"tool"`
 }
 
 func Default(tool string) Profile {
-	return Profile{Tool: tool, Context: "all", Skills: []string{}, Vault: []string{}}
+	return Profile{Tool: tool}
 }
 
 func Load(path string) (Profile, error) {
