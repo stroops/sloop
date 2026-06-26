@@ -14,7 +14,7 @@ import (
 	"github.com/stroops/sloop/internal/workspace"
 )
 
-func RunRun(startDir, target string, r runner.Runner) error {
+func RunRun(startDir, target string, extraArgs []string, r runner.Runner) error {
 	ws, err := workspace.Resolve(startDir)
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func RunRun(startDir, target string, r runner.Runner) error {
 		defer store.Close()
 	}
 
-	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch})
+	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch, Args: extraArgs})
 
 	if store != nil && sessID > 0 {
 		_ = store.EndSession(sessID, time.Now())
@@ -112,9 +112,18 @@ func selectRunner(workspace, tool string) runner.Runner {
 var runWorkspace string
 
 var runCmd = &cobra.Command{
-	Use:   "run [tool|profile]",
+	Use:   "run [tool|profile] [-- <args>]",
 	Short: "Sync context and launch an AI tool in the workspace",
-	Args:  cobra.MaximumNArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		n := len(args)
+		if d := cmd.ArgsLenAtDash(); d >= 0 {
+			n = d // only the args before -- count as the tool/profile target
+		}
+		if n > 1 {
+			return fmt.Errorf("accepts at most 1 tool/profile argument before --, got %d", n)
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -124,9 +133,14 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		// Split "<tool> -- <args>": everything after -- is passed through to the tool.
+		positional, passthrough := args, []string(nil)
+		if d := cmd.ArgsLenAtDash(); d >= 0 {
+			positional, passthrough = args[:d], args[d:]
+		}
 		target := ""
-		if len(args) == 1 {
-			target = args[0]
+		if len(positional) == 1 {
+			target = positional[0]
 		}
 		ws, err := workspace.Resolve(startDir)
 		if err != nil {
@@ -139,7 +153,7 @@ var runCmd = &cobra.Command{
 		if target == "" {
 			target = proj.DefaultTool
 		}
-		return RunRun(startDir, target, selectRunner(ws.Name, target))
+		return RunRun(startDir, target, passthrough, selectRunner(ws.Name, target))
 	},
 }
 
