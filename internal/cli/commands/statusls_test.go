@@ -16,8 +16,8 @@ func TestRunStatusShowsWorkspaceAndStale(t *testing.T) {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	out := b.String()
-	if !strings.Contains(out, filepathBase(dir)) || !strings.Contains(out, "sync:") {
-		t.Fatalf("status missing workspace/sync:\n%s", out)
+	if !strings.Contains(out, filepathBase(dir)) || !strings.Contains(out, "skills:") {
+		t.Fatalf("status missing workspace/skills:\n%s", out)
 	}
 }
 

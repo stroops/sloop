@@ -17,9 +17,15 @@ func TestRunInitScaffolds(t *testing.T) {
 		t.Fatalf("RunInit: %v", err)
 	}
 
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatalf("expected AGENTS.md: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".sloop", "context")); !os.IsNotExist(err) {
+		t.Fatalf(".sloop/context should not exist")
+	}
+
 	for _, p := range []string{
 		".sloop/config.yaml",
-		".sloop/context/project.md",
 		".sloop/profiles/claude.yaml",
 		".sloop/.gitignore",
 	} {

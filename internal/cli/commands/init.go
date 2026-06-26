@@ -11,12 +11,9 @@ import (
 	"github.com/stroops/sloop/internal/detect"
 	"github.com/stroops/sloop/internal/profile"
 	"github.com/stroops/sloop/internal/session"
+	syncpkg "github.com/stroops/sloop/internal/sync"
 )
 
-const starterContext = `# Project Context
-
-Describe this project so AI tools start with the right background.
-`
 
 const sloopGitignore = `# Local, machine-specific caches
 cache/
@@ -25,7 +22,7 @@ cache/
 
 func RunInit(dir string) error {
 	sloopDir := filepath.Join(dir, config.SloopDirName)
-	for _, sub := range []string{"context", "skills", "vault", "profiles"} {
+	for _, sub := range []string{"skills", "vault", "profiles"} {
 		if err := os.MkdirAll(filepath.Join(sloopDir, sub), 0o755); err != nil {
 			return err
 		}
@@ -52,8 +49,7 @@ func RunInit(dir string) error {
 		return err
 	}
 
-	if err := os.WriteFile(filepath.Join(sloopDir, "context", "project.md"),
-		[]byte(starterContext), 0o644); err != nil {
+	if _, err := syncpkg.EnsureAgents(dir); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(sloopDir, ".gitignore"),

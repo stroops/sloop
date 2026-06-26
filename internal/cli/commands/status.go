@@ -23,27 +23,17 @@ func RunStatus(startDir string, w io.Writer) error {
 		return err
 	}
 	tool := proj.DefaultTool
-	prof, err := resolveProfile(ws.SloopDir(), tool, proj.DefaultTool)
-	if err != nil {
-		return err
-	}
 	manifests, err := adapter.Load()
 	if err != nil {
 		return err
 	}
-	sync := "unknown"
-	if m, ok := manifests[prof.Tool]; ok {
-		stale, err := syncpkg.Stale(ws.Root, ws.SloopDir(), m, prof)
-		if err != nil {
-			return err
-		}
-		if stale {
-			sync = "stale"
-		} else {
-			sync = "fresh"
-		}
-	}
-	fmt.Fprintf(w, "⚓ %s · %s · sync:%s\n", ws.Name, tool, sync)
+	m := manifests[tool]
+	fmt.Fprintf(w, "⚓ %s · %s · agents:%s · ctx:%s · skills:%s\n",
+		ws.Name, tool,
+		syncpkg.AgentsState(ws.Root),
+		syncpkg.ContextState(ws.Root, m),
+		syncpkg.SkillsState(ws.Root, ws.SloopDir(), m),
+	)
 	return nil
 }
 

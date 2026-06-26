@@ -29,8 +29,7 @@ func resolveProfile(sloopDir, target, defaultTool string) (profile.Profile, erro
 	return profile.Default(target), nil
 }
 
-// RunSync resolves the workspace + profile and writes native files. Returns the
-// written paths.
+// RunSync resolves the workspace + profile and synchronizes v2 context.
 func RunSync(startDir, target string) ([]string, error) {
 	ws, err := workspace.Resolve(startDir)
 	if err != nil {
@@ -52,11 +51,32 @@ func RunSync(startDir, target string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown tool %q (no adapter)", prof.Tool)
 	}
-	assembled, err := syncpkg.Assemble(ws.SloopDir(), prof)
-	if err != nil {
+
+	var log []string
+	if a, err := syncpkg.EnsureAgents(ws.Root); err != nil {
 		return nil, err
+	} else if a == syncpkg.ActionCreated {
+		log = append(log, "created AGENTS.md")
 	}
-	return syncpkg.WriteNativeFiles(ws.Root, m, assembled)
+	switch a, err := syncpkg.SyncContext(ws.Root, m); {
+	case err != nil:
+		return nil, err
+	case a == syncpkg.ActionCreated:
+		log = append(log, "created "+m.Context.File)
+	case a == syncpkg.ActionForeign:
+		log = append(log, m.Context.File+" exists, left as-is")
+	}
+	switch a, err := syncpkg.SyncSkills(ws.Root, ws.SloopDir(), m); {
+	case err != nil:
+		return nil, err
+	case a == syncpkg.ActionLinked:
+		log = append(log, "linked "+m.Skills.Target)
+	case a == syncpkg.ActionCopied:
+		log = append(log, "copied skills to "+m.Skills.Target)
+	case a == syncpkg.ActionForeign:
+		log = append(log, m.Skills.Target+" exists, left as-is")
+	}
+	return log, nil
 }
 
 var syncWorkspace string
