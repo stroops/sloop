@@ -114,3 +114,43 @@ func TestSyncSkillsNoTarget(t *testing.T) {
 		t.Fatalf("no target = %v, %v", a, err)
 	}
 }
+
+func TestSyncSkillsRelativeLink(t *testing.T) {
+	root := t.TempDir()
+	sloopDir := filepath.Join(root, ".sloop")
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := adapter.Manifest{Skills: adapter.SkillsSpec{Target: ".claude/skills"}}
+	if a, err := SyncSkills(root, sloopDir, m); err != nil || a != ActionLinked {
+		t.Fatalf("link = %v, %v", a, err)
+	}
+	dst, err := os.Readlink(filepath.Join(root, ".claude", "skills"))
+	if err != nil || dst != filepath.Join("..", ".sloop", "skills") {
+		t.Fatalf("want relative ../.sloop/skills, got %q (%v)", dst, err)
+	}
+}
+
+func TestSyncSkillsHealsLegacyAbsoluteLink(t *testing.T) {
+	root := t.TempDir()
+	sloopDir := filepath.Join(root, ".sloop")
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, ".claude", "skills")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a pre-hardening absolute symlink.
+	if err := os.Symlink(filepath.Join(sloopDir, "skills"), link); err != nil {
+		t.Fatal(err)
+	}
+	m := adapter.Manifest{Skills: adapter.SkillsSpec{Target: ".claude/skills"}}
+	if a, err := SyncSkills(root, sloopDir, m); err != nil || a != ActionRelinked {
+		t.Fatalf("relink = %v, %v", a, err)
+	}
+	dst, _ := os.Readlink(link)
+	if dst != filepath.Join("..", ".sloop", "skills") {
+		t.Fatalf("want relative after heal, got %q", dst)
+	}
+}

@@ -36,18 +36,18 @@ func SkillsState(root, sloopDir string, m adapter.Manifest) string {
 	if m.Skills.Target == "" {
 		return "none"
 	}
-	target := filepath.Join(root, m.Skills.Target)
-	fi, err := os.Lstat(target)
-	if os.IsNotExist(err) {
-		return "missing"
-	}
+	link, source, rel := skillsPaths(root, sloopDir, m.Skills.Target)
+	fi, err := os.Lstat(link)
 	if err != nil {
 		return "missing"
 	}
-	if fi.Mode()&os.ModeSymlink != 0 {
-		if dst, _ := os.Readlink(target); dst == filepath.Join(sloopDir, "skills") {
+	if fi.Mode()&os.ModeSymlink != 0 && isOurLink(readlink(link), source, rel) {
+		if _, err := os.Stat(link); err == nil {
 			return "linked"
 		}
+		return "broken"
 	}
 	return "present"
 }
+
+func readlink(p string) string { d, _ := os.Readlink(p); return d }

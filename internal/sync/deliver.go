@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/stroops/sloop/internal/adapter"
+	"github.com/stroops/sloop/internal/config"
 )
 
 type Action string
@@ -18,7 +19,26 @@ const (
 	ActionLinked  Action = "linked"
 	ActionCopied  Action = "copied"
 	ActionNone    Action = "none"
+	ActionBroken   Action = "broken"
+	ActionRelinked Action = "relinked"
 )
+
+// skillsPaths returns the link path, the absolute skills source, and the
+// relative form used as the symlink target.
+func skillsPaths(root, sloopDir, manifestTarget string) (link, source, rel string) {
+	link = filepath.Join(root, manifestTarget)
+	source = filepath.Join(sloopDir, "skills")
+	rel, _ = filepath.Rel(filepath.Dir(link), source)
+	return
+}
+
+// isOurLink reports whether a readlink destination is one sloop created:
+// the canonical relative form, the legacy absolute source, or any
+// "<...>/.sloop/skills" path.
+func isOurLink(dst, source, rel string) bool {
+	return dst == rel || dst == source ||
+		(filepath.Base(dst) == "skills" && filepath.Base(filepath.Dir(dst)) == config.SloopDirName)
+}
 
 const agentsStarter = `# AGENTS.md
 
@@ -81,31 +101,46 @@ func SyncSkills(root, sloopDir string, m adapter.Manifest) (Action, error) {
 	if m.Skills.Target == "" {
 		return ActionNone, nil
 	}
-	source := filepath.Join(sloopDir, "skills")
-	target := filepath.Join(root, m.Skills.Target)
+	link, source, rel := skillsPaths(root, sloopDir, m.Skills.Target)
 
-	if fi, err := os.Lstat(target); err == nil {
+	if fi, err := os.Lstat(link); err == nil {
 		if fi.Mode()&os.ModeSymlink != 0 {
-			if dst, _ := os.Readlink(target); dst == source {
+			dst, _ := os.Readlink(link)
+			_, statErr := os.Stat(link) // resolves through the link
+			switch {
+			case dst == rel && statErr == nil:
 				return ActionSkipped, nil
+			case isOurLink(dst, source, rel) && statErr == nil:
+				if err := relink(link, rel); err != nil {
+					return ActionSkipped, err
+				}
+				return ActionRelinked, nil
+			case isOurLink(dst, source, rel):
+				return ActionBroken, nil // our link, destination gone
 			}
 		}
-		return ActionForeign, nil // real file/dir or foreign symlink: leave it
+		return ActionForeign, nil // real dir/file or a foreign symlink
 	} else if !os.IsNotExist(err) {
 		return ActionSkipped, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		return ActionSkipped, err
 	}
-	if err := symlinkFunc(source, target); err == nil {
+	if err := symlinkFunc(rel, link); err == nil {
 		return ActionLinked, nil
 	}
-	// Fallback: copy.
-	if err := copyDir(source, target); err != nil {
+	if err := copyDir(source, link); err != nil {
 		return ActionSkipped, err
 	}
 	return ActionCopied, nil
+}
+
+func relink(link, rel string) error {
+	if err := os.Remove(link); err != nil {
+		return err
+	}
+	return symlinkFunc(rel, link)
 }
 
 func copyDir(src, dst string) error {
