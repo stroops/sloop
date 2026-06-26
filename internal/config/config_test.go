@@ -11,9 +11,6 @@ func TestSaveAndLoadProject(t *testing.T) {
 	if err := SaveProject(dir, p); err != nil {
 		t.Fatalf("SaveProject: %v", err)
 	}
-	if _, err := filepath.Glob(filepath.Join(dir, "config.yaml")); err != nil {
-		t.Fatalf("glob: %v", err)
-	}
 	got, err := LoadProject(dir)
 	if err != nil {
 		t.Fatalf("LoadProject: %v", err)

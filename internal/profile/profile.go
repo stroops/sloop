@@ -15,7 +15,7 @@ type Profile struct {
 }
 
 func Default(tool string) Profile {
-	return Profile{Tool: tool, Context: "all"}
+	return Profile{Tool: tool, Context: "all", Skills: []string{}, Vault: []string{}}
 }
 
 func Load(path string) (Profile, error) {
