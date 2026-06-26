@@ -1,0 +1,12 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["sprint/**", "main"]
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: "Build all areas regardless of changed paths"
+        type: boolean
+        default: false

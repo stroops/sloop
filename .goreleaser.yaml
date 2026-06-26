@@ -1,0 +1,60 @@
+# .goreleaser.yaml
+version: 2
+
+builds:
+  - id: sloop
+    main: ./cmd/sloop
+    binary: sloop
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+  - id: sloopd
+    main: ./cmd/sloopd
+    binary: sloopd
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: sloop
+    builds: [sloop]
+    name_template: "sloop_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: sloopd
+    builds: [sloopd]
+    name_template: "sloopd_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+homebrew_casks:
+  - name: sloop
+    homepage: "https://github.com/stroops/sloop"
+    description: "AI-native terminal workspace manager"
+    repository:
+      owner: stroops
+      name: homebrew-sloop
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
