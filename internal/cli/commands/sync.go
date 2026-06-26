@@ -59,6 +59,8 @@ func RunSync(startDir, target string) ([]string, error) {
 	return syncpkg.WriteNativeFiles(ws.Root, m, assembled)
 }
 
+var syncWorkspace string
+
 var syncCmd = &cobra.Command{
 	Use:   "sync [tool|profile]",
 	Short: "Regenerate native context files from .sloop",
@@ -68,11 +70,15 @@ var syncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		startDir, err := resolveStartDir(cwd, syncWorkspace)
+		if err != nil {
+			return err
+		}
 		target := ""
 		if len(args) == 1 {
 			target = args[0]
 		}
-		written, err := RunSync(cwd, target)
+		written, err := RunSync(startDir, target)
 		if err != nil {
 			return err
 		}
@@ -83,4 +89,7 @@ var syncCmd = &cobra.Command{
 	},
 }
 
-func RegisterSync(cmd *cobra.Command) { cmd.AddCommand(syncCmd) }
+func RegisterSync(cmd *cobra.Command) {
+	syncCmd.Flags().StringVarP(&syncWorkspace, "workspace", "w", "", "target a registered workspace by name")
+	cmd.AddCommand(syncCmd)
+}

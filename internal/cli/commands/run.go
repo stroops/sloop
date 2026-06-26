@@ -79,6 +79,38 @@ func recordSessionBestEffort(ws *workspace.Workspace, tool, profileName string) 
 	return id, store
 }
 
+// resolveStartDir maps an optional -w workspace name to a directory via the
+// registry; with no flag it returns cwd unchanged.
+func resolveStartDir(cwd, workspaceFlag string) (string, error) {
+	if workspaceFlag == "" {
+		return cwd, nil
+	}
+	dbPath, err := config.GlobalDBPath()
+	if err != nil {
+		return "", err
+	}
+	store, err := session.Open(dbPath)
+	if err != nil {
+		return "", err
+	}
+	defer store.Close()
+	ws, err := store.WorkspaceByName(workspaceFlag)
+	if err != nil {
+		return "", fmt.Errorf("workspace %q not found in registry: %w", workspaceFlag, err)
+	}
+	return ws.Path, nil
+}
+
+// selectRunner returns a tmux-backed runner when tmux is available, else exec.
+func selectRunner(workspace, tool string) runner.Runner {
+	if runner.TmuxAvailable() {
+		return runner.TmuxRunner{Session: runner.TmuxSessionName(workspace, tool)}
+	}
+	return runner.ExecRunner{}
+}
+
+var runWorkspace string
+
 var runCmd = &cobra.Command{
 	Use:   "run [tool|profile]",
 	Short: "Sync context and launch an AI tool in the workspace",
@@ -88,12 +120,30 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		startDir, err := resolveStartDir(cwd, runWorkspace)
+		if err != nil {
+			return err
+		}
 		target := ""
 		if len(args) == 1 {
 			target = args[0]
 		}
-		return RunRun(cwd, target, runner.ExecRunner{})
+		ws, err := workspace.Resolve(startDir)
+		if err != nil {
+			return err
+		}
+		proj, err := config.LoadProject(ws.SloopDir())
+		if err != nil {
+			return err
+		}
+		if target == "" {
+			target = proj.DefaultTool
+		}
+		return RunRun(startDir, target, selectRunner(ws.Name, target))
 	},
 }
 
-func RegisterRun(cmd *cobra.Command) { cmd.AddCommand(runCmd) }
+func RegisterRun(cmd *cobra.Command) {
+	runCmd.Flags().StringVarP(&runWorkspace, "workspace", "w", "", "target a registered workspace by name")
+	cmd.AddCommand(runCmd)
+}
