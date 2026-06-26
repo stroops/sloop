@@ -4,9 +4,17 @@ on:
   pull_request:
   push:
     branches: ["sprint/**", "main"]
-  workflow_dispatch:
-    inputs:
-      build_all:
-        description: "Build all areas regardless of changed paths"
-        type: boolean
-        default: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          
+      - name: Run Tests
+        run: go test -v -race ./...
