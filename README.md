@@ -81,6 +81,7 @@ sloop attach <name>                    # attach a tmux session (if tmux present)
 sloop tools                            # list adapters + install status
 sloop doctor                           # environment health check
 sloop status                           # one-line Sloop statusline
+sloop skill new <name>                 # scaffold a reusable skill in .sloop/skills
 ```
 
 ---
