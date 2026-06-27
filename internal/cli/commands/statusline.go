@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/tmux"
 )
@@ -39,7 +40,8 @@ func renderStatusline(session string) string {
 	if m, ok := fleetstate.Read(session); ok {
 		st = stateToStatus(m.Status)
 	} else if out, err := tmux.Output(tmux.BuildCaptureArgs(session)...); err == nil {
-		st = tmux.ClassifyStatus(string(out))
+		manifests, _ := adapter.Load()
+		st = tmux.ClassifyStatus(string(out), manifests[tool])
 	}
 	return fmt.Sprintf("⚓ %s %s %s", ws, tool, tmuxStatusLabel(st))
 }

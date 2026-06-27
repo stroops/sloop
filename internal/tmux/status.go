@@ -3,6 +3,8 @@ package tmux
 import (
 	"regexp"
 	"strings"
+
+	"github.com/stroops/sloop/internal/adapter"
 )
 
 // AgentStatus is a best-effort classification of what an AI session is doing,
@@ -67,19 +69,19 @@ const spinnerRunes = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷◐�
 // ClassifyStatus inspects the tail of a captured pane and returns a best-effort
 // status. Waiting (needs you) takes precedence over working, which takes
 // precedence over idle. Empty input is StatusUnknown.
-func ClassifyStatus(pane string) AgentStatus {
+func ClassifyStatus(pane string, manifest adapter.Manifest) AgentStatus {
 	tail := lastLines(pane, statusScanLines)
 	if tail == "" {
 		return StatusUnknown
 	}
 	low := strings.ToLower(tail)
-	for _, m := range waitingMarkers {
-		if strings.Contains(low, m) {
+	for _, m := range append(waitingMarkers, manifest.Heuristics.Waiting...) {
+		if strings.Contains(low, strings.ToLower(m)) {
 			return StatusWaiting
 		}
 	}
-	for _, m := range workingMarkers {
-		if strings.Contains(low, m) {
+	for _, m := range append(workingMarkers, manifest.Heuristics.Working...) {
+		if strings.Contains(low, strings.ToLower(m)) {
 			return StatusWorking
 		}
 	}

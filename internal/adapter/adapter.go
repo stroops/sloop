@@ -42,6 +42,14 @@ type HooksSpec struct {
 	Events  HookEvents `yaml:"events"`
 }
 
+// HeuristicsSpec defines fallback text-matching rules to classify agent status
+// when native hooks aren't available. In the future, this could be extended
+// with LLM prompts for deeper "AI awareness" of the session state.
+type HeuristicsSpec struct {
+	Working []string `yaml:"working"`
+	Waiting []string `yaml:"waiting"`
+}
+
 type Manifest struct {
 	Name string `yaml:"name"`
 	// Detect is the binary name used to detect installation; Launch is the
@@ -51,6 +59,8 @@ type Manifest struct {
 	Context ContextSpec `yaml:"context"`
 	Skills  SkillsSpec  `yaml:"skills"`
 	Hooks   HooksSpec   `yaml:"hooks"`
+	// Fallback text-parsing rules for status (paving the way for AI-driven awareness)
+	Heuristics HeuristicsSpec `yaml:"heuristics"`
 	// Scaffold lists the tool's standard project dirs that `sloop init --scaffold`
 	// can create (e.g. .claude/skills, .cursor/rules), so users start from the
 	// provider's expected layout instead of an ad-hoc one.

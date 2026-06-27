@@ -19,6 +19,7 @@ import (
 	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/hints"
 	"github.com/stroops/sloop/internal/session"
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
 )
@@ -115,7 +116,7 @@ const captureTimeout = 2 * time.Second
 // writes a distinct index, so no locking is needed, and each capture is bounded
 // by captureTimeout so a stuck pane can't block. When a fresh hook-written
 // marker exists for a session it overrides the pane heuristic (authoritative).
-func enrichGlances(rows []FleetRow) []FleetRow {
+func enrichGlances(rows []FleetRow, manifests map[string]adapter.Manifest) []FleetRow {
 	var wg sync.WaitGroup
 	for i := range rows {
 		wg.Add(1)
@@ -129,7 +130,7 @@ func enrichGlances(rows []FleetRow) []FleetRow {
 			out, err := tmux.OutputContext(ctx, tmux.BuildCaptureArgs(rows[i].Name)...)
 			if err == nil {
 				rows[i].Glance = truncate(tmux.LastNonEmptyLine(string(out)), 72)
-				rows[i].Status = tmux.ClassifyStatus(string(out))
+				rows[i].Status = tmux.ClassifyStatus(string(out), manifests[rows[i].Tool])
 			}
 			if hasMarker {
 				rows[i].Status = stateToStatus(marker.Status)
@@ -369,7 +370,8 @@ var psCmd = &cobra.Command{
 			return runWatch(cmd.OutOrStdout(), psInterval, psWaiting, psNotify)
 		}
 
-		rows = enrichGlances(rows)
+		manifests, _ := adapter.Load()
+		rows = enrichGlances(rows, manifests)
 		sortNeedsAttention(rows)
 		paths := registryPaths()
 		annotatePaths(rows, paths)
@@ -581,7 +583,8 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 	}
 	var prev []FleetRow
 	for {
-		rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())))
+		manifests, _ := adapter.Load()
+		rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
 		sortNeedsAttention(rows)
 
 		shown := rows

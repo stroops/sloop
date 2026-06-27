@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/tmux"
 )
 
@@ -73,9 +74,10 @@ func RunKill(w io.Writer, in io.Reader, targets []string, all, waiting, yes bool
 	if !tmux.Available() {
 		return nil, fmt.Errorf("tmux is not installed; `sloop kill` needs tmux")
 	}
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
-	if waiting {
-		rows = enrichGlances(rows) // need status to find who's waiting
+	manifests, _ := adapter.Load()
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	if len(rows) == 0 {
+		rows = enrichGlances(rows, manifests) // need status to find who's waiting
 	}
 	victims, err := selectSessions(rows, targets, all, waiting)
 	if err != nil {

@@ -18,3 +18,11 @@ hooks:
     working: UserPromptSubmit
     waiting: Notification
     idle: Stop
+heuristics:
+  waiting:
+    - "(y/n)"
+    - "approve"
+    - "press enter"
+  working:
+    - "running command"
+    - "reading file"

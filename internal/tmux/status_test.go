@@ -1,6 +1,10 @@
 package tmux
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stroops/sloop/internal/adapter"
+)
 
 func TestClassifyStatus(t *testing.T) {
 	cases := []struct {
@@ -23,7 +27,7 @@ func TestClassifyStatus(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := ClassifyStatus(c.pane); got != c.want {
+			if got := ClassifyStatus(c.pane, adapter.Manifest{}); got != c.want {
 				t.Fatalf("ClassifyStatus(%q) = %v, want %v", c.pane, got, c.want)
 			}
 		})
