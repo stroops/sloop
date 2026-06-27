@@ -44,7 +44,7 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 	if err != nil {
 		return -1, 0, err
 	}
-	defer term.Restore(fd, oldState)
+	defer func() { _ = term.Restore(fd, oldState) }()
 
 	fmt.Print("\033[?25l")       // hide cursor
 	defer fmt.Print("\033[?25h") // restore cursor

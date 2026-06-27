@@ -32,7 +32,7 @@ func RunStatus(startDir string, w io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(w, "⚓ %s  %s\n", tui.Bold(ws.Name), tui.Grey(ws.Root))
+	_, _ = fmt.Fprintf(w, "⚓ %s  %s\n", tui.Bold(ws.Name), tui.Grey(ws.Root))
 
 	// tools (default marked) + which auto-install hooks + which have skills linked.
 	var tools, autoHooks, linked []string
@@ -50,11 +50,11 @@ func RunStatus(startDir string, w io.Writer) error {
 			linked = append(linked, t)
 		}
 	}
-	fmt.Fprintf(w, "  tools:    %s  %s\n", strings.Join(tools, ", "), tui.Grey("(* default)"))
+	_, _ = fmt.Fprintf(w, "  tools:    %s  %s\n", strings.Join(tools, ", "), tui.Grey("(* default)"))
 
 	// context: AGENTS.md + the default tool's pointer state.
 	dm := manifests[proj.DefaultTool]
-	fmt.Fprintf(w, "  context:  AGENTS.md %s · %s %s\n",
+	_, _ = fmt.Fprintf(w, "  context:  AGENTS.md %s · %s %s\n",
 		stateMark(syncpkg.AgentsState(ws.Root)),
 		ctxName(dm), stateMark(syncpkg.ContextState(ws.Root, dm)))
 
@@ -63,14 +63,14 @@ func RunStatus(startDir string, w io.Writer) error {
 	if len(linked) > 0 {
 		linkedStr = strings.Join(linked, ", ")
 	}
-	fmt.Fprintf(w, "  skills:   %d in .sloop/skills · linked: %s\n", skillCount(ws.SloopDir()), linkedStr)
+	_, _ = fmt.Fprintf(w, "  skills:   %d in .sloop/skills · linked: %s\n", skillCount(ws.SloopDir()), linkedStr)
 
 	// hooks.
 	hooksStr := tui.Grey("none installed")
 	if len(autoHooks) > 0 {
 		hooksStr = "auto: " + strings.Join(autoHooks, ", ")
 	}
-	fmt.Fprintf(w, "  hooks:    %s  %s\n", hooksStr, tui.Grey("(sloop hooks list)"))
+	_, _ = fmt.Fprintf(w, "  hooks:    %s  %s\n", hooksStr, tui.Grey("(sloop hooks list)"))
 
 	// running sessions (best-effort; needs tmux).
 	if tmux.Available() {
@@ -80,7 +80,7 @@ func RunStatus(startDir string, w io.Writer) error {
 				n++
 			}
 		}
-		fmt.Fprintf(w, "  running:  %d sessions  %s\n", n, tui.Grey("(sloop ps)"))
+		_, _ = fmt.Fprintf(w, "  running:  %d sessions  %s\n", n, tui.Grey("(sloop ps)"))
 	}
 	return nil
 }

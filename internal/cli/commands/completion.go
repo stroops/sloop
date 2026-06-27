@@ -44,7 +44,7 @@ func workspaceNames() []string {
 	if err != nil {
 		return nil
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	wss, err := store.ListWorkspaces()
 	if err != nil {
 		return nil

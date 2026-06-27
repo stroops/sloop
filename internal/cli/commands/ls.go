@@ -20,15 +20,15 @@ func RunLs(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	workspaces, err := store.ListWorkspaces()
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(w, "Workspaces:")
+	_, _ = fmt.Fprintln(w, "Workspaces:")
 	for _, ws := range workspaces {
-		fmt.Fprintf(w, "  %-16s %s\n", ws.Name, ws.Path)
+		_, _ = fmt.Fprintf(w, "  %-16s %s\n", ws.Name, ws.Path)
 	}
 
 	sessions, err := store.ListSessions(10)
@@ -36,9 +36,9 @@ func RunLs(w io.Writer) error {
 		return err
 	}
 	if len(sessions) > 0 {
-		fmt.Fprintln(w, "Recent sessions:")
+		_, _ = fmt.Fprintln(w, "Recent sessions:")
 		for _, s := range sessions {
-			fmt.Fprintf(w, "  %s  tool=%s  %s\n", s.StartedAt.Format("2006-01-02 15:04"), s.Tool, s.Cwd)
+			_, _ = fmt.Fprintf(w, "  %s  tool=%s  %s\n", s.StartedAt.Format("2006-01-02 15:04"), s.Tool, s.Cwd)
 		}
 	}
 	return nil
@@ -56,14 +56,14 @@ var lsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		defer store.Close()
+		defer func() { _ = store.Close() }()
 
 		workspaces, err := store.ListWorkspaces()
 		if err != nil {
 			return err
 		}
 		if len(workspaces) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "No workspaces found.")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No workspaces found.")
 			return nil
 		}
 

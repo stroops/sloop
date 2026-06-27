@@ -103,7 +103,7 @@ func RunInit(dir string, scan bool) ([]string, error) {
 	if err != nil {
 		return summary, err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return summary, err

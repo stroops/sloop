@@ -16,7 +16,7 @@ var killFunc = tmux.Kill
 
 // confirm prints prompt and returns true only on y/yes.
 func confirm(w io.Writer, in io.Reader, prompt string) bool {
-	fmt.Fprint(w, prompt)
+	_, _ = fmt.Fprint(w, prompt)
 	line, _ := bufio.NewReader(in).ReadString('\n')
 	line = strings.ToLower(strings.TrimSpace(line))
 	return line == "y" || line == "yes"
@@ -24,7 +24,7 @@ func confirm(w io.Writer, in io.Reader, prompt string) bool {
 
 // promptLine prints prompt and returns the entered line (trimmed).
 func promptLine(w io.Writer, in io.Reader, prompt string) string {
-	fmt.Fprint(w, prompt)
+	_, _ = fmt.Fprint(w, prompt)
 	line, _ := bufio.NewReader(in).ReadString('\n')
 	return strings.TrimSpace(line)
 }

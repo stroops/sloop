@@ -69,7 +69,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP("auto", "y", false, "assume yes / run automatically without prompts")
 	rootCmd.PersistentFlags().Bool("no-input", false, "never prompt; fail instead of asking")
 
-	viper.BindPFlag("no_color", rootCmd.PersistentFlags().Lookup("no-color"))
+	_ = viper.BindPFlag("no_color", rootCmd.PersistentFlags().Lookup("no-color"))
 
 	// Auto-register commands
 	commands.Register(rootCmd)
@@ -89,7 +89,7 @@ func initConfig() {
 
 		// create ~/.sloop if not exists
 		if _, err := os.Stat(configDir); os.IsNotExist(err) {
-			os.MkdirAll(configDir, 0700)
+			_ = os.MkdirAll(configDir, 0700)
 		}
 	}
 

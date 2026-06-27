@@ -187,7 +187,7 @@ func Show(w io.Writer, context string) {
 	if !ok {
 		return
 	}
-	fmt.Fprintln(w, tui.Grey("💡 "+h.Localized(Lang())))
+	_, _ = fmt.Fprintln(w, tui.Grey("💡 "+h.Localized(Lang())))
 	st.Last = now.Unix()
 	st.Shown[h.ID] = now.Unix()
 	saveState(st)

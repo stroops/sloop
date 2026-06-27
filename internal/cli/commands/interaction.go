@@ -32,7 +32,7 @@ func (i Interaction) Confirm(prompt string, in io.Reader, out io.Writer) (bool, 
 	if i.NoInput {
 		return false, fmt.Errorf("%s (refusing to prompt under --no-input)", prompt)
 	}
-	fmt.Fprintf(out, "%s [y/N]: ", prompt)
+	_, _ = fmt.Fprintf(out, "%s [y/N]: ", prompt)
 	line, _ := bufio.NewReader(in).ReadString('\n')
 	line = strings.TrimSpace(strings.ToLower(line))
 	return line == "y" || line == "yes", nil

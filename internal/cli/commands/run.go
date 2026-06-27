@@ -47,7 +47,7 @@ func RunRun(startDir, target string, extraArgs []string, r runner.Runner) error 
 	// Record session (best-effort: never block the launch).
 	sessID, store := recordSessionBestEffort(ws, tool, target)
 	if store != nil {
-		defer store.Close()
+		defer func() { _ = store.Close() }()
 	}
 
 	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch, Args: extraArgs})
@@ -69,14 +69,14 @@ func recordSessionBestEffort(ws *workspace.Workspace, tool, profileName string) 
 	}
 	w, err := store.RegisterWorkspace(ws.Name, ws.Root)
 	if err != nil {
-		store.Close()
+		_ = store.Close()
 		return 0, nil
 	}
 	id, err := store.RecordSession(session.Session{
 		WorkspaceID: w.ID, Tool: tool, Profile: profileName, Cwd: ws.Root, StartedAt: time.Now(),
 	})
 	if err != nil {
-		store.Close()
+		_ = store.Close()
 		return 0, nil
 	}
 	return id, store
@@ -96,7 +96,7 @@ func resolveStartDir(cwd, workspaceFlag string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	ws, err := store.WorkspaceByName(workspaceFlag)
 	if err != nil {
 		return "", fmt.Errorf("workspace %q not found in registry: %w", workspaceFlag, err)

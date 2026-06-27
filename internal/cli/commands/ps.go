@@ -47,7 +47,7 @@ func registryPaths() map[string]string {
 	if err != nil {
 		return nil
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	wss, err := store.ListWorkspaces()
 	if err != nil {
 		return nil
@@ -199,7 +199,7 @@ func truncate(s string, n int) string {
 
 func RunPs(w io.Writer, rows []FleetRow) error {
 	if len(rows) == 0 {
-		fmt.Fprintln(w, "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
+		_, _ = fmt.Fprintln(w, "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
 		return nil
 	}
 	waiting := 0
@@ -212,15 +212,15 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 	if waiting > 0 {
 		header += fmt.Sprintf(", %d waiting on you", waiting)
 	}
-	fmt.Fprintf(w, "%s\n\n", header)
+	_, _ = fmt.Fprintf(w, "%s\n\n", header)
 	for i, r := range rows {
-		fmt.Fprintf(w, "  %-3d %-16s %-9s %s · %s\n",
+		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-9s %s · %s\n",
 			i+1, r.Workspace, r.Tool, stateLabel(r), humanizeSince(r.Activity))
 		if r.Glance != "" {
-			fmt.Fprintf(w, "      └ %s\n", r.Glance)
+			_, _ = fmt.Fprintf(w, "      └ %s\n", r.Glance)
 		}
 	}
-	fmt.Fprintf(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"   ·   %s\n", tmux.DetachLine())
+	_, _ = fmt.Fprintf(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"   ·   %s\n", tmux.DetachLine())
 	return nil
 }
 
@@ -305,11 +305,11 @@ func runPsAll(w io.Writer, rows []FleetRow, paths map[string]string) error {
 	if len(idle) == 0 {
 		return nil
 	}
-	fmt.Fprintf(w, "\nKnown workspaces (not running):\n")
+	_, _ = fmt.Fprintf(w, "\nKnown workspaces (not running):\n")
 	for _, name := range idle {
-		fmt.Fprintf(w, "  ○ %-16s %s\n", name, paths[name])
+		_, _ = fmt.Fprintf(w, "  ○ %-16s %s\n", name, paths[name])
 	}
-	fmt.Fprintln(w, "\nstart one: sloop run -w <name>")
+	_, _ = fmt.Fprintln(w, "\nstart one: sloop run -w <name>")
 	return nil
 }
 
@@ -342,14 +342,14 @@ var psCmd = &cobra.Command{
 		}
 
 		if len(rows) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces).")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces).")
 			return nil
 		}
 
 		if psWaiting {
 			rows = filterWaiting(rows)
 			if len(rows) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "⚓ No agents waiting on you.")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "⚓ No agents waiting on you.")
 				return nil
 			}
 		}
@@ -491,16 +491,16 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 			shown = filterWaiting(rows)
 		}
 
-		fmt.Fprint(w, "\033[H\033[2J") // home + clear screen
+		_, _ = fmt.Fprint(w, "\033[H\033[2J") // home + clear screen
 		if waitingOnly && len(shown) == 0 {
-			fmt.Fprintln(w, "⚓ No agents waiting on you.")
+			_, _ = fmt.Fprintln(w, "⚓ No agents waiting on you.")
 		} else {
 			_ = RunPs(w, shown)
 		}
-		fmt.Fprintf(w, "\nwatching every %s · Ctrl-C to stop\n", interval)
+		_, _ = fmt.Fprintf(w, "\nwatching every %s · Ctrl-C to stop\n", interval)
 
 		for _, name := range newlyWaiting(prev, rows) {
-			fmt.Fprint(w, "\a") // bell
+			_, _ = fmt.Fprint(w, "\a") // bell
 			if notify {
 				osNotify("sloop", name+" is waiting on you")
 			}

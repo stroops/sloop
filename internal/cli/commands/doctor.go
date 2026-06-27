@@ -12,7 +12,7 @@ import (
 )
 
 func RunDoctor(w io.Writer) error {
-	fmt.Fprintln(w, "Tools:")
+	_, _ = fmt.Fprintln(w, "Tools:")
 	manifests, err := adapter.Load()
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func RunDoctor(w io.Writer) error {
 				extra = " " + s.Version
 			}
 		}
-		fmt.Fprintf(w, "  %s %s%s\n", mark, s.Key, extra)
+		_, _ = fmt.Fprintf(w, "  %s %s%s\n", mark, s.Key, extra)
 	}
 
 	tmux := detect.Tmux()
@@ -34,13 +34,13 @@ func RunDoctor(w io.Writer) error {
 	if tmux.Installed {
 		mark = "✓ " + tmux.Version
 	}
-	fmt.Fprintf(w, "tmux: %s\n", mark)
+	_, _ = fmt.Fprintf(w, "tmux: %s\n", mark)
 
 	g, err := config.LoadGlobal()
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(w, "mode: %s\n", g.Mode)
+	_, _ = fmt.Fprintf(w, "mode: %s\n", g.Mode)
 	return nil
 }
 

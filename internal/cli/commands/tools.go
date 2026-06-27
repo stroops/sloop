@@ -19,7 +19,7 @@ func RunTools(w io.Writer) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "KEY\tNAME\tINSTALLED\tCONTEXT\tSKILLS\tHOOKS")
+	_, _ = fmt.Fprintln(tw, "KEY\tNAME\tINSTALLED\tCONTEXT\tSKILLS\tHOOKS")
 	for _, s := range detect.Tools(manifests) {
 		status := "missing"
 		if s.Installed {
@@ -29,7 +29,7 @@ func RunTools(w io.Writer) error {
 			}
 		}
 		m := manifests[s.Key]
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			s.Key, s.Name, status, contextLabel(m), skillsLabel(m), hooksLabel(m))
 	}
 	return tw.Flush()

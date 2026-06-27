@@ -12,7 +12,7 @@ func newTestStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 
@@ -78,14 +78,14 @@ func TestMigrationsSetUserVersionAndReopen(t *testing.T) {
 	if mode != "wal" {
 		t.Fatalf("journal_mode = %q, want wal", mode)
 	}
-	s.Close()
+	_ = s.Close()
 
 	// Reopen is a no-op (no pending migrations) and still works.
 	s2, err := Open(path)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer s2.Close()
+	defer func() { _ = s2.Close() }()
 	if _, err := s2.RegisterWorkspace("w", t.TempDir()); err != nil {
 		t.Fatalf("use after reopen: %v", err)
 	}

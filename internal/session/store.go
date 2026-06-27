@@ -51,7 +51,7 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	if err := migrate(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return &Store{db: db}, nil
@@ -70,12 +70,12 @@ func migrate(db *sql.DB) error {
 			return err
 		}
 		if _, err := tx.Exec(migrations[i]); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return err
 		}
 		// user_version can't be parameterized; i+1 is a trusted int.
 		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return err
 		}
 		if err := tx.Commit(); err != nil {
@@ -133,7 +133,7 @@ func (s *Store) ListWorkspaces() ([]Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []Workspace
 	for rows.Next() {
 		var w Workspace
@@ -182,7 +182,7 @@ func (s *Store) ListSessions(limit int) ([]Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []Session
 	for rows.Next() {
 		var s Session
