@@ -38,8 +38,9 @@ func RunStatus(startDir string, w io.Writer) error {
 }
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show the current sloop workspace status",
+	Use:     "status",
+	Aliases: []string{"st"},
+	Short:   "Show the current sloop workspace status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {

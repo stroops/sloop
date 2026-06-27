@@ -30,14 +30,16 @@ func RunSkillNew(startDir, name string) (string, error) {
 }
 
 var skillCmd = &cobra.Command{
-	Use:   "skill",
-	Short: "Manage reusable skills",
+	Use:     "skill",
+	Aliases: []string{"sk"},
+	Short:   "Manage reusable skills",
 }
 
 var skillNewCmd = &cobra.Command{
-	Use:   "new <name>",
-	Short: "Scaffold a new skill file under .sloop/skills",
-	Args:  cobra.ExactArgs(1),
+	Use:     "new <name>",
+	Aliases: []string{"n"},
+	Short:   "Scaffold a new skill file under .sloop/skills",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {

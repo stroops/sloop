@@ -134,9 +134,10 @@ var syncAll bool
 var syncRepair bool
 
 var syncCmd = &cobra.Command{
-	Use:   "sync [tool|profile]",
-	Short: "Regenerate native context files from .sloop",
-	Args:  cobra.MaximumNArgs(1),
+	Use:     "sync [tool|profile]",
+	Aliases: []string{"s"},
+	Short:   "Regenerate native context files from .sloop",
+	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {

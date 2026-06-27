@@ -145,8 +145,9 @@ var (
 )
 
 var runCmd = &cobra.Command{
-	Use:   "run [tool|profile ...] [-- <args>]",
-	Short: "Sync context and launch an AI tool in the workspace (--split for side-by-side panes)",
+	Use:     "run [tool|profile ...] [-- <args>]",
+	Aliases: []string{"r"},
+	Short:   "Sync context and launch an AI tool in the workspace (--split for side-by-side panes)",
 	Args: func(cmd *cobra.Command, args []string) error {
 		n := len(args)
 		if d := cmd.ArgsLenAtDash(); d >= 0 {

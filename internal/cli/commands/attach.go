@@ -28,9 +28,10 @@ func RunAttach(session string) error {
 }
 
 var attachCmd = &cobra.Command{
-	Use:   "attach <session>",
-	Short: "Attach to a tmux session created by sloop",
-	Args:  cobra.ExactArgs(1),
+	Use:     "attach <session>",
+	Aliases: []string{"a"},
+	Short:   "Attach to a tmux session created by sloop",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return RunAttach(args[0])
 	},
