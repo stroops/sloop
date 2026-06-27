@@ -41,10 +41,9 @@ This creates:
 ```
 AGENTS.md            # canonical context — YOU write this (the source of truth)
 .sloop/
-  config.yaml        # enabled tools + default tool (auto-detected)
+  config.yaml        # version, enabled tools + default tool (auto-detected)
   skills/            # reusable *.md skills
   vault/             # personal notes (not delivered to tools)
-  profiles/          # one per enabled tool
   .gitignore
 ```
 
@@ -152,17 +151,20 @@ can't get stuck "waiting".
 
 **Multi-provider:** every major CLI now has a hook/notify system. `sloop hooks list` shows the
 matrix, and `sloop hooks print <tool>` prints the exact event → `sloop hook <state>` wiring for
-each (Claude is auto-installed; Gemini/Cursor/Copilot/Codex are print-and-paste for now):
+each (Claude and Gemini auto-install; Cursor/Copilot/Codex are print-and-paste for now):
 
 ```
 sloop hooks list
 TOOL      AUTO-INSTALL  CONFIG
 claude    yes           .claude/settings.local.json
-gemini    print+paste   .gemini/settings.json
+gemini    yes           .gemini/settings.json
 cursor    print+paste   .cursor/hooks.json
 copilot   print+paste   ~/.copilot/hooks/notification-hooks.json
 codex     print+paste   ~/.codex/config.toml  (notify = [...])
 ```
+
+Hook knowledge lives in each tool's adapter manifest (see `docs/ADAPTERS.md`), so adding a provider
+is "drop one yaml". `sloop tools` shows the full capability matrix (context / skills / hooks).
 
 ### Whole cross-repo board (`ps --all`)
 

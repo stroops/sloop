@@ -17,6 +17,9 @@ that lane is well served (ntm, Claude Squad). Sloop sits **above** those tools a
 
 **Hard rules:** never violate the AI provider (use its own hooks or non-invasive local signals,
 never intercept/inject); stay a single lightweight CGO-free Go binary, no daemon, no bundled LLM.
+**Provider-aware by construction:** all per-provider knowledge lives in the adapter manifest
+(`docs/ADAPTERS.md`); features are manifest-driven, never hardcode a tool. User config is unified
+(`docs/CONFIG.md`), not per-provider.
 
 ## Landscape (why the wedge is here)
 
@@ -71,9 +74,14 @@ cross-repo wedge specifically — not generic orchestration.
      is now a provider registry (`hooks list`/`print <tool>`) covering claude/gemini/cursor/
      copilot/codex — each tool's event→`sloop hook <state>` mapping is captured (Claude
      auto-installs; others are print-and-paste pending a verified installer per tool).
-   - _(next)_ **More auto-installers** — implement `hooks install gemini|cursor|copilot` (verify
-     each exact config schema first) and a Codex `notify`-payload mode for `sloop hook`. Group
-     `ps` output by workspace; show repo path on running rows too.
+   - _(shipped)_ **Provider-aware consolidation (0.0.1 prep)** — hooks moved into the adapter
+     manifest (single source); `hooks.go` is manifest-driven; **Gemini auto-installs** too
+     (`settings-json` strategy, same shape as Claude). `sloop tools` is a capability matrix
+     (context/skills/hooks). Empty `.sloop/profiles/` removed. Config carries `version: 1`.
+     Docs: `docs/ADAPTERS.md` (contract), `docs/CONFIG.md` (layering), AGENTS.md rule.
+   - _(next)_ **More auto-installers** — `hooks install cursor|copilot` (different JSON shapes) and a
+     Codex `notify`-payload mode for `sloop hook` (TOML; no parser per no-new-modules). Group `ps`
+     output by workspace; show repo path on running rows too.
 2. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
    ntm/Squad don't do skills distribution). Path: (a) shipped `skills add <url|github>`;
    (b) a `.sloop/skills.lock` recording each imported skill + source so `skills update` re-fetches
