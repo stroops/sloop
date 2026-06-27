@@ -23,6 +23,11 @@ vet:
 	go vet ./...
 
 lint:
+	@if [ -n "$$(gofmt -l .)" ]; then \
+		echo "Some files are not formatted correctly. Please run 'make fmt'"; \
+		gofmt -l .; \
+		exit 1; \
+	fi
 	golangci-lint run ./...
 
 sec:

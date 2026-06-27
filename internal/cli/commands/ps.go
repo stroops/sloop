@@ -15,11 +15,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/hints"
 	"github.com/stroops/sloop/internal/session"
-	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
 )
