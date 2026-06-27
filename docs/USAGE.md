@@ -95,6 +95,11 @@ What `run` does: ensures `AGENTS.md`, writes pointer files (e.g. `CLAUDE.md` →
 symlinks `.sloop/skills` into the tool's skills dir, records the session, then launches —
 inside a tmux session named `<workspace>__<tool>` when tmux is present.
 
+**Status bar:** each sloop session shows its own live status in the tmux bar, e.g.
+`⚓ myrepo claude ◆ waiting` (the status word is colored: yellow waiting · cyan working · green idle),
+refreshed every 2s. It's set **per session** so it never touches your global tmux config. Adopted
+sessions get it too; add it to any session with `sloop statusline setup`.
+
 ### Side-by-side panes (the orchestration win)
 
 ```sh
