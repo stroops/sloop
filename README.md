@@ -120,7 +120,8 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 | `hints [list\|on\|off]` | — | — | Contextual education tips (en/vi). |
 | `completion <shell>` / `version` | — | — | Shell completion · version info. |
 
-**Global flags** (any command): `-y/--auto` (assume yes), `--no-color`, `--no-input`, `--config <file>`.
+**Global flags** (any command): `-y/--auto` (assume yes), `--no-color`, `--no-input`, `--config <file>`,
+`--debug` (log diagnostics to stderr; or set `SLOOP_DEBUG=1` — shows every multiplexer call sloop makes).
 
 Full, example-driven walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
 
