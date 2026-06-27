@@ -30,7 +30,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/stroops/sloop/internal/cli/commands"
-	_ "github.com/stroops/sloop/internal/cli/commands"
 )
 
 var (
@@ -40,7 +39,7 @@ var (
 	date    string
 )
 
-// SetVersion được gọi từ main.go (ldflags)
+// SetVersion called from main.go (ldflags)
 func SetVersion(v, c, d string) {
 	version, commit, date = v, c, d
 }
@@ -66,17 +65,21 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: $HOME/.sloop/config.yaml)")
-	rootCmd.PersistentFlags().String("socket", filepath.Join(os.TempDir(), "sloop.sock"), "daemon socket path")
 	rootCmd.PersistentFlags().Bool("no-color", false, "disable colored output")
+	rootCmd.PersistentFlags().BoolP("auto", "y", false, "assume yes / run automatically without prompts")
+	rootCmd.PersistentFlags().Bool("no-input", false, "never prompt; fail instead of asking")
+	rootCmd.PersistentFlags().Bool("debug", false, "log debug diagnostics to stderr (or set SLOOP_DEBUG)")
 
-	viper.BindPFlag("socket", rootCmd.PersistentFlags().Lookup("socket"))
-	viper.BindPFlag("no_color", rootCmd.PersistentFlags().Lookup("no-color"))
+	_ = viper.BindPFlag("no_color", rootCmd.PersistentFlags().Lookup("no-color"))
 
 	// Auto-register commands
 	commands.Register(rootCmd)
 }
 
 func initConfig() {
+	debug, _ := rootCmd.PersistentFlags().GetBool("debug")
+	setupLogging(debug)
+
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -88,9 +91,9 @@ func initConfig() {
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 
-		// Tạo ~/.sloop nếu chưa có
+		// create ~/.sloop if not exists
 		if _, err := os.Stat(configDir); os.IsNotExist(err) {
-			os.MkdirAll(configDir, 0755)
+			_ = os.MkdirAll(configDir, 0700)
 		}
 	}
 

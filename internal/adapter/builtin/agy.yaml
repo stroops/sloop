@@ -1,0 +1,13 @@
+# Google Antigravity — its CLI binary is `agy`.
+name: Google Antigravity
+detect: agy
+launch: agy
+
+context:
+  mode: native
+  file: ""
+skills:
+  target: ""
+hooks:
+  config: ""
+  install: ""

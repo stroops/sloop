@@ -1,0 +1,20 @@
+name: Cursor CLI
+detect: agent
+launch: agent
+
+context:
+  mode: native
+  file: ""
+skills:
+  target: ""
+scaffold:
+  - .cursor/rules
+hooks:
+  config: .cursor/hooks.json
+  install: ""
+  docs: https://cursor.com/docs/hooks
+  notes: CLI hooks since v1.7 (sessionStart/stop/prompt)
+  events:
+    working: beforeSubmitPrompt
+    waiting: beforeShellExecution
+    idle: stop

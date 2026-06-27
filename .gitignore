@@ -24,10 +24,22 @@ vendor/
 .DS_Store
 Thumbs.db
 
-# sloop
+# sloop - context (agent workspace)
 *.db
 *.db-journal
 *.sock
+.sloop/cache/
+.sloop/sessions/
 ~/.sloop/
 
+# local settings
+.claude/
+.tool-versions
+docs/local/
 dev-notes.md
+
+# feature tracking
+_features/
+
+# runtime
+*.pid

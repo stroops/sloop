@@ -1,0 +1,5 @@
+# Local, machine-specific caches
+cache/
+*.local
+# Personal notes — not shared with the team
+vault/

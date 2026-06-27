@@ -1,4 +1,32 @@
 name: Release
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "v*" # Run only when a tag matching v* is pushed (e.g., v0.1.0)
+
+permissions:
+  contents: write # Required for Goreleaser to create GitHub Releases
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Required for Goreleaser to generate changelog from git history
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
