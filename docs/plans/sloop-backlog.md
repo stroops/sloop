@@ -52,8 +52,8 @@ cross-repo wedge specifically — not generic orchestration.
 
 ## Next actions (post-dogfood, prioritized for the wedge)
 
-1. **Cross-repo `ps` polish** ⭐ — registry-aware (show known workspaces, not only live tmux), group
-   by workspace, show repo path, sort by "needs-attention". Make the cross-repo lens genuinely better
+1. **Cross-repo `ps` and `ls` polish (Micro-TUI)** ⭐ — registry-aware (show known workspaces, not only live tmux), group
+   by workspace, show repo path, sort by "needs-attention". Add a zero-dependency, ultra-lightweight interactive menu (ANSI raw mode) with colors to let users select sessions/workspaces with arrow keys. Make the cross-repo lens genuinely better
    than `tmux list-sessions`.
 2. **Context-portability depth** — confirm/extend per-tool delivery (native vs pointer) for more
    tools; skills authored once → everywhere; keep AGENTS.md the single canonical source.
