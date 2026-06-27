@@ -13,8 +13,20 @@ import (
 // run without a terminal. An option may contain "\r\n" to add indented
 // continuation lines (e.g. a glance); only its first line gets the pointer.
 func SelectMenu(prompt string, options []string) (int, error) {
+	idx, key, err := SelectAction(prompt, options, nil)
+	if err != nil || key == 0 {
+		return -1, err
+	}
+	return idx, nil
+}
+
+// SelectAction is SelectMenu plus extra single-byte action keys: pressing one
+// returns immediately with the highlighted index and that key. The returned key
+// is 13 (Enter), one of actionKeys, or 0 when cancelled (q/Esc/Ctrl-C) or run
+// without a terminal. Callers can then act on the highlighted row in place.
+func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte, error) {
 	if len(options) == 0 {
-		return -1, nil
+		return -1, 0, nil
 	}
 
 	fd := int(os.Stdin.Fd())
@@ -25,12 +37,12 @@ func SelectMenu(prompt string, options []string) (int, error) {
 		for _, opt := range options {
 			fmt.Println("  " + strings.ReplaceAll(opt, "\r\n", "\n  "))
 		}
-		return -1, nil
+		return -1, 0, nil
 	}
 
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		return -1, err
+		return -1, 0, err
 	}
 	defer term.Restore(fd, oldState)
 
@@ -88,16 +100,23 @@ func SelectMenu(prompt string, options []string) (int, error) {
 			switch buf[0] {
 			case 3, 4, 27, 'q': // Ctrl-C, Ctrl-D, Esc, q
 				leave()
-				return -1, nil
+				return -1, 0, nil
 			case 13: // Enter
 				leave()
-				return selected, nil
+				return selected, 13, nil
 			case 'k': // vim up
 				selected = (selected - 1 + len(options)) % len(options)
 				draw()
 			case 'j': // vim down
 				selected = (selected + 1) % len(options)
 				draw()
+			default:
+				for _, k := range actionKeys {
+					if buf[0] == k {
+						leave()
+						return selected, k, nil
+					}
+				}
 			}
 			continue
 		}

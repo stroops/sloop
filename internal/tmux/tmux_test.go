@@ -58,3 +58,11 @@ func TestResolveBin(t *testing.T) {
 		t.Fatalf("default: got %q", b)
 	}
 }
+
+func TestBuildKillArgs(t *testing.T) {
+	got := BuildKillArgs("web__claude")
+	want := []string{"kill-session", "-t", "web__claude"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}

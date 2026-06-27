@@ -109,6 +109,15 @@ func BuildAttachArgs(session string) []string {
 	return []string{"attach", "-t", session}
 }
 
+func BuildKillArgs(session string) []string {
+	return []string{"kill-session", "-t", session}
+}
+
+// Kill ends a session (the agent stops with it).
+func Kill(session string) error {
+	return exec.Command(Bin(), BuildKillArgs(session)...).Run()
+}
+
 type Runner struct {
 	Session string
 }

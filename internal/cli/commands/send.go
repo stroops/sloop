@@ -65,17 +65,74 @@ func RunSend(target, msg string) error {
 	return tmux.LaunchSend(row.Name, msg)
 }
 
+// RunSendBroadcast types msg into every session (all) or every waiting session,
+// returning how many it reached.
+func RunSendBroadcast(msg string, all, waiting bool) (int, error) {
+	if strings.TrimSpace(msg) == "" {
+		return 0, fmt.Errorf("nothing to send (empty message)")
+	}
+	if !tmux.Available() {
+		return 0, fmt.Errorf("tmux is not installed; `sloop send` needs tmux")
+	}
+	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+	if waiting {
+		rows = filterWaiting(enrichGlances(rows))
+	}
+	if len(rows) == 0 {
+		return 0, fmt.Errorf("no matching sessions")
+	}
+	n := 0
+	for _, r := range rows {
+		if err := tmux.LaunchSend(r.Name, msg); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+var (
+	sendAll     bool
+	sendWaiting bool
+	sendYes     bool
+)
+
 var sendCmd = &cobra.Command{
-	Use:   "send <session|workspace|#> <message...>",
+	Use:   "send [<session|workspace|#>] <message...>",
 	Short: "Send a prompt to a running session without attaching (via tmux)",
 	Long: `Type a prompt into a running AI session without attaching to it.
 
 The target is a fleet number (from ` + "`sloop ps`" + `), a full session name
 (<workspace>__<tool>), or a workspace name when only one session runs in it.
-send-keys types into your own pane exactly as if you typed it — the provider is
-never intercepted.`,
-	Args: cobra.MinimumNArgs(2),
+With --waiting / --all, omit the target to broadcast to every waiting / running
+session. send-keys types into your own pane exactly as if you typed it — the
+provider is never intercepted.`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if sendAll || sendWaiting {
+			if len(args) < 1 {
+				return fmt.Errorf("provide a message to broadcast")
+			}
+			return nil
+		}
+		if len(args) < 2 {
+			return fmt.Errorf("requires <target> <message...> (or --waiting/--all <message>)")
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if sendAll || sendWaiting {
+			msg := strings.Join(args, " ")
+			if sendAll && !assumeYes(cmd, sendYes) && !confirm(cmd.OutOrStdout(), cmd.InOrStdin(),
+				"broadcast to ALL running sessions? [y/N] ") {
+				return nil
+			}
+			n, err := RunSendBroadcast(msg, sendAll, sendWaiting)
+			if err != nil {
+				return err
+			}
+			cmd.Printf("sent to %d sessions\n", n)
+			return nil
+		}
 		target := args[0]
 		msg := strings.Join(args[1:], " ")
 		if err := RunSend(target, msg); err != nil {
@@ -87,6 +144,9 @@ never intercepted.`,
 }
 
 func RegisterSend(cmd *cobra.Command) {
+	sendCmd.Flags().BoolVar(&sendAll, "all", false, "broadcast to every running session")
+	sendCmd.Flags().BoolVar(&sendWaiting, "waiting", false, "broadcast to every session waiting on you")
+	sendCmd.Flags().BoolVar(&sendYes, "yes", false, "skip the --all confirmation (or use global -y)")
 	sendCmd.ValidArgsFunction = completeSendTargets
 	cmd.AddCommand(sendCmd)
 }

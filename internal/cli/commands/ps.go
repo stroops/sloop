@@ -381,18 +381,48 @@ var psCmd = &cobra.Command{
 		if waiting > 0 {
 			header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
 		}
-		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · q quit · "+tmux.DetachLine())
+		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · s send · x kill · q quit")
 
-		selected, err := tui.SelectMenu(prompt, options)
+		idx, key, err := tui.SelectAction(prompt, options, []byte{'s', 'x'})
 		if err != nil {
 			return err
 		}
-		if selected >= 0 {
-			return jumpToFleet(rows, selected+1)
+		switch key {
+		case 13: // Enter → jump
+			return jumpToFleet(rows, idx+1)
+		case 's': // send a quick prompt to the highlighted session
+			return promptAndSend(cmd, rows[idx])
+		case 'x': // kill the highlighted session (with confirm)
+			return confirmAndKill(cmd, rows[idx])
 		}
 		hints.Show(cmd.OutOrStdout(), "ps")
 		return nil
 	},
+}
+
+// promptAndSend asks for a line and sends it to the row (used by the ps `s` key).
+func promptAndSend(cmd *cobra.Command, row FleetRow) error {
+	msg := promptLine(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("send to %s: ", row.Name))
+	if strings.TrimSpace(msg) == "" {
+		return nil
+	}
+	if err := tmux.LaunchSend(row.Name, msg); err != nil {
+		return err
+	}
+	cmd.Printf("sent to %s\n", row.Name)
+	return nil
+}
+
+// confirmAndKill ends the row's session after a y/N confirm (used by ps `x`).
+func confirmAndKill(cmd *cobra.Command, row FleetRow) error {
+	if !confirm(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("kill %s? [y/N] ", row.Name)) {
+		return nil
+	}
+	if err := killFunc(row.Name); err != nil {
+		return err
+	}
+	cmd.Printf("killed %s\n", row.Name)
+	return nil
 }
 
 // statusDot renders the agent status as a colored dot plus a label for the
