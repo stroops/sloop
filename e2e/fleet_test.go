@@ -138,12 +138,17 @@ func TestPopupSetupBindsKey(t *testing.T) {
 	requireTmux(t)
 	bin := buildSloop(t)
 	home := t.TempDir()
+	
+	dummy := prefix + "popup_test"
+	tmuxNew(t, dummy)
+	t.Cleanup(func() { tmuxRun(t, "kill-session", "-t", dummy) })
+
 	key := "F12" // unlikely to clash with the developer's binds
 	t.Cleanup(func() { tmuxRun(t, "unbind-key", key) })
 
-	sloop(t, bin, home, "popup", "setup", "--key", key)
-	out, _ := exec.Command("tmux", "list-keys").Output()
+	outSloop := sloop(t, bin, home, "popup", "setup", "--key", key)
+	out, err := exec.Command("tmux", "list-keys").Output()
 	if !strings.Contains(string(out), "display-popup") || !strings.Contains(string(out), key) {
-		t.Fatalf("popup setup did not bind %s to display-popup", key)
+		t.Fatalf("popup setup did not bind %s to display-popup\nerr: %v\nsloop output:\n%s", key, err, outSloop)
 	}
 }

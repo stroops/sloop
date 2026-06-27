@@ -45,9 +45,11 @@ var popupSetupCmd = &cobra.Command{
 			return fmt.Errorf("display-popup needs tmux ≥ 3.2")
 		}
 		bindLine := fmt.Sprintf(`bind-key %s display-popup -w 80%% -h 60%% -E "%s"`, popupKey, fleetPopupCmd)
-		if os.Getenv("TMUX") != "" {
+		if tmux.Available() {
 			if err := tmux.BindPopup(popupKey, fleetPopupCmd); err == nil {
 				cmd.Printf("bound for this tmux server: press your prefix then %s to open the fleet popup\n", popupKey)
+			} else {
+				cmd.Printf("warning: failed to bind for this tmux server: %v\n", err)
 			}
 		}
 		cmd.Printf("add this to ~/.tmux.conf to make it permanent:\n  %s\n", bindLine)

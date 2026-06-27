@@ -19,4 +19,4 @@ the global DB), never split per provider.
 
 ## Development workflow
 
-- **Always run `make lint` and `make test` before committing.** This project requires strict adherence to linting rules and 100% passing tests.
+- **Always run `make lint`, `make test`, and `go test -v -tags e2e ./e2e/...` before committing.** This project requires strict adherence to linting rules and 100% passing tests (including E2E tests which require tmux).
