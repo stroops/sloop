@@ -1,5 +1,0 @@
-# sloops cli
-
-## Overview
-
-## Goals
