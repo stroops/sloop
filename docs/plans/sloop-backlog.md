@@ -59,14 +59,12 @@ cross-repo wedge specifically — not generic orchestration.
    prose (Phase 5 Step C); only when a minimal client exists.
 4. **Complementarity** — document/position sloop as working *alongside* ntm/Claude Squad (context +
    cross-repo) rather than competing; explore a light integration if it helps.
+5. **Precise agent status & Remote messaging (`sloop send`)** ⭐ — Depend on provider hooks (e.g. Claude `Stop`/`Notification`) or shell markers to accurately detect if an agent is waiting. Once status is precise, introduce `sloop send <session> "msg"` (via `tmux send-keys`) to inject prompts without attaching. Overcomes the CLI limitation of lacking a direct chat box.
 
 ---
 
 ## Later / parked
 
-- **Precise agent status via the provider's own hooks** (e.g. Claude `Stop`/`Notification`) — useful
-  for `ps` (⏸/●/✓) and provider-respecting; technique to borrow from tmuxai's "prepare mode" (shell
-  prompt markers). Parked unless the cross-repo `ps` proves valuable enough to deepen.
 - **`sloop init --scan` LLM enrichment** + **AI `sloop doctor`** — when reached, add a **minimal**
   `Complete(prompt)` client inside the first feature, not a standalone "LLM foundation".
 - **Windows multiplexer** (`wt.exe`/`psmux`) — only if Windows users matter.
