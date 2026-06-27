@@ -61,9 +61,13 @@ cross-repo wedge specifically — not generic orchestration.
 1. **Fleet intelligence** —
    - _(shipped, slice 1)_ `ps --waiting` filter; `ps --watch [-n]` live monitor that bells +
      optional `--notify` (desktop) when an agent **newly** waits; concurrent pane capture for speed.
-   - _(next, slice 2)_ **Status precision via provider hooks** — make it exact for Claude by
-     installing its own `Stop`/`Notification` hooks (writing a marker `sloop` reads) so
-     "waiting/done" is authoritative, heuristic as fallback for other tools.
+   - _(shipped, slice 2)_ **Status precision via provider hooks** — `sloop hooks install` adds
+     Claude's own `UserPromptSubmit`/`Notification`/`Stop` hooks (each calling `sloop hook
+     <state>`, persisted under `~/.sloop/state`); `ps` prefers a fresh marker over the
+     heuristic. Provider-respecting (Claude's own hook mechanism), 15-min marker TTL, hardened
+     with a per-capture timeout so a stuck pane can't hang the fleet view.
+   - _(next, slice 3)_ **Registry-aware `ps`/`ls`** — show *known* workspaces (not only live
+     tmux), group by workspace, show repo path; extend hooks to more tools as they expose them.
 2. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
    ntm/Squad don't do skills distribution). Path: (a) shipped `skills add <url|github>`;
    (b) a `.sloop/skills.lock` recording each imported skill + source so `skills update` re-fetches

@@ -107,7 +107,8 @@ jump: sloop ps <#>   ·   send: sloop send <#> "msg"
 - Each session is classified from **its own terminal** (non-invasive — sloop never
   reads the provider): `◆ waiting on you` (blocked on an approval/question), `▸ working`,
   `○ idle`, or `● attached`. **Sessions waiting on you float to the top** so you see who
-  needs you first.
+  needs you first. Install the Claude hooks (below) to make this status **authoritative**
+  instead of a heuristic.
 - The `└` line is the session's last terminal output (the glance).
 - On a real terminal, `sloop ps` opens an interactive menu — `↑/↓` (or `j/k`) to move,
   `Enter` to jump, `q`/`Esc` to quit. Piped/CI prints the plain listing above. Colors honor
@@ -131,6 +132,23 @@ sloop ps -f --waiting          # monitor, but only list those that need you
 
 > `-f` (follow) is the short for `--watch`. `-w` is reserved for `--workspace` everywhere
 > (`run`/`sync`), so it is intentionally not a `ps` shorthand.
+
+### Precise status via Claude's own hooks
+
+The pane heuristic is a good guess; Claude's hooks make it exact. Install once per repo:
+
+```sh
+sloop hooks install     # merges into .claude/settings.local.json (idempotent, never clobbers)
+sloop hooks print       # or print the JSON snippet to add by hand
+```
+
+This registers three of Claude's documented hooks — `UserPromptSubmit` → working,
+`Notification` → waiting on you, `Stop` → idle — each calling `sloop hook <state>`, which
+records the session's status under `~/.sloop/state`. `sloop ps` then **prefers that marker**
+over the heuristic (falling back to the heuristic if no fresh marker exists). This stays
+within the provider's rules: Claude calls sloop through its **own** hook mechanism; sloop
+never intercepts or injects. Markers older than 15 min are ignored so a crashed session
+can't get stuck "waiting".
 
 `--watch` turns `ps` from a snapshot into a live board: it re-renders on the interval and,
 whenever a session **newly** starts waiting on you, rings the terminal bell (and, with
