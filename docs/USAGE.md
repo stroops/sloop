@@ -227,6 +227,8 @@ unblocking an agent across repos without losing your place.
 Broadcast to many at once, or end sessions:
 
 ```sh
+sloop ps --all                         # also lists tmux sessions you started yourself (unmanaged)
+sloop adopt agy -w myrepo --as agy     # bring an external session into the fleet (rename to myrepo__agy)
 sloop approve --waiting                # send each waiting agent its Yes/Approve answer (one command)
 sloop approve 1                        # approve just session #1
 sloop send --waiting "yes, go ahead"   # custom reply to every agent waiting on you
