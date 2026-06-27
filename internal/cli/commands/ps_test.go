@@ -100,7 +100,7 @@ func TestRunPsAllShowsNotRunning(t *testing.T) {
 	var b bytes.Buffer
 	rows := []FleetRow{{Workspace: "api", Tool: "claude", Name: "api__claude", Activity: time.Now()}}
 	paths := map[string]string{"api": "/a", "infra": "/srv/infra"}
-	_ = runPsAll(&b, rows, paths)
+	_ = runPsAll(&b, rows, paths, nil)
 	out := b.String()
 	if !strings.Contains(out, "Known workspaces (not running)") ||
 		!strings.Contains(out, "infra") || !strings.Contains(out, "/srv/infra") {

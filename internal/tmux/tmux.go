@@ -118,6 +118,26 @@ func Kill(session string) error {
 	return exec.Command(Bin(), BuildKillArgs(session)...).Run()
 }
 
+func BuildRenameArgs(old, name string) []string {
+	return []string{"rename-session", "-t", old, name}
+}
+
+// Rename renames a running session (used to adopt an external session into the
+// sloop `<workspace>__<tool>` convention).
+func Rename(old, name string) error {
+	return exec.Command(Bin(), BuildRenameArgs(old, name)...).Run()
+}
+
+// SessionPath reports a session's active pane working directory (best-effort),
+// so an adopted session can be registered against its repo path.
+func SessionPath(session string) string {
+	out, err := exec.Command(Bin(), "display-message", "-t", session, "-p", "#{pane_current_path}").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 type Runner struct {
 	Session string
 }

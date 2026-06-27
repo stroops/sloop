@@ -304,19 +304,49 @@ func notRunningWorkspaces(rows []FleetRow, paths map[string]string) []string {
 	return idle
 }
 
-// runPsAll prints the live fleet plus the registered workspaces that aren't
-// running — the full cross-repo board, not just what's live right now.
-func runPsAll(w io.Writer, rows []FleetRow, paths map[string]string) error {
+// externalSessions returns live tmux sessions NOT created by sloop (no "__"),
+// so the fleet can surface agents you started yourself and offer to adopt them.
+func externalSessions(sessions []tmux.Session) []tmux.Session {
+	var out []tmux.Session
+	for _, s := range sessions {
+		if !strings.Contains(s.Name, "__") {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// externalNudge prints a one-line pointer to unmanaged tmux sessions.
+func externalNudge(w io.Writer, ext []tmux.Session) {
+	if len(ext) == 0 {
+		return
+	}
+	names := make([]string, 0, len(ext))
+	for _, s := range ext {
+		names = append(names, s.Name)
+	}
+	_, _ = fmt.Fprintln(w, tui.Grey(fmt.Sprintf("+ %d tmux session(s) not in sloop (%s) — `sloop adopt <name>` to add",
+		len(ext), strings.Join(names, ", "))))
+}
+
+// runPsAll prints the live fleet, the registered workspaces that aren't running,
+// and any unmanaged tmux sessions — the full picture, not just what sloop runs.
+func runPsAll(w io.Writer, rows []FleetRow, paths map[string]string, ext []tmux.Session) error {
 	_ = RunPs(w, rows)
-	idle := notRunningWorkspaces(rows, paths)
-	if len(idle) == 0 {
-		return nil
+	if idle := notRunningWorkspaces(rows, paths); len(idle) > 0 {
+		_, _ = fmt.Fprintf(w, "\nKnown workspaces (not running):\n")
+		for _, name := range idle {
+			_, _ = fmt.Fprintf(w, "  ○ %-16s %s\n", name, paths[name])
+		}
+		_, _ = fmt.Fprintln(w, "\nstart one: sloop run -w <name>")
 	}
-	_, _ = fmt.Fprintf(w, "\nKnown workspaces (not running):\n")
-	for _, name := range idle {
-		_, _ = fmt.Fprintf(w, "  ○ %-16s %s\n", name, paths[name])
+	if len(ext) > 0 {
+		_, _ = fmt.Fprintf(w, "\nOther tmux sessions (not managed by sloop):\n")
+		for _, s := range ext {
+			_, _ = fmt.Fprintf(w, "  ◌ %s\n", s.Name)
+		}
+		_, _ = fmt.Fprintln(w, "\nadopt one: sloop adopt <name>")
 	}
-	_, _ = fmt.Fprintln(w, "\nstart one: sloop run -w <name>")
 	return nil
 }
 
@@ -325,7 +355,8 @@ var psCmd = &cobra.Command{
 	Short: "List running AI sessions (the fleet); `sloop ps <#>` jumps to one",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		rows := fleetRows(tmux.ParseSessions(tmuxList()))
+		parsed := tmux.ParseSessions(tmuxList())
+		rows := fleetRows(parsed)
 		if len(args) == 1 {
 			n, err := strconv.Atoi(args[0])
 			if err != nil {
@@ -342,14 +373,16 @@ var psCmd = &cobra.Command{
 		sortNeedsAttention(rows)
 		paths := registryPaths()
 		annotatePaths(rows, paths)
+		ext := externalSessions(parsed)
 
-		// --all: the full cross-repo board (live + known-but-idle workspaces).
+		// --all: the full cross-repo board (live + known-but-idle + unmanaged).
 		if psAll {
-			return runPsAll(cmd.OutOrStdout(), rows, paths)
+			return runPsAll(cmd.OutOrStdout(), rows, paths, ext)
 		}
 
 		if len(rows) == 0 {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces).")
+			externalNudge(cmd.OutOrStdout(), ext)
 			return nil
 		}
 
@@ -367,6 +400,7 @@ var psCmd = &cobra.Command{
 			if err := RunPs(cmd.OutOrStdout(), rows); err != nil {
 				return err
 			}
+			externalNudge(cmd.OutOrStdout(), ext)
 			hints.Show(cmd.OutOrStdout(), "ps")
 			return nil
 		}
@@ -407,6 +441,7 @@ var psCmd = &cobra.Command{
 				return sendAnswer(cmd, rows[idx], a)
 			}
 		}
+		externalNudge(cmd.OutOrStdout(), ext)
 		hints.Show(cmd.OutOrStdout(), "ps")
 		return nil
 	},

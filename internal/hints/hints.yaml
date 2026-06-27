@@ -38,6 +38,12 @@ hints:
       en: "Reply to an agent without attaching: `sloop send <#> \"yes, go ahead\"`."
       vi: "Trả lời một agent mà không cần attach: `sloop send <#> \"ừ, làm tiếp đi\"`."
 
+  - id: adopt
+    context: ps
+    text:
+      en: "Started an agent in tmux yourself? `sloop ps --all` lists it; `sloop adopt <name>` brings it into the fleet."
+      vi: "Tự mở một agent trong tmux? `sloop ps --all` liệt kê nó; `sloop adopt <tên>` đưa nó vào fleet."
+
   - id: ps-answer
     context: ps
     text:
