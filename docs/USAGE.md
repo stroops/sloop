@@ -238,6 +238,21 @@ sloop kill --waiting                   # end all that are waiting
 sloop kill --all -y                    # clean up everything (global -y = assume yes)
 ```
 
+### Fleet HUD popup (tmux ≥ 3.2)
+
+Pop the whole cross-repo fleet over whatever you're doing — glance, answer, jump, and it closes back
+to your work without losing your place:
+
+```sh
+sloop popup                  # open the fleet popup now (must be inside tmux)
+sloop popup setup            # bind <prefix> g to it (and print the line for ~/.tmux.conf)
+sloop popup setup --key f    # use a different key
+```
+
+After `setup`, press your tmux **prefix then `g`** from inside any agent to summon the HUD: the `ps`
+control center appears floating, you answer/jump with one key, and the popup vanishes. (Native Windows
+psmux may not support popups; everything else still works.)
+
 ---
 
 ## 4. Context delivery without launching
