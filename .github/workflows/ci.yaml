@@ -15,10 +15,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.1' # Fallback to 1.23 for stability in most GH action runners, update as needed.
-          
+          go-version: '1.26.4'
+
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           args: --timeout=5m
@@ -37,4 +37,4 @@ jobs:
       - name: Run govulncheck
         uses: golang/govulncheck-action@v1
         with:
-          go-version-input: '1.26.1'
+          go-version-input: '1.26.4'
