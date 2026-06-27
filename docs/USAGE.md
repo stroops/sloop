@@ -123,11 +123,14 @@ sloop attach webapp__claude   # attach by full session name
 
 ```sh
 sloop ps --waiting             # show only agents waiting on you
-sloop ps --watch               # live monitor: refresh every 2s, ring the bell
-sloop ps --watch -n 5s         # custom interval
-sloop ps --watch --notify      # also fire a desktop notification on new waiting agents
-sloop ps --watch --waiting     # monitor, but only list those that need you
+sloop ps -f                    # follow live (alias of --watch): refresh every 2s, ring the bell
+sloop ps -f -n 5s              # custom interval
+sloop ps -f --notify           # also fire a desktop notification on new waiting agents
+sloop ps -f --waiting          # monitor, but only list those that need you
 ```
+
+> `-f` (follow) is the short for `--watch`. `-w` is reserved for `--workspace` everywhere
+> (`run`/`sync`), so it is intentionally not a `ps` shorthand.
 
 `--watch` turns `ps` from a snapshot into a live board: it re-renders on the interval and,
 whenever a session **newly** starts waiting on you, rings the terminal bell (and, with
@@ -195,6 +198,25 @@ sloop doctor    # environment health (tools, tmux, mode)
 ```
 
 (`ls` = registry/history; `ps` = what's live right now.)
+
+---
+
+## 7. Shell completion (autocomplete)
+
+Install once, then Tab-complete commands, flags **and live values**:
+
+```sh
+# zsh (add to ~/.zshrc, or drop into a completions dir)
+source <(sloop completion zsh)
+# bash
+source <(sloop completion bash)
+# fish
+sloop completion fish | source
+```
+
+Completion is **dynamic**: `sloop run <Tab>` lists your tools, `-w <Tab>` lists registered
+workspaces, and `sloop ps`/`send`/`attach <Tab>` list the sessions running right now (with the
+session name shown next to each `ps` number).
 
 ---
 
