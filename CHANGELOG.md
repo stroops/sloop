@@ -39,4 +39,4 @@ The initial public release: the local-first control layer for your AI coding CLI
 - Dynamic shell completion; local SQLite registry + history (WAL + migrations).
 
 ### Foundation
-- Single CGO-free Go binary, no daemon, no cloud. MIT licensed.
+- Single CGO-free Go binary, no daemon, no cloud.
