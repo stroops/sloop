@@ -81,6 +81,7 @@ func RunAdopt(sessionName, wsFlag, toolFlag string) (string, error) {
 	if err := renameFunc(sessionName, newName); err != nil {
 		return "", err
 	}
+	tmux.SetStatusLine(newName) // give the adopted session sloop's status bar
 	if path != "" {
 		if dbPath, err := config.GlobalDBPath(); err == nil {
 			if store, err := session.Open(dbPath); err == nil {

@@ -38,6 +38,12 @@ hints:
       en: "Reply to an agent without attaching: `sloop send <#> \"yes, go ahead\"`."
       vi: "Trả lời một agent mà không cần attach: `sloop send <#> \"ừ, làm tiếp đi\"`."
 
+  - id: statusline
+    context: run
+    text:
+      en: "Each sloop session shows its live status in the tmux bar (⚓ repo tool ◆ waiting). Add it to any session with `sloop statusline setup`."
+      vi: "Mỗi session sloop hiện trạng thái sống ở thanh tmux (⚓ repo tool ◆ waiting). Thêm cho session bất kỳ bằng `sloop statusline setup`."
+
   - id: popup
     context: run
     text:

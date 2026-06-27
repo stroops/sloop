@@ -138,7 +138,7 @@ func TestPopupSetupBindsKey(t *testing.T) {
 	requireTmux(t)
 	bin := buildSloop(t)
 	home := t.TempDir()
-	
+
 	dummy := prefix + "popup_test"
 	tmuxNew(t, dummy)
 	t.Cleanup(func() { tmuxRun(t, "kill-session", "-t", dummy) })
@@ -150,5 +150,26 @@ func TestPopupSetupBindsKey(t *testing.T) {
 	out, err := exec.Command("tmux", "list-keys").Output()
 	if !strings.Contains(string(out), "display-popup") || !strings.Contains(string(out), key) {
 		t.Fatalf("popup setup did not bind %s to display-popup\nerr: %v\nsloop output:\n%s", key, err, outSloop)
+	}
+}
+
+func TestStatuslineSetup(t *testing.T) {
+	requireTmux(t)
+	bin := buildSloop(t)
+	home := t.TempDir()
+
+	sess := prefix + "sl__claude"
+	tmuxNew(t, sess)
+	t.Cleanup(func() { tmuxRun(t, "kill-session", "-t", sess) })
+
+	// the formatter renders a readable line for the session.
+	if out := sloop(t, bin, home, "statusline", sess); !strings.Contains(out, "⚓ "+prefix+"sl claude") {
+		t.Fatalf("statusline output: %q", out)
+	}
+	// setup points the session's status-right back at sloop.
+	sloop(t, bin, home, "statusline", "setup", sess)
+	out, _ := exec.Command("tmux", "show-options", "-t", sess, "status-right").Output()
+	if !strings.Contains(string(out), "statusline "+sess) {
+		t.Fatalf("status-right not set: %q", out)
 	}
 }

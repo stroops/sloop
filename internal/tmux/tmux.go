@@ -145,7 +145,20 @@ type Runner struct {
 func (r Runner) Launch(s runner.Spec) error {
 	fmt.Printf("\n%s\n\n", DetachHint())
 
-	cmd := exec.Command(Bin(), BuildNewArgs(r.Session, s)...)
+	// Create the session detached so we can give it sloop's own status bar
+	// before attaching; then attach (or switch if already inside tmux).
+	if !hasSession(r.Session) {
+		create := append([]string{"new-session", "-d", "-s", r.Session, "-c", s.Dir, s.Command}, s.Args...)
+		if err := exec.Command(Bin(), create...).Run(); err != nil {
+			return err
+		}
+		SetStatusLine(r.Session)
+	}
+	args := BuildAttachArgs(r.Session)
+	if os.Getenv("TMUX") != "" {
+		args = BuildSwitchArgs(r.Session)
+	}
+	cmd := exec.Command(Bin(), args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
