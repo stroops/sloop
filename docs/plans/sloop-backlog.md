@@ -41,6 +41,8 @@ never intercept/inject); stay a single lightweight CGO-free Go binary, no daemon
   (import from a URL / GitHub blob). Command renamed `skill` → `skills` (aliases kept).
 - **Cross-repo fleet prototype:** `sloop ps` (running sessions across workspaces) + glance (last
   output line, non-invasive) + `ps <#>` jump; `run --split` (panes, minor convenience).
+- **Micro-TUI for `ps`/`ls`:** zero-dependency, colored, ANSI-raw interactive menu (arrow-key
+  select / jump) — no external TUI lib, single binary preserved (`internal/tui`).
 
 ## Now — validating
 
@@ -52,21 +54,25 @@ cross-repo wedge specifically — not generic orchestration.
 
 ## Next actions (post-dogfood, prioritized for the wedge)
 
-1. **Cross-repo `ps` and `ls` polish (Micro-TUI)** ⭐ — registry-aware (show known workspaces, not only live tmux), group
-   by workspace, show repo path, sort by "needs-attention". Add a zero-dependency, ultra-lightweight interactive menu (ANSI raw mode) with colors to let users select sessions/workspaces with arrow keys. Make the cross-repo lens genuinely better
-   than `tmux list-sessions`.
-2. **Context-portability depth** — confirm/extend per-tool delivery (native vs pointer) for more
-   tools; skills authored once → everywhere; keep AGENTS.md the single canonical source.
-3. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
+1. **Precise agent status & Remote messaging (`sloop send`)** ⭐ — Depend on provider hooks (e.g.
+   Claude `Stop`/`Notification`) or shell markers to accurately detect if an agent is waiting. Once
+   status is precise, introduce `sloop send <session> "msg"` (via `tmux send-keys`) to inject prompts
+   without attaching. Overcomes the CLI limitation of lacking a direct chat box. Directly answers the
+   dogfood question ("which agent needs me") and upgrades the heuristic glance line in `ps`.
+2. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
    ntm/Squad don't do skills distribution). Path: (a) shipped `skills add <url|github>`;
    (b) a `.sloop/skills.lock` recording each imported skill + source so `skills update` re-fetches
    and the team gets reproducible skills; (c) later, a registry (`skills search`/`add <name>`)
    resolving from skills.sh or a curated index. _(skills.sh's API/format needs investigating first.)_
-3. **`init --scan` LLM enrichment** — reuse a minimal LLM client to turn the heuristic scaffold into
+3. **Cross-repo `ps`/`ls` registry-awareness** — now that the Micro-TUI shipped, make the list show
+   *known* workspaces (from the registry), not only live tmux sessions; group by workspace, show repo
+   path, sort by "needs-attention" (pairs with #1's precise status).
+4. **Context-portability depth** — confirm/extend per-tool delivery (native vs pointer) for more
+   tools; skills authored once → everywhere; keep AGENTS.md the single canonical source.
+5. **`init --scan` LLM enrichment** — reuse a minimal LLM client to turn the heuristic scaffold into
    prose (Phase 5 Step C); only when a minimal client exists.
-4. **Complementarity** — document/position sloop as working *alongside* ntm/Claude Squad (context +
+6. **Complementarity** — document/position sloop as working *alongside* ntm/Claude Squad (context +
    cross-repo) rather than competing; explore a light integration if it helps.
-5. **Precise agent status & Remote messaging (`sloop send`)** ⭐ — Depend on provider hooks (e.g. Claude `Stop`/`Notification`) or shell markers to accurately detect if an agent is waiting. Once status is precise, introduce `sloop send <session> "msg"` (via `tmux send-keys`) to inject prompts without attaching. Overcomes the CLI limitation of lacking a direct chat box.
 
 ---
 
