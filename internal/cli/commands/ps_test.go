@@ -59,3 +59,30 @@ func TestJumpToFleetBounds(t *testing.T) {
 		t.Fatal("expected error for empty fleet")
 	}
 }
+
+func TestFilterWaitingAndNewlyWaiting(t *testing.T) {
+	waiting := FleetRow{Name: "a__claude", Status: runner.StatusWaiting}
+	working := FleetRow{Name: "b__cursor", Status: runner.StatusWorking}
+	idle := FleetRow{Name: "c__claude", Status: runner.StatusIdle}
+
+	got := filterWaiting([]FleetRow{waiting, working, idle})
+	if len(got) != 1 || got[0].Name != "a__claude" {
+		t.Fatalf("filterWaiting = %+v", got)
+	}
+
+	// b__cursor flips from working to waiting → newly waiting; a__claude was
+	// already waiting → not reported again.
+	prev := []FleetRow{waiting, working, idle}
+	curr := []FleetRow{
+		waiting,
+		{Name: "b__cursor", Status: runner.StatusWaiting},
+		idle,
+	}
+	nw := newlyWaiting(prev, curr)
+	if len(nw) != 1 || nw[0] != "b__cursor" {
+		t.Fatalf("newlyWaiting = %v", nw)
+	}
+	if n := newlyWaiting(curr, curr); len(n) != 0 {
+		t.Fatalf("stable snapshot should yield none, got %v", n)
+	}
+}
