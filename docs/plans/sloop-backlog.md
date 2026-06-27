@@ -66,8 +66,14 @@ cross-repo wedge specifically — not generic orchestration.
      <state>`, persisted under `~/.sloop/state`); `ps` prefers a fresh marker over the
      heuristic. Provider-respecting (Claude's own hook mechanism), 15-min marker TTL, hardened
      with a per-capture timeout so a stuck pane can't hang the fleet view.
-   - _(next, slice 3)_ **Registry-aware `ps`/`ls`** — show *known* workspaces (not only live
-     tmux), group by workspace, show repo path; extend hooks to more tools as they expose them.
+   - _(shipped, slice 3)_ **Registry-aware `ps` + multi-provider hook awareness** — `ps --all`
+     adds registered-but-idle workspaces (with repo path) for the full cross-repo board; `hooks`
+     is now a provider registry (`hooks list`/`print <tool>`) covering claude/gemini/cursor/
+     copilot/codex — each tool's event→`sloop hook <state>` mapping is captured (Claude
+     auto-installs; others are print-and-paste pending a verified installer per tool).
+   - _(next)_ **More auto-installers** — implement `hooks install gemini|cursor|copilot` (verify
+     each exact config schema first) and a Codex `notify`-payload mode for `sloop hook`. Group
+     `ps` output by workspace; show repo path on running rows too.
 2. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
    ntm/Squad don't do skills distribution). Path: (a) shipped `skills add <url|github>`;
    (b) a `.sloop/skills.lock` recording each imported skill + source so `skills update` re-fetches

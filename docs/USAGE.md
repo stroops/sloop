@@ -150,6 +150,39 @@ within the provider's rules: Claude calls sloop through its **own** hook mechani
 never intercepts or injects. Markers older than 15 min are ignored so a crashed session
 can't get stuck "waiting".
 
+**Multi-provider:** every major CLI now has a hook/notify system. `sloop hooks list` shows the
+matrix, and `sloop hooks print <tool>` prints the exact event → `sloop hook <state>` wiring for
+each (Claude is auto-installed; Gemini/Cursor/Copilot/Codex are print-and-paste for now):
+
+```
+sloop hooks list
+TOOL      AUTO-INSTALL  CONFIG
+claude    yes           .claude/settings.local.json
+gemini    print+paste   .gemini/settings.json
+cursor    print+paste   .cursor/hooks.json
+copilot   print+paste   ~/.copilot/hooks/notification-hooks.json
+codex     print+paste   ~/.codex/config.toml  (notify = [...])
+```
+
+### Whole cross-repo board (`ps --all`)
+
+`sloop ps` lists what's live; `sloop ps --all` also lists registered workspaces that **aren't**
+running, with their repo path — the full picture of every project, not just the running ones:
+
+```sh
+sloop ps --all
+```
+```
+⚓ AI fleet — 1 running
+  1   api          claude    ◆ waiting on you · active 2m ago
+
+Known workspaces (not running):
+  ○ web              ~/code/web
+  ○ infra            ~/code/infra
+
+start one: sloop run -w <name>
+```
+
 `--watch` turns `ps` from a snapshot into a live board: it re-renders on the interval and,
 whenever a session **newly** starts waiting on you, rings the terminal bell (and, with
 `--notify`, shows an OS notification via `osascript`/`notify-send`). Captures run concurrently,
