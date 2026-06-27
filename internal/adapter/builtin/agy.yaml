@@ -1,8 +1,7 @@
-# Google Antigravity. Verify the CLI binary name on the target machine; override
-# in ~/.sloop/adapters/agy.yaml if it differs.
+# Google Antigravity — its CLI binary is `agy`.
 name: Google Antigravity
-detect: antigravity
-launch: antigravity
+detect: agy
+launch: agy
 
 context:
   mode: native
