@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stroops/sloop/internal/runner"
+	"github.com/stroops/sloop/internal/tui"
 )
 
 // FleetRow is one running sloop AI session, ready to display.
@@ -119,8 +120,6 @@ func humanizeSince(t time.Time) string {
 	}
 }
 
-// jumpToFleet attaches to row n (1-based); switches the client instead when
-// already inside tmux, since attach cannot nest.
 func jumpToFleet(rows []FleetRow, n int) error {
 	if n < 1 || n > len(rows) {
 		return fmt.Errorf("no session #%d (have %d)", n, len(rows))
@@ -151,7 +150,42 @@ var psCmd = &cobra.Command{
 			}
 			return jumpToFleet(rows, n)
 		}
-		return RunPs(cmd.OutOrStdout(), enrichGlances(rows))
+
+		if len(rows) == 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
+			return nil
+		}
+
+		rows = enrichGlances(rows)
+
+		var options []string
+		for _, r := range rows {
+			stateMark := "\033[32m🟢 idle\033[0m"
+			if r.Attached {
+				stateMark = "\033[34m🔵 attached\033[0m"
+			}
+
+			line := fmt.Sprintf("%-16s %-9s %s · %s", r.Workspace, r.Tool, stateMark, humanizeSince(r.Activity))
+			if r.Glance != "" {
+				line += fmt.Sprintf("\r\n       └ \033[90m%s\033[0m", r.Glance)
+			}
+			options = append(options, line)
+		}
+
+		prompt := fmt.Sprintf("⚓ AI fleet — %d running\r\nSelect a session to attach (↑/↓ to navigate, Enter to attach, Esc to quit):", len(rows))
+		
+		// Import tui dynamically since it's an internal package
+		// The import will be added via goimports or explicitly
+		// Actually, I'll need to make sure the import is there.
+		
+		selected, err := tui.SelectMenu(prompt, options)
+		if err != nil {
+			return err
+		}
+		if selected >= 0 {
+			return jumpToFleet(rows, selected+1)
+		}
+		return nil
 	},
 }
 

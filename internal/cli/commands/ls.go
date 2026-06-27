@@ -8,6 +8,7 @@ import (
 
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/session"
+	"github.com/stroops/sloop/internal/tui"
 )
 
 func RunLs(w io.Writer) error {
@@ -47,7 +48,40 @@ var lsCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List sloop workspaces and recent sessions",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return RunLs(cmd.OutOrStdout())
+		dbPath, err := config.GlobalDBPath()
+		if err != nil {
+			return err
+		}
+		store, err := session.Open(dbPath)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+
+		workspaces, err := store.ListWorkspaces()
+		if err != nil {
+			return err
+		}
+		if len(workspaces) == 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "No workspaces found.")
+			return nil
+		}
+
+		var options []string
+		for _, ws := range workspaces {
+			options = append(options, fmt.Sprintf("📁 %-16s \033[90m%s\033[0m", ws.Name, ws.Path))
+		}
+		
+		prompt := "⚓ Sloop Workspaces - Select to jump (↑/↓, Enter to jump, Esc to quit):"
+		selected, err := tui.SelectMenu(prompt, options)
+		if err != nil {
+			return err
+		}
+		if selected >= 0 {
+			ws := workspaces[selected]
+			fmt.Printf("\nTo jump to workspace, run:\n  cd %s\n", ws.Path)
+		}
+		return nil
 	},
 }
 
