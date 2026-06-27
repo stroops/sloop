@@ -105,7 +105,7 @@ var initCmd = &cobra.Command{
 }
 
 func RegisterInit(cmd *cobra.Command) {
-	initCmd.Flags().BoolVar(&initScan, "scan", false, "scan the existing codebase to pre-fill AGENTS.md")
+	initCmd.Flags().BoolVarP(&initScan, "scan", "s", false, "scan the existing codebase to pre-fill AGENTS.md")
 	cmd.AddCommand(initCmd)
 }
 
