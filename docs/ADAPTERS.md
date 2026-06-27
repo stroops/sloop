@@ -38,6 +38,10 @@ hooks:                         # status hooks for `sloop ps` (see docs/USAGE.md)
     working: UserPromptSubmit           #   "" if the tool can't signal that state
     waiting: Notification
     idle: Stop
+
+heuristics:                    # OPTIONAL fallback status markers (see below) — usually omit
+  waiting: ["shall I apply"]   #   tool-specific phrasing the cross-tool defaults miss
+  working: ["indexing repo"]
 ```
 
 ## Which features are manifest-driven
@@ -49,6 +53,7 @@ hooks:                         # status hooks for `sloop ps` (see docs/USAGE.md)
 | `sloop sync` context | `sync` | `context.mode/file` |
 | skills symlink | `sync` | `skills.target` |
 | `sloop hooks` + status | `hooks.go` | `hooks.*` |
+| `sloop ps` status fallback | `tmux.ClassifyStatus` | `heuristics.*` (additive; see below) |
 | shell completion | `completion.go` | manifest keys |
 
 The runtime view of all of this is **`sloop tools`** (capability matrix:
@@ -62,6 +67,22 @@ The runtime view of all of this is **`sloop tools`** (capability matrix:
 - `""` (manual) — no safe auto-writer yet; `sloop hooks print <tool>` shows the exact
   event→command wiring and `sloop hooks list` marks it `print+paste`. Cursor/Copilot/Codex are here
   (different config formats; Codex needs a `notify`-payload mode and is TOML, which we don't parse).
+
+## Status heuristics (fallback only)
+
+`sloop ps` classifies each session as waiting / working / idle. The **precise** signal is the
+`hooks` above (the tool tells sloop its state). Heuristics are the **fallback** when hooks aren't
+installed: a non-invasive read of the tool's own pane text.
+
+Most prompt conventions — `(y/n)`, `press enter`, `esc to interrupt`, spinners, `tokens` — are
+**cross-tool defaults** baked in once (`defaultWaitingMarkers`/`defaultWorkingMarkers` in
+`internal/tmux/status.go`) and applied to **every** manifest. They are terminal conventions, not
+per-provider knowledge, so they live in code, not duplicated into each YAML.
+
+A manifest's optional `heuristics` block is **additive on top of** the defaults — add markers only
+for phrasing a specific tool uses that the defaults genuinely miss. If a tool needs none (most don't,
+e.g. claude), omit the block. Don't re-list default markers. If you want precision, install the
+tool's hooks rather than growing heuristics.
 
 ## Adding a new CLI (checklist)
 

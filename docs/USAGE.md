@@ -298,11 +298,18 @@ sloop skills new code-review                                  # scaffold + link 
 sloop skills add https://example.com/review.md               # import from a URL
 sloop skills add https://github.com/o/r/blob/main/review.md  # GitHub blob URL (auto-raw)
 sloop skills add <url> --name custom-name                    # override the derived name
+sloop skills update                                          # re-fetch every imported skill
+sloop skills update code-review                              # re-fetch just one
 ```
 
 Skills live in `.sloop/skills/*.md` and are **symlinked** into each tool's skills dir — write or
 import once, every tool sees the same set. `skills new`/`add` link them in automatically (`skill`
 and `sk` are aliases). If a tool isn't linked yet, run `sloop sync`.
+
+Imported skills are recorded in **`.sloop/skills.lock`** (name + source + content hash). Commit it so
+your team gets reproducible skills, and run `sloop skills update` (`up`) to re-fetch from the recorded
+sources — only changed files are rewritten and relinked. Locally authored (`skills new`) skills aren't
+locked, since they have no upstream source.
 
 ---
 

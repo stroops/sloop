@@ -18,11 +18,7 @@ hooks:
     working: UserPromptSubmit
     waiting: Notification
     idle: Stop
-heuristics:
-  waiting:
-    - "(y/n)"
-    - "approve"
-    - "press enter"
-  working:
-    - "running command"
-    - "reading file"
+# No `heuristics:` block: Claude's prompts use the cross-tool defaults (see
+# defaultWaitingMarkers/defaultWorkingMarkers in internal/tmux/status.go).
+# Precise status comes from the hooks above; heuristics are only the fallback.
+# Add a heuristics block here only for phrasing the defaults genuinely miss.

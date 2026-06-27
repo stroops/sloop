@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/skills"
 	"github.com/stroops/sloop/internal/workspace"
 )
 
@@ -79,7 +80,26 @@ func RunSkillAdd(startDir, url, name string) (string, []string, error) {
 	if err := os.WriteFile(dst, body, 0o600); err != nil {
 		return "", nil, err
 	}
+	if err := recordSkillLock(ws.SloopDir(), name, url, body); err != nil {
+		return "", nil, err
+	}
 	return dst, ensureSkillsLinked(ws), nil
+}
+
+// recordSkillLock upserts a source-imported skill into .sloop/skills.lock so
+// `sloop skills update` can later re-fetch it reproducibly.
+func recordSkillLock(sloopDir, name, source string, body []byte) error {
+	lock, err := skills.Load(sloopDir)
+	if err != nil {
+		return err
+	}
+	lock.Upsert(skills.Entry{
+		Name:    name,
+		Source:  source,
+		SHA256:  skills.Hash(body),
+		Updated: time.Now().UTC().Format(time.RFC3339),
+	})
+	return lock.Save(sloopDir)
 }
 
 var skillAddName string
