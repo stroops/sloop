@@ -1,177 +1,195 @@
 # ⚓ Sloop
 
-> **A local-first developer workspace for AI coding tools.**
+> **The local-first control layer for your AI coding CLIs.**
+> One canonical context for every tool, and one cross-repo view of every agent you're running.
 
-Sloop is a lightweight CLI that improves the developer experience (DX) of working with AI coding tools such as Claude Code, Cursor CLI, Codex CLI, GitHub Copilot CLI, Gemini CLI, and future local agents.
-
-Instead of replacing existing tools, Sloop provides a shared workspace layer that keeps your AI workflows organized, contextual, and reusable.
-
----
-
-## Why Sloop
-
-Modern AI coding tools are powerful, but using several of them together quickly becomes fragmented.
-
-Developers often need to:
-
-- manage multiple terminal sessions
-- switch between different AI tools
-- repeatedly provide project context
-- remember prompts and workflows
-- maintain personal knowledge and reusable skills
-
-Sloop reduces this friction by introducing a lightweight workspace layer above your existing AI CLI tools.
+Sloop is a single, lightweight Go binary that sits **above** your AI coding tools — Claude Code,
+Cursor CLI, Codex CLI, GitHub Copilot CLI, Gemini CLI, Google Antigravity, and future agents. It
+doesn't replace them or proxy their models; it removes the friction of using several of them, across
+several repos, at once.
 
 ---
 
-## What Sloop Provides
+## The problem
 
-- **One canonical context, every tool sees it** — write your project guidance once in
-  `AGENTS.md` at the repo root. Tools that read `AGENTS.md` natively (Cursor, Codex, Copilot)
-  use it directly; tools with their own file (Claude → `CLAUDE.md`, Gemini → `GEMINI.md`) get a
-  thin **pointer** file that redirects to `AGENTS.md`.
-- **Zero-copy skills** — `.sloop/skills/*.md` is **symlinked** into each tool's native skills
-  directory (e.g. `.claude/skills`). Editing either side edits the same files — no duplication,
-  no drift.
-- **Never clobbers your files** — delivery is **create-if-missing**. Sloop writes what's absent
-  and leaves anything you hand-authored untouched (it warns instead of overwriting). There is no
-  `--force`; recovery is opt-in via `sync --repair`, which backs your file aside before replacing.
-- **One-command launch** — `sloop run claude` cd's into the workspace and starts the tool with
-  context already in place. No juggling terminals, paths, or flags.
-- **Workspaces from anywhere** — register projects once; jump to any of them with
-  `sloop run -w <name>`, with optional tmux multiplexing.
-- **Personal vault (second brain)** — `.sloop/vault/*.md` for your own notes (kept local to the
-  workspace; not delivered to tools).
-- **Session history** — a local SQLite log of what you launched, where, and when.
-- **Local-first** — a single binary, no daemon, no cloud, no required services, CGO-free.
+Running AI coding agents is powerful but quickly gets messy:
 
----
+- **Context is duplicated** — each tool wants its own instructions file (`CLAUDE.md`, `GEMINI.md`, …),
+  so the same project guidance gets copy-pasted and drifts out of sync.
+- **Too many windows** — each agent runs in its own terminal. With a few repos open you lose track of
+  *which agent is waiting for you* and which is still working.
+- **Per-tool knobs everywhere** — skills, hooks, and standard folders differ per provider, so setup is
+  ad-hoc and hard to share with a team.
 
-## Mental Model
+Sloop fixes these with three ideas:
 
-```
-                Developer
-                    │
-                    ▼
-                  Sloop
-                    │
-         AGENTS.md (canonical)  +  .sloop/skills (symlinked)
-                    │
-               ┌────┼─────────────────────┐
-               ▼    ▼                     ▼
-            Claude  Cursor CLI      Other AI CLIs
-        (CLAUDE.md →  (reads        (pointer or native
-         AGENTS.md)   AGENTS.md)     per adapter)
-```
+1. **Portable context** — write guidance once in `AGENTS.md`; every tool reads it (natively, or via a
+   thin pointer file). Skills are written once and **symlinked** into each tool.
+2. **Cross-repo fleet** — `sloop ps` shows every running agent across all your repos, floats the ones
+   **waiting on you** to the top, and lets you jump / reply / kill in place.
+3. **Provider-aware by construction** — everything a tool needs (detect, launch, context, skills,
+   hooks, standard folders) lives in one declarative adapter manifest. Adding a CLI = adding one file.
 
-Sloop focuses on the developer experience, while existing AI tools remain responsible for code generation and reasoning.
+**Local-first:** one binary, no daemon, no cloud, no required services, CGO-free.
 
 ---
 
-## How It Works
+## Prerequisites
 
-`AGENTS.md` (at the repo root) is the **canonical context** — you author it, it's committed to
-git. Sloop's job is to make each tool see it, without copying or clobbering.
+- **To run sloop:** nothing — it's a single static binary. (Building from source needs **Go 1.26+**.)
+- **For the orchestration features** (`ps`, `run --split`, `send`, `attach`, `kill`): a
+  tmux-compatible multiplexer — **[tmux]** on macOS/Linux/WSL, or **[psmux]** on native Windows
+  (auto-detected; override with `SLOOP_MUX`). Everything else works without it.
+- **The AI CLIs you actually use** (`claude`, `cursor`/`agent`, `codex`, `copilot`, `gemini`,
+  `antigravity`) must be installed for sloop to launch them.
 
-`sloop run <tool|profile>`:
+[tmux]: https://github.com/tmux/tmux/wiki/Installing
+[psmux]: https://github.com/psmux/psmux
 
-1. **Resolve the workspace** — walk up to the directory holding `.sloop/`, or use `-w <name>`
-   from the global registry.
-2. **Resolve the target** — a tool, or a profile (a named tool binding).
-3. **Ensure `AGENTS.md` exists** — create a starter if it's missing (never overwrites yours).
-4. **Deliver** —
-   - *pointer-mode tools* (Claude, Gemini): write a thin pointer file (`CLAUDE.md`/`GEMINI.md`)
-     that redirects to `AGENTS.md`, only if absent;
-   - *native-mode tools* (Cursor, Codex, Copilot): nothing to write — they read `AGENTS.md`;
-   - *skills*: symlink `.sloop/skills/` into the tool's native skills dir (relative link, so it
-     survives moving/renaming the repo; falls back to a copy where symlinks aren't available).
-5. **Record the session** in SQLite (best-effort; a write failure warns, never blocks the launch).
-6. **Launch** the tool at the workspace root — through tmux if present, otherwise plain exec.
-   Anything after `--` is passed straight through to the tool (`sloop run claude -- --model opus`).
+---
 
-`sloop sync [tool | --all]` runs steps 1–4 only (no launch), to (re)deliver context and skills.
+## Installation
 
-Sloop is a **single binary, no daemon**. tmux is an optional enhancement, never required.
+```sh
+# Homebrew (macOS / Linux)
+brew install stroops/tap/sloops
+brew upgrade sloops          # to update later
 
-### Commands
+# With Go (always works)
+go install github.com/stroops/sloop/cmd/sloop@latest
 
-```
-sloop init [--name <n>]                       # scaffold AGENTS.md + .sloop/, register workspace, auto-enable detected tools
-sloop sync [tool | --all] [--repair]          # deliver context pointers + skills symlinks (--all: every enabled tool)
-sloop run [tool|profile] [-w <ws>] [-- <a>]   # sync + cd + launch (tmux-aware); args after -- go to the tool
-sloop ls                                      # list workspaces + recent sessions
-sloop attach <name>                           # attach a tmux session (if tmux present)
-sloop tools                                   # list adapters + install status
-sloop doctor                                  # environment health check
-sloop status                                  # one-line Sloop statusline
-sloop skill new <name>                        # scaffold a reusable skill in .sloop/skills
+# From source
+git clone https://github.com/stroops/sloop && cd sloop
+make build                   # → ./sloop   (or: make install)
+
+# Prebuilt binaries: see the GitHub Releases page.
 ```
 
-`sync --repair` is non-destructive: when a target is occupied by a file Sloop didn't create, it
-renames the occupant aside (`<name>.sloopbak-<timestamp>`) and then writes Sloop's artifact. It
-never deletes, and never touches `AGENTS.md`.
+Verify and (optionally) enable shell completion:
+
+```sh
+sloop doctor                 # check tools + multiplexer are detected
+source <(sloop completion zsh)   # bash / fish also supported
+```
 
 ---
 
-## Design Principles
+## Quick start
 
-- Developer experience first
-- Local-first by default
-- Build on existing AI tools
-- Canonical source, never clobbered
-- Reuse knowledge instead of repeating prompts
-- Stay lightweight
+```sh
+cd ~/code/my-service
+sloop init                   # scaffold AGENTS.md + .sloop/, deliver CLAUDE.md, register the workspace
+$EDITOR AGENTS.md            # write your project guidance once
+
+sloop run claude             # sync context, then launch claude (inside tmux if present)
+sloop hooks install          # let `sloop ps` know exactly when an agent is waiting
+
+# …open more agents in more repos…
+sloop ps                     # the whole fleet: who's waiting, who's working — across every repo
+```
+
+In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` kill · `q` quit.
 
 ---
 
-## Workspace
+## Commands (the menu)
 
-A workspace is a project directory containing a `.sloop/` folder. `AGENTS.md` and `.sloop/` are
-committed to git and shared with your team; the generated pointer files and skill symlinks live in
-your tree — commit them or add them to your own `.gitignore`, as you prefer.
+`alias` = command shortcut · `-x` = short flag.
+
+| Command | Alias | Flags (short) | What it does |
+|---|---|---|---|
+| `init` | — | `-s/--scan`, `-S/--scaffold` | Scaffold `AGENTS.md` + `.sloop/`, deliver pointers, register the workspace. `--scan` pre-fills `AGENTS.md` from the codebase; `--scaffold` creates each tool's standard folders. |
+| `run [tool]` | `r` | `-w/--workspace`, `--split`, `-- <args>` | Sync context, then launch a tool (in tmux if present). `--split` runs several side by side; `-w` targets a registered workspace from anywhere. |
+| `sync [tool]` | `s` | `-a/--all`, `-r/--repair`, `-w/--workspace` | (Re)deliver pointer files + skills symlinks without launching. `--repair` safely moves a foreign file aside (never deletes). |
+| `ps [#]` | — | `-f/--watch`, `-n/--interval`, `--waiting`, `--notify`, `--all` | The cross-repo fleet. `<#>` jumps; `-f` live-monitors + alerts; `--all` includes idle workspaces. |
+| `send <target> <msg>` | — | `--waiting`, `--all`, `--yes` | Reply to a running agent without attaching; `--waiting`/`--all` broadcast. |
+| `kill <target>` | — | `--all`, `--waiting`, `--yes` | End session(s) — confirms (skip with `--yes` or global `-y`). |
+| `attach <session>` | `a` | — | Attach to a session by full name. |
+| `skills new\|add <…>` | `sk`, `skill` | `new`→`n`, `add`→`import` | Scaffold or import a reusable skill (shared across every tool). |
+| `hooks install\|list\|print [tool]` | — | — | Wire a tool's own hooks so `ps` status is authoritative. |
+| `tools` | — | — | Capability matrix (context / skills / hooks per tool). |
+| `status` | `st` | — | One-screen workspace summary. |
+| `ls` | — | — | Registered workspaces + recent sessions. |
+| `doctor` | — | — | Environment health (tools, multiplexer, mode). |
+| `hints [list\|on\|off]` | — | — | Contextual education tips (en/vi). |
+| `completion <shell>` / `version` | — | — | Shell completion · version info. |
+
+**Global flags** (any command): `-y/--auto` (assume yes), `--no-color`, `--no-input`, `--config <file>`.
+
+Full, example-driven walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
+
+---
+
+## How it works (in one breath)
+
+`AGENTS.md` at the repo root is the **canonical context** — you author it, it's committed. `sloop run`
+/ `sloop sync` make each tool see it without copying or clobbering: pointer-mode tools (Claude →
+`CLAUDE.md`, Gemini → `GEMINI.md`) get a thin redirect file *only if absent*; native-mode tools
+(Cursor, Codex, Copilot) read `AGENTS.md` directly; `.sloop/skills` is symlinked into each tool's
+skills dir. Delivery is **create-if-missing** — sloop never overwrites a file you hand-authored.
+Launch happens in a tmux/psmux session named `<workspace>__<tool>`, which is what makes the fleet
+view, `send`, and `attach` possible.
+
+Architecture & internals: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
+---
+
+## Workspace layout
 
 ```
 <project>/
   AGENTS.md           # canonical context (hand-authored) — the source of truth
-  CLAUDE.md           # thin pointer → AGENTS.md (generated for Claude)
+  CLAUDE.md           # thin pointer → AGENTS.md (generated, create-if-missing)
   .claude/skills      # symlink → ../.sloop/skills (generated)
   .sloop/
-    config.yaml       # enabled tools, default tool
-    skills/           # reusable *.md snippets — symlinked into each tool's skills dir
-    vault/            # second-brain *.md notes (kept local; not delivered to tools)
-    profiles/         # *.yaml launch presets (a named tool binding)
-    .gitignore        # ignores .sloop/cache/ and *.local
+    config.yaml       # version, enabled tools, default tool
+    skills/           # reusable *.md skills — symlinked into each tool's skills dir (committed)
+    vault/            # personal notes — kept local, gitignored
+    .gitignore
 ```
 
-Machine-local state lives separately under `~/.sloop/`: the workspaces registry, session
-history (`sloop.db`), and any user-added adapter manifests (`~/.sloop/adapters/*.yaml`).
+Machine-local state lives under `~/.sloop/`: the workspaces registry + session history (`sloop.db`,
+SQLite with WAL), hook status markers (`state/`), and any user adapter manifests (`adapters/*.yaml`).
+Config layering is documented in **[docs/CONFIG.md](docs/CONFIG.md)**.
 
-### Adapters
+---
 
-Tools are described by **declarative YAML manifests** — adding a tool is adding a file, not
-editing Go. Built-ins are embedded; user adapters live in `~/.sloop/adapters/*.yaml`:
+## Provider-aware adapters
+
+Every tool is a declarative YAML manifest — adding a CLI is adding a file, never editing Go. Built-ins
+are embedded; user adapters/overrides live in `~/.sloop/adapters/*.yaml`. `sloop tools` shows the
+capability matrix. See **[docs/ADAPTERS.md](docs/ADAPTERS.md)** for the contract.
 
 ```yaml
 name: Claude Code
-detect: claude          # binary checked on PATH
-launch: claude          # launch command
-context:
-  mode: pointer         # "pointer" (generate CLAUDE.md) | "native" (reads AGENTS.md)
-  file: CLAUDE.md
-skills:
-  target: .claude/skills  # dir to symlink .sloop/skills into; empty = none
+detect: claude
+launch: claude
+context: { mode: pointer, file: CLAUDE.md }   # or mode: native (reads AGENTS.md)
+skills:  { target: .claude/skills }
+hooks:                                          # status hooks for `sloop ps`
+  install: settings-json
+  config:  .claude/settings.local.json
+  events:  { working: UserPromptSubmit, waiting: Notification, idle: Stop }
 ```
 
 ---
 
-## Philosophy
+## Philosophy & non-goals
 
-Sloop does not compete with AI coding tools.
+- **Build on existing tools** — sloop syncs context and orchestrates sessions; it never proxies an LLM
+  or replaces a CLI.
+- **Local-first & lightweight** — one CGO-free binary, no daemon, no cloud.
+- **Canonical source, never clobbered** — `AGENTS.md` is yours; delivery is create-if-missing.
+- **Not** an in-repo multi-agent orchestrator with worktrees/dashboards (tools like ntm and Claude
+  Squad own that lane). Sloop's edge is **portable context + the cross-repo fleet view**.
 
-It connects them into a cohesive local development workflow, allowing developers to focus on building instead of managing terminals, prompts, and context.
+## Docs
 
----
+- [docs/USAGE.md](docs/USAGE.md) — hands-on guide, every command with examples
+- [docs/CONFIG.md](docs/CONFIG.md) — the three config layers (local / global / built-in)
+- [docs/ADAPTERS.md](docs/ADAPTERS.md) — the provider-aware adapter contract
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — packages, data flow, internals
 
-## Vision
+## License
 
-Sloop aims to become the developer experience layer for AI-native development—bringing together workspaces, context, skills, memory, and AI coding tools into one simple local workflow.
+See [LICENSE](LICENSE).
