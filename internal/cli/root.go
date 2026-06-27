@@ -68,6 +68,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("no-color", false, "disable colored output")
 	rootCmd.PersistentFlags().BoolP("auto", "y", false, "assume yes / run automatically without prompts")
 	rootCmd.PersistentFlags().Bool("no-input", false, "never prompt; fail instead of asking")
+	rootCmd.PersistentFlags().Bool("debug", false, "log debug diagnostics to stderr (or set SLOOP_DEBUG)")
 
 	_ = viper.BindPFlag("no_color", rootCmd.PersistentFlags().Lookup("no-color"))
 
@@ -76,6 +77,9 @@ func init() {
 }
 
 func initConfig() {
+	debug, _ := rootCmd.PersistentFlags().GetBool("debug")
+	setupLogging(debug)
+
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {

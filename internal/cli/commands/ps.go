@@ -98,7 +98,7 @@ func fleetRows(sessions []tmux.Session) []FleetRow {
 // tmuxList runs `tmux list-sessions`; an error (no server / no sessions) is
 // treated as an empty fleet rather than a hard failure.
 func tmuxList() string {
-	out, err := exec.Command(tmux.Bin(), tmux.BuildListArgs()...).Output()
+	out, err := tmux.Output(tmux.BuildListArgs()...)
 	if err != nil {
 		return ""
 	}
@@ -126,7 +126,7 @@ func enrichGlances(rows []FleetRow) []FleetRow {
 
 			ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 			defer cancel()
-			out, err := exec.CommandContext(ctx, tmux.Bin(), tmux.BuildCaptureArgs(rows[i].Name)...).Output()
+			out, err := tmux.OutputContext(ctx, tmux.BuildCaptureArgs(rows[i].Name)...)
 			if err == nil {
 				rows[i].Glance = truncate(tmux.LastNonEmptyLine(string(out)), 72)
 				rows[i].Status = tmux.ClassifyStatus(string(out))

@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -39,7 +38,7 @@ func renderStatusline(session string) string {
 	st := tmux.StatusUnknown
 	if m, ok := fleetstate.Read(session); ok {
 		st = stateToStatus(m.Status)
-	} else if out, err := exec.Command(tmux.Bin(), tmux.BuildCaptureArgs(session)...).Output(); err == nil {
+	} else if out, err := tmux.Output(tmux.BuildCaptureArgs(session)...); err == nil {
 		st = tmux.ClassifyStatus(string(out))
 	}
 	return fmt.Sprintf("⚓ %s %s %s", ws, tool, tmuxStatusLabel(st))

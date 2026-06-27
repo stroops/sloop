@@ -1,7 +1,9 @@
 package tmux
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -9,6 +11,32 @@ import (
 
 	"github.com/stroops/sloop/internal/runner"
 )
+
+// Run / Output / OutputContext execute a multiplexer subcommand, logging the
+// call (and any error) at debug level so `--debug` shows exactly what sloop
+// asked tmux/psmux to do — the first thing you want when a fleet command
+// misbehaves. All sloop multiplexer access goes through these.
+func Run(args ...string) error {
+	slog.Debug("mux", "bin", Bin(), "args", args)
+	if err := exec.Command(Bin(), args...).Run(); err != nil {
+		slog.Debug("mux failed", "args", args, "err", err)
+		return err
+	}
+	return nil
+}
+
+func Output(args ...string) ([]byte, error) {
+	return OutputContext(context.Background(), args...)
+}
+
+func OutputContext(ctx context.Context, args ...string) ([]byte, error) {
+	slog.Debug("mux", "bin", Bin(), "args", args)
+	out, err := exec.CommandContext(ctx, Bin(), args...).Output()
+	if err != nil {
+		slog.Debug("mux failed", "args", args, "err", err)
+	}
+	return out, err
+}
 
 // muxCandidates are the tmux-compatible multiplexers sloop drives, in
 // preference order. psmux (native Windows, Rust) speaks the same CLI as tmux,
@@ -69,7 +97,7 @@ func DetachLine() string {
 }
 
 func Prefix() string {
-	out, err := exec.Command(Bin(), "show-options", "-g", "prefix").Output()
+	out, err := Output("show-options", "-g", "prefix")
 	if err != nil {
 		return "Ctrl+b"
 	}
@@ -115,7 +143,7 @@ func BuildKillArgs(session string) []string {
 
 // Kill ends a session (the agent stops with it).
 func Kill(session string) error {
-	return exec.Command(Bin(), BuildKillArgs(session)...).Run()
+	return Run(BuildKillArgs(session)...)
 }
 
 func BuildRenameArgs(old, name string) []string {
@@ -125,13 +153,13 @@ func BuildRenameArgs(old, name string) []string {
 // Rename renames a running session (used to adopt an external session into the
 // sloop `<workspace>__<tool>` convention).
 func Rename(old, name string) error {
-	return exec.Command(Bin(), BuildRenameArgs(old, name)...).Run()
+	return Run(BuildRenameArgs(old, name)...)
 }
 
 // SessionPath reports a session's active pane working directory (best-effort),
 // so an adopted session can be registered against its repo path.
 func SessionPath(session string) string {
-	out, err := exec.Command(Bin(), "display-message", "-t", session, "-p", "#{pane_current_path}").Output()
+	out, err := Output("display-message", "-t", session, "-p", "#{pane_current_path}")
 	if err != nil {
 		return ""
 	}
@@ -149,7 +177,7 @@ func (r Runner) Launch(s runner.Spec) error {
 	// before attaching; then attach (or switch if already inside tmux).
 	if !hasSession(r.Session) {
 		create := append([]string{"new-session", "-d", "-s", r.Session, "-c", s.Dir, s.Command}, s.Args...)
-		if err := exec.Command(Bin(), create...).Run(); err != nil {
+		if err := Run(create...); err != nil {
 			return err
 		}
 		SetStatusLine(r.Session)

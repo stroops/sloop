@@ -28,14 +28,14 @@ func BuildBindArgs(key, command string) []string {
 
 // BindPopup binds <prefix> <key> to open command in a popup on the live server.
 func BindPopup(key, command string) error {
-	return exec.Command(Bin(), BuildBindArgs(key, command)...).Run()
+	return Run(BuildBindArgs(key, command)...)
 }
 
 var versionRe = regexp.MustCompile(`(\d+)\.(\d+)`)
 
 // Version returns the multiplexer major/minor version (0,0 if unknown).
 func Version() (major, minor int) {
-	out, err := exec.Command(Bin(), "-V").Output()
+	out, err := Output("-V")
 	if err != nil {
 		return 0, 0
 	}

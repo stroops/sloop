@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -23,7 +22,7 @@ func currentSession() string {
 	if os.Getenv("TMUX") == "" {
 		return ""
 	}
-	out, err := exec.Command(tmux.Bin(), "display-message", "-p", "#S").Output()
+	out, err := tmux.Output("display-message", "-p", "#S")
 	if err != nil {
 		return ""
 	}

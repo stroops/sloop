@@ -1,7 +1,5 @@
 package tmux
 
-import "os/exec"
-
 // Send delivers a prompt to a running session without attaching. It is
 // non-invasive: send-keys types into your own tmux pane exactly as if you did
 // so at the keyboard — sloop never injects into the provider's process or API.
@@ -21,8 +19,8 @@ func BuildSendEnterArgs(session string) []string {
 
 // LaunchSend types msg into the session and submits it with Enter.
 func LaunchSend(session, msg string) error {
-	if err := exec.Command(Bin(), BuildSendTextArgs(session, msg)...).Run(); err != nil {
+	if err := Run(BuildSendTextArgs(session, msg)...); err != nil {
 		return err
 	}
-	return exec.Command(Bin(), BuildSendEnterArgs(session)...).Run()
+	return Run(BuildSendEnterArgs(session)...)
 }

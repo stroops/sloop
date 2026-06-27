@@ -3,7 +3,6 @@ package tmux
 import (
 	"fmt"
 	"os"
-	"os/exec"
 )
 
 // StatusRightFormat is the tmux status-right value that calls back into sloop to
@@ -21,7 +20,7 @@ func SetStatusLine(session string) {
 		exe = "sloop"
 	}
 	set := func(opt, val string) {
-		_ = exec.Command(Bin(), "set-option", "-t", session, opt, val).Run()
+		_ = Run("set-option", "-t", session, opt, val)
 	}
 	set("status-right", StatusRightFormat(exe, session))
 	set("status-right-length", "60")
