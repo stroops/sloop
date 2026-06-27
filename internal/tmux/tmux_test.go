@@ -39,3 +39,22 @@ func TestDetachHintAndLine(t *testing.T) {
 		t.Fatalf("DetachLine = %q", DetachLine())
 	}
 }
+
+func TestResolveBin(t *testing.T) {
+	// env override wins.
+	if b := resolveBin("psmux", func(string) bool { return false }); b != "psmux" {
+		t.Fatalf("env override: got %q", b)
+	}
+	// prefer tmux when both present.
+	if b := resolveBin("", func(string) bool { return true }); b != "tmux" {
+		t.Fatalf("prefer tmux: got %q", b)
+	}
+	// fall back to psmux when only it is present.
+	if b := resolveBin("", func(c string) bool { return c == "psmux" }); b != "psmux" {
+		t.Fatalf("psmux fallback: got %q", b)
+	}
+	// default when nothing found.
+	if b := resolveBin("", func(string) bool { return false }); b != "tmux" {
+		t.Fatalf("default: got %q", b)
+	}
+}

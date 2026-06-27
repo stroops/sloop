@@ -14,3 +14,9 @@ func TestQuote(t *testing.T) {
 		}
 	}
 }
+
+func TestPsEscape(t *testing.T) {
+	if got := psEscape("it's a 'test'"); got != "it''s a ''test''" {
+		t.Fatalf("psEscape = %q", got)
+	}
+}

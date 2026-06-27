@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stroops/sloop/internal/fleetstate"
+	"github.com/stroops/sloop/internal/tmux"
 )
 
 // currentSession resolves the sloop/tmux session the hook is firing inside.
@@ -22,7 +23,7 @@ func currentSession() string {
 	if os.Getenv("TMUX") == "" {
 		return ""
 	}
-	out, err := exec.Command("tmux", "display-message", "-p", "#S").Output()
+	out, err := exec.Command(tmux.Bin(), "display-message", "-p", "#S").Output()
 	if err != nil {
 		return ""
 	}

@@ -5,12 +5,50 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/stroops/sloop/internal/runner"
 )
 
+// muxCandidates are the tmux-compatible multiplexers sloop drives, in
+// preference order. psmux (native Windows, Rust) speaks the same CLI as tmux,
+// so the whole backend works on Windows by just picking a different binary.
+var muxCandidates = []string{"tmux", "psmux"}
+
+var (
+	binOnce sync.Once
+	binName string
+)
+
+// Bin returns the multiplexer binary to invoke: $SLOOP_MUX if set, else the
+// first of tmux/psmux found on PATH, else "tmux" (so callers still get a
+// sensible command; Available() reports whether it actually exists).
+func Bin() string {
+	binOnce.Do(func() {
+		binName = resolveBin(os.Getenv("SLOOP_MUX"), func(c string) bool {
+			_, err := exec.LookPath(c)
+			return err == nil
+		})
+	})
+	return binName
+}
+
+// resolveBin is the pure selection logic behind Bin (testable without PATH).
+func resolveBin(env string, onPath func(string) bool) string {
+	if env != "" {
+		return env
+	}
+	for _, c := range muxCandidates {
+		if onPath(c) {
+			return c
+		}
+	}
+	return "tmux"
+}
+
+// Available reports whether a usable multiplexer (tmux or psmux) is installed.
 func Available() bool {
-	_, err := exec.LookPath("tmux")
+	_, err := exec.LookPath(Bin())
 	return err == nil
 }
 
@@ -31,7 +69,7 @@ func DetachLine() string {
 }
 
 func Prefix() string {
-	out, err := exec.Command("tmux", "show-options", "-g", "prefix").Output()
+	out, err := exec.Command(Bin(), "show-options", "-g", "prefix").Output()
 	if err != nil {
 		return "Ctrl+b"
 	}
@@ -78,7 +116,7 @@ type Runner struct {
 func (r Runner) Launch(s runner.Spec) error {
 	fmt.Printf("\n%s\n\n", DetachHint())
 
-	cmd := exec.Command("tmux", BuildNewArgs(r.Session, s)...)
+	cmd := exec.Command(Bin(), BuildNewArgs(r.Session, s)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

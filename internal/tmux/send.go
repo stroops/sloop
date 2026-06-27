@@ -21,8 +21,8 @@ func BuildSendEnterArgs(session string) []string {
 
 // LaunchSend types msg into the session and submits it with Enter.
 func LaunchSend(session, msg string) error {
-	if err := exec.Command("tmux", BuildSendTextArgs(session, msg)...).Run(); err != nil {
+	if err := exec.Command(Bin(), BuildSendTextArgs(session, msg)...).Run(); err != nil {
 		return err
 	}
-	return exec.Command("tmux", BuildSendEnterArgs(session)...).Run()
+	return exec.Command(Bin(), BuildSendEnterArgs(session)...).Run()
 }

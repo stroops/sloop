@@ -22,7 +22,7 @@ func RunAttach(session string) error {
 
 	fmt.Printf("\n%s\n\n", tmux.DetachHint())
 
-	cmd := exec.Command("tmux", tmux.BuildAttachArgs(session)...)
+	cmd := exec.Command(tmux.Bin(), tmux.BuildAttachArgs(session)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

@@ -20,7 +20,7 @@ func BuildTiledLayout(session string) []string {
 }
 
 func hasSession(session string) bool {
-	return exec.Command("tmux", "has-session", "-t", session).Run() == nil
+	return exec.Command(Bin(), "has-session", "-t", session).Run() == nil
 }
 
 // LaunchSplit creates (idempotently) a tmux session with one pane per command,
@@ -31,22 +31,22 @@ func LaunchSplit(session, dir string, cmds []string) error {
 		return nil
 	}
 	if !hasSession(session) {
-		if err := exec.Command("tmux", BuildSplitNew(session, dir, cmds[0])...).Run(); err != nil {
+		if err := exec.Command(Bin(), BuildSplitNew(session, dir, cmds[0])...).Run(); err != nil {
 			return err
 		}
 		for _, c := range cmds[1:] {
-			if err := exec.Command("tmux", BuildSplitAdd(session, dir, c)...).Run(); err != nil {
+			if err := exec.Command(Bin(), BuildSplitAdd(session, dir, c)...).Run(); err != nil {
 				return err
 			}
 			// Re-tile after each pane so tmux always has room for the next.
-			_ = exec.Command("tmux", BuildTiledLayout(session)...).Run()
+			_ = exec.Command(Bin(), BuildTiledLayout(session)...).Run()
 		}
 	}
 	args := BuildAttachArgs(session)
 	if os.Getenv("TMUX") != "" {
 		args = BuildSwitchArgs(session)
 	}
-	c := exec.Command("tmux", args...)
+	c := exec.Command(Bin(), args...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
 }
