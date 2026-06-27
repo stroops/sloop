@@ -15,8 +15,10 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/runner"
+	"github.com/stroops/sloop/internal/session"
 	"github.com/stroops/sloop/internal/tui"
 )
 
@@ -30,6 +32,37 @@ type FleetRow struct {
 	Activity  time.Time
 	Glance    string             // last line of the session's own terminal output (best-effort)
 	Status    runner.AgentStatus // waiting / working / idle, classified from the pane
+	Path      string             // repo path from the registry (cross-repo context)
+}
+
+// registryPaths maps each registered workspace name to its repo path, so the
+// fleet view can show where a session lives and surface known-but-idle repos.
+func registryPaths() map[string]string {
+	dbPath, err := config.GlobalDBPath()
+	if err != nil {
+		return nil
+	}
+	store, err := session.Open(dbPath)
+	if err != nil {
+		return nil
+	}
+	defer store.Close()
+	wss, err := store.ListWorkspaces()
+	if err != nil {
+		return nil
+	}
+	m := make(map[string]string, len(wss))
+	for _, ws := range wss {
+		m[ws.Name] = ws.Path
+	}
+	return m
+}
+
+// annotatePaths fills each row's Path from the registry (best-effort).
+func annotatePaths(rows []FleetRow, paths map[string]string) {
+	for i := range rows {
+		rows[i].Path = paths[rows[i].Workspace]
+	}
 }
 
 // fleetRows keeps only sloop-named sessions (`<workspace>__<tool>`), splitting
@@ -243,8 +276,42 @@ var (
 	psWatch    bool
 	psWaiting  bool
 	psNotify   bool
+	psAll      bool
 	psInterval time.Duration
 )
+
+// notRunningWorkspaces lists registered workspaces that have no live session,
+// sorted by name — the rest of your cross-repo fleet that isn't running yet.
+func notRunningWorkspaces(rows []FleetRow, paths map[string]string) []string {
+	running := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		running[r.Workspace] = true
+	}
+	var idle []string
+	for name := range paths {
+		if !running[name] {
+			idle = append(idle, name)
+		}
+	}
+	sort.Strings(idle)
+	return idle
+}
+
+// runPsAll prints the live fleet plus the registered workspaces that aren't
+// running — the full cross-repo board, not just what's live right now.
+func runPsAll(w io.Writer, rows []FleetRow, paths map[string]string) error {
+	_ = RunPs(w, rows)
+	idle := notRunningWorkspaces(rows, paths)
+	if len(idle) == 0 {
+		return nil
+	}
+	fmt.Fprintf(w, "\nKnown workspaces (not running):\n")
+	for _, name := range idle {
+		fmt.Fprintf(w, "  ○ %-16s %s\n", name, paths[name])
+	}
+	fmt.Fprintln(w, "\nstart one: sloop run -w <name>")
+	return nil
+}
 
 var psCmd = &cobra.Command{
 	Use:   "ps [#]",
@@ -264,13 +331,21 @@ var psCmd = &cobra.Command{
 			return runWatch(cmd.OutOrStdout(), psInterval, psWaiting, psNotify)
 		}
 
+		rows = enrichGlances(rows)
+		sortNeedsAttention(rows)
+		paths := registryPaths()
+		annotatePaths(rows, paths)
+
+		// --all: the full cross-repo board (live + known-but-idle workspaces).
+		if psAll {
+			return runPsAll(cmd.OutOrStdout(), rows, paths)
+		}
+
 		if len(rows) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
+			fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces).")
 			return nil
 		}
 
-		rows = enrichGlances(rows)
-		sortNeedsAttention(rows)
 		if psWaiting {
 			rows = filterWaiting(rows)
 			if len(rows) == 0 {
@@ -404,6 +479,7 @@ func RegisterPs(cmd *cobra.Command) {
 	psCmd.Flags().BoolVarP(&psWatch, "watch", "f", false, "follow the fleet live: refresh on an interval and alert when an agent needs you")
 	psCmd.Flags().BoolVar(&psWaiting, "waiting", false, "show only sessions waiting on you")
 	psCmd.Flags().BoolVar(&psNotify, "notify", false, "with --watch, also send a desktop notification on new waiting agents")
+	psCmd.Flags().BoolVar(&psAll, "all", false, "also list registered workspaces that aren't running (full cross-repo board)")
 	psCmd.Flags().DurationVarP(&psInterval, "interval", "n", 2*time.Second, "refresh interval for --watch")
 	psCmd.ValidArgsFunction = completePsIndex
 	cmd.AddCommand(psCmd)

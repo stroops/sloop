@@ -86,3 +86,24 @@ func TestFilterWaitingAndNewlyWaiting(t *testing.T) {
 		t.Fatalf("stable snapshot should yield none, got %v", n)
 	}
 }
+
+func TestNotRunningWorkspaces(t *testing.T) {
+	rows := []FleetRow{{Workspace: "api"}, {Workspace: "web"}}
+	paths := map[string]string{"api": "/a", "web": "/w", "infra": "/i", "docs": "/d"}
+	got := notRunningWorkspaces(rows, paths)
+	if len(got) != 2 || got[0] != "docs" || got[1] != "infra" {
+		t.Fatalf("got %v, want [docs infra]", got)
+	}
+}
+
+func TestRunPsAllShowsNotRunning(t *testing.T) {
+	var b bytes.Buffer
+	rows := []FleetRow{{Workspace: "api", Tool: "claude", Name: "api__claude", Activity: time.Now()}}
+	paths := map[string]string{"api": "/a", "infra": "/srv/infra"}
+	_ = runPsAll(&b, rows, paths)
+	out := b.String()
+	if !strings.Contains(out, "Known workspaces (not running)") ||
+		!strings.Contains(out, "infra") || !strings.Contains(out, "/srv/infra") {
+		t.Fatalf("missing not-running section: %s", out)
+	}
+}
