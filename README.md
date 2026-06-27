@@ -54,8 +54,8 @@ Sloop fixes these with three ideas:
 
 ```sh
 # Homebrew (macOS / Linux)
-brew install stroops/tap/sloops
-brew upgrade sloops          # to update later
+brew install stroops/tap/sloop
+brew upgrade sloop           # to update later
 
 # With Go (always works)
 go install github.com/stroops/sloop/cmd/sloop@latest
