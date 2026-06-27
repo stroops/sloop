@@ -109,8 +109,9 @@ jump: sloop ps <#>   ·   send: sloop send <#> "msg"
   `○ idle`, or `● attached`. **Sessions waiting on you float to the top** so you see who
   needs you first.
 - The `└` line is the session's last terminal output (the glance).
-- On a real terminal, `sloop ps` opens an arrow-key menu (Enter to jump); piped/CI it
-  prints the plain listing above.
+- On a real terminal, `sloop ps` opens an interactive menu — `↑/↓` (or `j/k`) to move,
+  `Enter` to jump, `q`/`Esc` to quit. Piped/CI prints the plain listing above. Colors honor
+  `NO_COLOR` and `--no-color`, and turn off automatically when output isn't a terminal.
 - Jump straight to one:
 
 ```sh
