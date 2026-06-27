@@ -22,7 +22,7 @@ import (
 // records a marker `sloop ps` reads.
 
 // hookCommandFor is the shell command a tool runs for a sloop state.
-func hookCommandFor(state string) string { return "sloop hook " + state }
+func hookCommandFor(state string) string { return appName + " hook " + state }
 
 // eventCommands turns a manifest's event→state mapping into the event→command
 // map the installers and printers use, skipping states the tool can't signal.
@@ -178,7 +178,7 @@ var hooksInstallCmd = &cobra.Command{
 	Short: "Install sloop status hooks (auto for settings-json tools; others: see `hooks print`)",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tool := "claude"
+		tool := fallbackTool
 		if len(args) == 1 {
 			tool = args[0]
 		}
@@ -223,7 +223,7 @@ var hooksPrintCmd = &cobra.Command{
 	Short: "Print how to wire a tool's hooks to sloop (settings-json tools print a JSON snippet)",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tool := "claude"
+		tool := fallbackTool
 		if len(args) == 1 {
 			tool = args[0]
 		}

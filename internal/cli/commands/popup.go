@@ -10,7 +10,7 @@ import (
 )
 
 // fleetPopupCmd is what the keybind runs: the cross-repo fleet in a popup.
-const fleetPopupCmd = "sloop ps"
+const fleetPopupCmd = appName + " ps"
 
 var popupCmd = &cobra.Command{
 	Use:   "popup",

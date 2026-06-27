@@ -43,10 +43,10 @@ func RunInit(dir string, scan bool) ([]string, error) {
 	}
 	enabled := detect.InstalledKeys(manifests)
 	if len(enabled) == 0 {
-		enabled = []string{"claude"}
+		enabled = []string{fallbackTool}
 	}
-	defaultTool := "claude"
-	if !contains(enabled, "claude") {
+	defaultTool := fallbackTool
+	if !contains(enabled, fallbackTool) {
 		defaultTool = enabled[0]
 	}
 
@@ -142,7 +142,7 @@ var initCmd = &cobra.Command{
 			manifests, _ := adapter.Load()
 			det := detect.InstalledKeys(manifests)
 			if len(det) == 0 {
-				det = []string{"claude"}
+				det = []string{fallbackTool}
 			}
 			cmd.Printf("Detected tools: %s\n", strings.Join(det, ", "))
 			cmd.Println(tui.Grey("(edit .sloop/config.yaml later to change which are enabled)"))
