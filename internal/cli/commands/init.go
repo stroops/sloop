@@ -1,10 +1,13 @@
 package commands
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
@@ -13,6 +16,7 @@ import (
 	scanpkg "github.com/stroops/sloop/internal/scan"
 	"github.com/stroops/sloop/internal/session"
 	syncpkg "github.com/stroops/sloop/internal/sync"
+	"github.com/stroops/sloop/internal/tui"
 )
 
 const sloopGitignore = `# Local, machine-specific caches
@@ -127,6 +131,26 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		// Interactive onboarding: when on a real terminal and not under
+		// --auto/--no-input, walk a new user through the choices. Otherwise keep
+		// the scriptable behavior (flags only).
+		wantHooks := false
+		if interactiveInit(cmd) {
+			r := bufio.NewReader(os.Stdin)
+			ix := initInteraction(cmd)
+			manifests, _ := adapter.Load()
+			det := detect.InstalledKeys(manifests)
+			if len(det) == 0 {
+				det = []string{"claude"}
+			}
+			cmd.Printf("Detected tools: %s\n", strings.Join(det, ", "))
+			cmd.Println(tui.Grey("(edit .sloop/config.yaml later to change which are enabled)"))
+			initScan = ix.Ask("Pre-fill AGENTS.md from your codebase?", true, r, cmd.OutOrStdout())
+			initScaffold = ix.Ask("Create each tool's standard folders?", false, r, cmd.OutOrStdout())
+			wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())
+		}
+
 		summary, err := RunInit(cwd, initScan)
 		if err != nil {
 			return err
@@ -135,10 +159,61 @@ var initCmd = &cobra.Command{
 		for _, l := range summary {
 			cmd.Printf("  %s\n", l)
 		}
+		if wantHooks {
+			for _, l := range installHooksForEnabled(cwd) {
+				cmd.Printf("  %s\n", l)
+			}
+		}
 		cmd.Println("Next: edit AGENTS.md, then `sloop run`.")
 		hints.Show(cmd.OutOrStdout(), "init")
 		return nil
 	},
+}
+
+// initInteraction resolves auto/no-input from the global flags + config mode.
+func initInteraction(cmd *cobra.Command) Interaction {
+	autoFlag, _ := cmd.Flags().GetBool("auto")
+	noInput, _ := cmd.Flags().GetBool("no-input")
+	gmode := ""
+	if g, err := config.LoadGlobal(); err == nil {
+		gmode = g.Mode
+	}
+	return ResolveInteraction("", gmode, autoFlag, noInput)
+}
+
+// interactiveInit reports whether init should prompt: a real terminal and not
+// forced non-interactive.
+func interactiveInit(cmd *cobra.Command) bool {
+	ix := initInteraction(cmd)
+	return !ix.Auto && !ix.NoInput && term.IsTerminal(int(os.Stdin.Fd()))
+}
+
+// installHooksForEnabled installs status hooks for each enabled settings-json
+// tool (claude/gemini), reusing the hooks installer. Best-effort.
+func installHooksForEnabled(root string) []string {
+	var log []string
+	proj, err := config.LoadProject(filepath.Join(root, config.SloopDirName))
+	if err != nil {
+		return log
+	}
+	manifests, err := adapter.Load()
+	if err != nil {
+		return log
+	}
+	for _, tool := range proj.Tools {
+		m, ok := manifests[tool]
+		if !ok || m.Hooks.Install != "settings-json" {
+			continue
+		}
+		path, err := resolveHookConfigPath(root, m.Hooks.Config)
+		if err != nil {
+			continue
+		}
+		if changed, err := installSettingsHooks(path, eventCommands(m.Hooks)); err == nil && changed {
+			log = append(log, "hooks: installed for "+tool)
+		}
+	}
+	return log
 }
 
 func RegisterInit(cmd *cobra.Command) {

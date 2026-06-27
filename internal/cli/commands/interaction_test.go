@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"strings"
 	"testing"
 
@@ -44,5 +45,29 @@ func TestConfirmReadsYes(t *testing.T) {
 	ok, _ = Interaction{}.Confirm("go?", strings.NewReader("n\n"), &strings.Builder{})
 	if ok {
 		t.Fatal("want false on n")
+	}
+}
+
+func TestAskDefaultsAndModes(t *testing.T) {
+	out := &strings.Builder{}
+	mk := func(s string) *bufio.Reader { return bufio.NewReader(strings.NewReader(s)) }
+
+	if !(Interaction{}).Ask("?", true, mk("\n"), out) {
+		t.Fatal("empty input should take defaultYes=true")
+	}
+	if (Interaction{}).Ask("?", false, mk("\n"), out) {
+		t.Fatal("empty input should take defaultNo=false")
+	}
+	if !(Interaction{}).Ask("?", false, mk("y\n"), out) {
+		t.Fatal("explicit y should be true")
+	}
+	if (Interaction{}).Ask("?", true, mk("n\n"), out) {
+		t.Fatal("explicit n should be false")
+	}
+	if !(Interaction{Auto: true}).Ask("?", false, nil, out) {
+		t.Fatal("auto should force true")
+	}
+	if !(Interaction{NoInput: true}).Ask("?", true, nil, out) {
+		t.Fatal("no-input should take the default")
 	}
 }
