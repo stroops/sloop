@@ -16,3 +16,7 @@ new CLI, drop in one `<tool>.yaml` — no Go changes unless it needs a brand-new
 
 User config is **unified** (one local `.sloop/config.yaml` + one global `~/.sloop/config.yaml` +
 the global DB), never split per provider.
+
+## Development workflow
+
+- **Always run `make lint` and `make test` before committing.** This project requires strict adherence to linting rules and 100% passing tests.
