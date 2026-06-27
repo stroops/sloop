@@ -109,6 +109,16 @@ cross-repo wedge specifically — not generic orchestration.
   minimal `PRAGMA user_version` migration runner (append-one-string; no framework). Safe for
   concurrent cross-repo writes.
 
+## Windows support (shipped, needs verification)
+
+- **Multiplexer-agnostic backend** — `tmux.Bin()` auto-detects `tmux` then **psmux** (native Windows,
+  tmux-CLI-compatible — same `new-session/list-sessions/capture-pane/send-keys/split-window/…`), with
+  `SLOOP_MUX` override. All `exec.Command("tmux")` route through `Bin()`. macOS/Linux unchanged.
+  **Lightweight win:** no WSL, no ConPTY reimplementation — psmux speaks tmux's CLI.
+- **Windows desktop notifications** — `osNotify` adds a PowerShell balloon (best-effort).
+- ⚠️ The psmux path is wired but **not yet verified on a real Windows machine** — needs a dogfood pass
+  for exact flag/format-variable compatibility (`list-sessions -F`, `capture-pane -p`, etc.).
+
 ## Later / parked
 
 - **`sloop init --scan` LLM enrichment** + **AI `sloop doctor`** — when reached, add a **minimal**

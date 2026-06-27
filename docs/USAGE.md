@@ -2,10 +2,14 @@
 
 A practical, example-driven walkthrough. For the "what & why", see `README.md`.
 
-> **Requirements:** Go 1.26 to build. **tmux** (macOS/Linux) for the orchestration features
-> (`run --split`, `ps`). Plain `sloop run` works without tmux (single tool, no multiplexing).
-> The AI tool binaries you target (`claude`, `cursor`/`agent`, `codex`, `copilot`, `gemini`) must
-> be installed for sloop to launch them.
+> **Requirements:** Go 1.26 to build. A **tmux-compatible multiplexer** for the orchestration
+> features (`run --split`, `ps`, `send`, `attach`): **tmux** on macOS/Linux, or **[psmux]**
+> (native, tmux-CLI-compatible) on Windows — no WSL needed. sloop auto-detects `tmux` then `psmux`;
+> override with `SLOOP_MUX=<binary>`. Plain `sloop run` works without any multiplexer (single tool).
+> The AI tool binaries you target (`claude`, `cursor`/`agent`, `codex`, `copilot`, `gemini`, `agy`)
+> must be installed for sloop to launch them.
+>
+> [psmux]: https://github.com/psmux/psmux
 
 ---
 
@@ -317,11 +321,12 @@ question that decides whether the orchestration direction is worth doubling down
 
 ## Limits (today)
 
-- Orchestration (`ps`, `run --split`, `attach`, `send`) needs **tmux** → macOS/Linux/WSL. On
-  Windows without tmux these features are simply unavailable, but everything else (`init`, `sync`,
-  `skills`, `hooks`, `tools`, `status`, the registry DB) works fine. The tmux backend lives in its own
-  package (`internal/tmux`) behind the `runner.Runner` seam, so a native Windows multiplexer backend
-  can be added later without touching the rest of the code.
+- Orchestration (`ps`, `run --split`, `attach`, `send`) needs a tmux-compatible multiplexer:
+  **tmux** on macOS/Linux, **psmux** on native Windows (auto-detected; `SLOOP_MUX` overrides).
+  Without one, the orchestration commands are unavailable but everything else (`init`, `sync`,
+  `skills`, `hooks`, `tools`, `status`, the registry DB) works fine. The multiplexer backend lives in
+  `internal/tmux` behind the `runner.Runner` seam. **Note:** the psmux path is wired but not yet
+  verified on a real Windows box — please report flag incompatibilities.
 - The `ps` glance is a heuristic by default; install each tool's hooks (`sloop hooks install`) to make
   status authoritative.
 - `sloop` launches tool binaries directly (no shell), so an adapter's `launch:` must be a plain
