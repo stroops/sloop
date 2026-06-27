@@ -43,6 +43,10 @@ never intercept/inject); stay a single lightweight CGO-free Go binary, no daemon
   output line, non-invasive) + `ps <#>` jump; `run --split` (panes, minor convenience).
 - **Micro-TUI for `ps`/`ls`:** zero-dependency, colored, ANSI-raw interactive menu (arrow-key
   select / jump) — no external TUI lib, single binary preserved (`internal/tui`).
+- **Precise-ish status + `sloop send`:** `ps` classifies each session from its own pane
+  (non-invasive) into waiting / working / idle and floats "waiting on you" to the top;
+  `sloop send <#|session|workspace> "msg"` injects a prompt via `tmux send-keys` without
+  attaching. Provider hooks (Claude `Stop`/`Notification`) remain a later precision upgrade.
 
 ## Now — validating
 
@@ -54,11 +58,10 @@ cross-repo wedge specifically — not generic orchestration.
 
 ## Next actions (post-dogfood, prioritized for the wedge)
 
-1. **Precise agent status & Remote messaging (`sloop send`)** ⭐ — Depend on provider hooks (e.g.
-   Claude `Stop`/`Notification`) or shell markers to accurately detect if an agent is waiting. Once
-   status is precise, introduce `sloop send <session> "msg"` (via `tmux send-keys`) to inject prompts
-   without attaching. Overcomes the CLI limitation of lacking a direct chat box. Directly answers the
-   dogfood question ("which agent needs me") and upgrades the heuristic glance line in `ps`.
+1. **Status precision upgrade (provider hooks)** — the capture-pane classifier shipped; make it
+   exact for Claude by installing its own `Stop`/`Notification` hooks (writing a marker `sloop`
+   reads) so "waiting/done" is authoritative, with the heuristic as fallback for other tools. Also
+   a `sloop ps --waiting` filter and watch/auto-refresh once status is trustworthy.
 2. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
    ntm/Squad don't do skills distribution). Path: (a) shipped `skills add <url|github>`;
    (b) a `.sloop/skills.lock` recording each imported skill + source so `skills update` re-fetches

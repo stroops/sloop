@@ -94,23 +94,43 @@ sloop ps
 ```
 
 ```
-⚓ AI fleet — 2 running
+⚓ AI fleet — 2 running, 1 waiting on you
 
-  1   my-service       cursor    ○ idle · active just now
-      └ Running tests... 12 passed
-  2   webapp           claude    ● attached · active 3m ago
+  1   webapp           claude    ◆ waiting on you · active 3m ago
       └ │ Waiting for your approval to edit main.go
+  2   my-service       cursor    ▸ working · active just now
+      └ Running tests... 12 passed
 
-jump: sloop ps <#>   (switches client if you're already in tmux)
+jump: sloop ps <#>   ·   send: sloop send <#> "msg"
 ```
 
-- The `└` line is each session's **last terminal output** — glance to see which agent needs you.
+- Each session is classified from **its own terminal** (non-invasive — sloop never
+  reads the provider): `◆ waiting on you` (blocked on an approval/question), `▸ working`,
+  `○ idle`, or `● attached`. **Sessions waiting on you float to the top** so you see who
+  needs you first.
+- The `└` line is the session's last terminal output (the glance).
+- On a real terminal, `sloop ps` opens an arrow-key menu (Enter to jump); piped/CI it
+  prints the plain listing above.
 - Jump straight to one:
 
 ```sh
 sloop ps 2          # attach (or switch-client if you're already inside tmux)
 sloop attach webapp__claude   # attach by full session name
 ```
+
+### Answer an agent without attaching (`sloop send`)
+
+When `ps` shows an agent `◆ waiting on you`, reply without switching to it:
+
+```sh
+sloop send 1 "yes, go ahead"                    # by fleet number (from ps)
+sloop send webapp__claude "use the opus model"  # by full session name
+sloop send webapp "run the tests"               # by workspace (if it has one session)
+```
+
+`send` types the message into that session's pane and presses Enter — exactly as if you
+typed it yourself (via `tmux send-keys`; the provider is never intercepted). Great for
+unblocking an agent across repos without losing your place.
 
 ---
 
