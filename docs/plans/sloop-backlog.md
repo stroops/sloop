@@ -37,6 +37,8 @@ never intercept/inject); stay a single lightweight CGO-free Go binary, no daemon
   `status`; `run … -- <args>`; README aligned.
 - **`sloop init --scan`:** heuristic, no-LLM codebase scan → pre-filled `AGENTS.md` (language,
   build/test/lint commands with Makefile precedence, layout, README seed, Conventions placeholder).
+- **Skills management:** `sloop skills new` (scaffold + auto-link into tools) and `sloop skills add`
+  (import from a URL / GitHub blob). Command renamed `skill` → `skills` (aliases kept).
 - **Cross-repo fleet prototype:** `sloop ps` (running sessions across workspaces) + glance (last
   output line, non-invasive) + `ps <#>` jump; `run --split` (panes, minor convenience).
 
@@ -55,6 +57,11 @@ cross-repo wedge specifically — not generic orchestration.
    than `tmux list-sessions`.
 2. **Context-portability depth** — confirm/extend per-tool delivery (native vs pointer) for more
    tools; skills authored once → everywhere; keep AGENTS.md the single canonical source.
+3. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
+   ntm/Squad don't do skills distribution). Path: (a) shipped `skills add <url|github>`;
+   (b) a `.sloop/skills.lock` recording each imported skill + source so `skills update` re-fetches
+   and the team gets reproducible skills; (c) later, a registry (`skills search`/`add <name>`)
+   resolving from skills.sh or a curated index. _(skills.sh's API/format needs investigating first.)_
 3. **`init --scan` LLM enrichment** — reuse a minimal LLM client to turn the heuristic scaffold into
    prose (Phase 5 Step C); only when a minimal client exists.
 4. **Complementarity** — document/position sloop as working *alongside* ntm/Claude Squad (context +

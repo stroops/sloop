@@ -138,11 +138,15 @@ Delivery is **create-if-missing**: sloop never overwrites a file you hand-author
 ## 5. Skills (shared across every tool)
 
 ```sh
-sloop skill new code-review     # scaffolds .sloop/skills/code-review.md
+sloop skills new code-review                                  # scaffold + link into your tools
+sloop skills add https://example.com/review.md               # import from a URL
+sloop skills add https://github.com/o/r/blob/main/review.md  # GitHub blob URL (auto-raw)
+sloop skills add <url> --name custom-name                    # override the derived name
 ```
 
-Write the skill in `.sloop/skills/*.md`. Because it's **symlinked** into each tool's skills dir,
-every tool sees the same set — edit once, available everywhere.
+Skills live in `.sloop/skills/*.md` and are **symlinked** into each tool's skills dir — write or
+import once, every tool sees the same set. `skills new`/`add` link them in automatically (`skill`
+and `sk` are aliases). If a tool isn't linked yet, run `sloop sync`.
 
 ---
 
