@@ -1,8 +1,5 @@
 # AGENTS.md
 
-Project guidance for AI coding tools. Describe the project, conventions, and constraints here.
-This is the canonical context; sloop points other tools (CLAUDE.md, GEMINI.md, ...) at this file.
-
 ## Provider-aware architecture (read before adding provider behavior)
 
 Sloop's reason to exist is **multi-AI-provider** support, so the codebase is provider-aware by

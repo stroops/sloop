@@ -3,7 +3,7 @@
 > **The local-first control layer for your AI coding CLIs.**
 > One canonical context for every tool, and one cross-repo view of every agent you're running.
 
-[stroops.tech](https://stroops.tech) · [Documentation](docs/USAGE.md) · MIT licensed
+[Documentation](docs/USAGE.md) · MIT licensed
 
 Sloop is a single, lightweight Go binary that sits **above** your AI coding tools — Claude Code,
 Cursor CLI, Codex CLI, GitHub Copilot CLI, Gemini CLI, Google Antigravity, and future agents. It
@@ -194,4 +194,4 @@ hooks:                                          # status hooks for `sloop ps`
 
 ## License
 
-**MIT** — see [LICENSE](LICENSE). Website: **[stroops.tech](https://stroops.tech)**.
+**MIT** — see [LICENSE](LICENSE).

@@ -35,6 +35,7 @@ Thumbs.db
 # local settings
 .claude/
 .tool-versions
+docs/local/
 dev-notes.md
 
 # feature tracking
