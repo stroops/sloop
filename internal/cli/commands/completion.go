@@ -8,8 +8,8 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
-	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/session"
+	"github.com/stroops/sloop/internal/tmux"
 )
 
 // Dynamic shell completion. Each function is best-effort: on any error it falls
@@ -62,7 +62,7 @@ func completeSessionNames(_ *cobra.Command, args []string, _ string) ([]string, 
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	rows := fleetRows(runner.ParseSessions(tmuxList()))
+	rows := fleetRows(tmux.ParseSessions(tmuxList()))
 	names := make([]string, 0, len(rows))
 	for _, r := range rows {
 		names = append(names, r.Name)
@@ -76,7 +76,7 @@ func completePsIndex(_ *cobra.Command, args []string, _ string) ([]string, cobra
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	rows := fleetRows(runner.ParseSessions(tmuxList()))
+	rows := fleetRows(tmux.ParseSessions(tmuxList()))
 	out := make([]string, 0, len(rows))
 	for i, r := range rows {
 		out = append(out, fmt.Sprintf("%d\t%s", i+1, r.Name)) // value<TAB>description
@@ -90,7 +90,7 @@ func completeSendTargets(_ *cobra.Command, args []string, _ string) ([]string, c
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	rows := fleetRows(runner.ParseSessions(tmuxList()))
+	rows := fleetRows(tmux.ParseSessions(tmuxList()))
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, r.Name)

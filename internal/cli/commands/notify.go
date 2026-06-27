@@ -1,15 +1,15 @@
-package runner
+package commands
 
 import (
 	"os/exec"
 	"runtime"
 )
 
-// Notify shows a best-effort desktop notification about one of your own
-// sessions. It shells out to the OS notifier (osascript on macOS, notify-send
-// on Linux) and silently does nothing if that tool is missing — it is a
-// convenience, never a hard dependency, and never touches the AI provider.
-func Notify(title, message string) {
+// osNotify shows a best-effort desktop notification about one of your own
+// sessions (used by `ps --watch`). It shells out to the OS notifier (osascript
+// on macOS, notify-send on Linux) and silently does nothing if that tool is
+// missing — a convenience, never a hard dependency, never touches the provider.
+func osNotify(title, message string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":

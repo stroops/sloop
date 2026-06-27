@@ -17,8 +17,8 @@ import (
 
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/fleetstate"
-	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/session"
+	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
 )
 
@@ -30,9 +30,9 @@ type FleetRow struct {
 	Attached  bool
 	Windows   int
 	Activity  time.Time
-	Glance    string             // last line of the session's own terminal output (best-effort)
-	Status    runner.AgentStatus // waiting / working / idle, classified from the pane
-	Path      string             // repo path from the registry (cross-repo context)
+	Glance    string           // last line of the session's own terminal output (best-effort)
+	Status    tmux.AgentStatus // waiting / working / idle, classified from the pane
+	Path      string           // repo path from the registry (cross-repo context)
 }
 
 // registryPaths maps each registered workspace name to its repo path, so the
@@ -67,7 +67,7 @@ func annotatePaths(rows []FleetRow, paths map[string]string) {
 
 // fleetRows keeps only sloop-named sessions (`<workspace>__<tool>`), splitting
 // on the last `__`, and sorts them by workspace then tool.
-func fleetRows(sessions []runner.TmuxSession) []FleetRow {
+func fleetRows(sessions []tmux.Session) []FleetRow {
 	var rows []FleetRow
 	for _, s := range sessions {
 		i := strings.LastIndex(s.Name, "__")
@@ -95,7 +95,7 @@ func fleetRows(sessions []runner.TmuxSession) []FleetRow {
 // tmuxList runs `tmux list-sessions`; an error (no server / no sessions) is
 // treated as an empty fleet rather than a hard failure.
 func tmuxList() string {
-	out, err := exec.Command("tmux", runner.BuildTmuxListArgs()...).Output()
+	out, err := exec.Command("tmux", tmux.BuildListArgs()...).Output()
 	if err != nil {
 		return ""
 	}
@@ -123,10 +123,10 @@ func enrichGlances(rows []FleetRow) []FleetRow {
 
 			ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 			defer cancel()
-			out, err := exec.CommandContext(ctx, "tmux", runner.BuildTmuxCaptureArgs(rows[i].Name)...).Output()
+			out, err := exec.CommandContext(ctx, "tmux", tmux.BuildCaptureArgs(rows[i].Name)...).Output()
 			if err == nil {
-				rows[i].Glance = truncate(runner.LastNonEmptyLine(string(out)), 72)
-				rows[i].Status = runner.ClassifyStatus(string(out))
+				rows[i].Glance = truncate(tmux.LastNonEmptyLine(string(out)), 72)
+				rows[i].Status = tmux.ClassifyStatus(string(out))
 			}
 			if hasMarker {
 				rows[i].Status = stateToStatus(marker.Status)
@@ -138,16 +138,16 @@ func enrichGlances(rows []FleetRow) []FleetRow {
 }
 
 // stateToStatus maps a hook marker's status string to an AgentStatus.
-func stateToStatus(s string) runner.AgentStatus {
+func stateToStatus(s string) tmux.AgentStatus {
 	switch s {
 	case "waiting":
-		return runner.StatusWaiting
+		return tmux.StatusWaiting
 	case "working":
-		return runner.StatusWorking
+		return tmux.StatusWorking
 	case "idle":
-		return runner.StatusIdle
+		return tmux.StatusIdle
 	default:
-		return runner.StatusUnknown
+		return tmux.StatusUnknown
 	}
 }
 
@@ -219,7 +219,7 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 			fmt.Fprintf(w, "      └ %s\n", r.Glance)
 		}
 	}
-	fmt.Fprintf(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"   ·   %s\n", runner.DetachLine())
+	fmt.Fprintf(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"   ·   %s\n", tmux.DetachLine())
 	return nil
 }
 
@@ -227,9 +227,9 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 // with whichever matters most (a session waiting on you wins).
 func stateLabel(r FleetRow) string {
 	switch r.Status {
-	case runner.StatusWaiting:
+	case tmux.StatusWaiting:
 		return "◆ waiting on you"
-	case runner.StatusWorking:
+	case tmux.StatusWorking:
 		return "▸ working"
 	}
 	if r.Attached {
@@ -256,15 +256,15 @@ func jumpToFleet(rows []FleetRow, n int) error {
 	if n < 1 || n > len(rows) {
 		return fmt.Errorf("no session #%d (have %d)", n, len(rows))
 	}
-	if !runner.TmuxAvailable() {
+	if !tmux.Available() {
 		return fmt.Errorf("tmux is not installed")
 	}
 	name := rows[n-1].Name
-	args := runner.BuildTmuxAttachArgs(name)
+	args := tmux.BuildAttachArgs(name)
 	if os.Getenv("TMUX") != "" {
-		args = runner.BuildTmuxSwitchArgs(name)
+		args = tmux.BuildSwitchArgs(name)
 	}
-	fmt.Printf("\n%s\n\n", runner.DetachHint())
+	fmt.Printf("\n%s\n\n", tmux.DetachHint())
 
 	cmd := exec.Command("tmux", args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -317,7 +317,7 @@ var psCmd = &cobra.Command{
 	Short: "List running AI sessions (the fleet); `sloop ps <#>` jumps to one",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		rows := fleetRows(runner.ParseSessions(tmuxList()))
+		rows := fleetRows(tmux.ParseSessions(tmuxList()))
 		if len(args) == 1 {
 			n, err := strconv.Atoi(args[0])
 			if err != nil {
@@ -376,7 +376,7 @@ var psCmd = &cobra.Command{
 		if waiting > 0 {
 			header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
 		}
-		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · q quit · "+runner.DetachLine())
+		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · q quit · "+tmux.DetachLine())
 
 		selected, err := tui.SelectMenu(prompt, options)
 		if err != nil {
@@ -394,9 +394,9 @@ var psCmd = &cobra.Command{
 // idle green. A filled dot means active; a hollow dot means idle.
 func statusDot(r FleetRow) (dot, label string) {
 	switch r.Status {
-	case runner.StatusWaiting:
+	case tmux.StatusWaiting:
 		return tui.Yellow("●"), "waiting on you"
-	case runner.StatusWorking:
+	case tmux.StatusWorking:
 		return tui.Cyan("●"), "working"
 	}
 	if r.Attached {
@@ -447,7 +447,7 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 	}
 	var prev []FleetRow
 	for {
-		rows := enrichGlances(fleetRows(runner.ParseSessions(tmuxList())))
+		rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())))
 		sortNeedsAttention(rows)
 
 		shown := rows
@@ -466,7 +466,7 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 		for _, name := range newlyWaiting(prev, rows) {
 			fmt.Fprint(w, "\a") // bell
 			if notify {
-				runner.Notify("sloop", name+" is waiting on you")
+				osNotify("sloop", name+" is waiting on you")
 			}
 		}
 		prev = rows

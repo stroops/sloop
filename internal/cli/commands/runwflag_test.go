@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stroops/sloop/internal/runner"
+	"github.com/stroops/sloop/internal/tmux"
 )
 
 func TestResolveStartDirFromRegistry(t *testing.T) {
@@ -35,8 +36,8 @@ func TestResolveStartDirNoFlagReturnsCwd(t *testing.T) {
 func TestSelectRunnerPrefersExecWhenNoTmux(t *testing.T) {
 	// selectRunner returns a TmuxRunner only when tmux is available; otherwise ExecRunner.
 	r := selectRunner("backend", "claude")
-	if runner.TmuxAvailable() {
-		if _, ok := r.(runner.TmuxRunner); !ok {
+	if tmux.Available() {
+		if _, ok := r.(tmux.Runner); !ok {
 			t.Fatalf("expected TmuxRunner when tmux present")
 		}
 	} else {

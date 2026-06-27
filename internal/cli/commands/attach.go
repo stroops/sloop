@@ -7,23 +7,22 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/stroops/sloop/internal/runner"
+	"github.com/stroops/sloop/internal/tmux"
 )
 
 // attachArgs is a tiny testable seam returning the tmux args as a string.
 func attachArgs(session string) string {
-	return strings.Join(runner.BuildTmuxAttachArgs(session), " ")
+	return strings.Join(tmux.BuildAttachArgs(session), " ")
 }
 
 func RunAttach(session string) error {
-	if !runner.TmuxAvailable() {
+	if !tmux.Available() {
 		return fmt.Errorf("tmux is not installed; attach requires tmux")
 	}
 
-	fmt.Printf("\n%s\n\n", runner.DetachHint())
+	fmt.Printf("\n%s\n\n", tmux.DetachHint())
 
-	cmd := exec.Command("tmux", runner.BuildTmuxAttachArgs(session)...)
+	cmd := exec.Command("tmux", tmux.BuildAttachArgs(session)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

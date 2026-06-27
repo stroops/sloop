@@ -2,6 +2,7 @@ package session
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -11,8 +12,14 @@ import (
 
 type Store struct{ db *sql.DB }
 
-const schema = `
-CREATE TABLE IF NOT EXISTS workspaces (
+// migrations are applied in order; the current schema version is the slice
+// length, tracked in SQLite's built-in PRAGMA user_version (no migrations
+// table, no framework). To evolve the schema, append one entry — never edit a
+// shipped one. Each must be safe to re-run (IF NOT EXISTS) so existing DBs that
+// predate user_version tracking migrate cleanly.
+var migrations = []string{
+	// v1: initial schema.
+	`CREATE TABLE IF NOT EXISTS workspaces (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT UNIQUE NOT NULL,
   path       TEXT UNIQUE NOT NULL,
@@ -27,21 +34,55 @@ CREATE TABLE IF NOT EXISTS sessions (
   tmux_session TEXT,
   started_at   TIMESTAMP NOT NULL,
   ended_at     TIMESTAMP
-);`
+);`,
+}
+
+// dsnPragmas hardens the DB for concurrent cross-repo writes: WAL allows
+// readers and a writer at once, busy_timeout retries instead of erroring on a
+// lock, and foreign_keys enforces referential integrity.
+const dsnPragmas = "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)"
 
 func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite", "file:"+path+dsnPragmas)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := db.Exec(schema); err != nil {
+	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, err
 	}
 	return &Store{db: db}, nil
+}
+
+// migrate applies any migrations newer than the DB's user_version, each in its
+// own transaction, then bumps user_version.
+func migrate(db *sql.DB) error {
+	var v int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&v); err != nil {
+		return err
+	}
+	for i := v; i < len(migrations); i++ {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(migrations[i]); err != nil {
+			tx.Rollback()
+			return err
+		}
+		// user_version can't be parameterized; i+1 is a trusted int.
+		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {
+			tx.Rollback()
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }

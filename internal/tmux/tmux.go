@@ -1,18 +1,20 @@
-package runner
+package tmux
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/stroops/sloop/internal/runner"
 )
 
-func TmuxAvailable() bool {
+func Available() bool {
 	_, err := exec.LookPath("tmux")
 	return err == nil
 }
 
-func TmuxSessionName(workspace, tool string) string {
+func SessionName(workspace, tool string) string {
 	return sanitize(workspace) + "__" + sanitize(tool)
 }
 
@@ -20,15 +22,15 @@ func TmuxSessionName(workspace, tool string) string {
 // return to the terminal), using the user's actual tmux prefix. Shared by run,
 // attach, and ps so the wording stays consistent.
 func DetachHint() string {
-	return fmt.Sprintf("\033[36m💡 detach (hide this agent, keep it running): press \033[1m%s\033[0m\033[36m then \033[1md\033[0m", TmuxPrefix())
+	return fmt.Sprintf("\033[36m💡 detach (hide this agent, keep it running): press \033[1m%s\033[0m\033[36m then \033[1md\033[0m", Prefix())
 }
 
 // DetachLine is a compact one-liner for menu/list footers.
 func DetachLine() string {
-	return fmt.Sprintf("detach: %s then d", TmuxPrefix())
+	return fmt.Sprintf("detach: %s then d", Prefix())
 }
 
-func TmuxPrefix() string {
+func Prefix() string {
 	out, err := exec.Command("tmux", "show-options", "-g", "prefix").Output()
 	if err != nil {
 		return "Ctrl+b"
@@ -58,25 +60,25 @@ func sanitize(s string) string {
 	return b.String()
 }
 
-// BuildTmuxNewArgs builds `tmux new-session -A -s <session> -c <dir> <command> <args...>`.
+// BuildNewArgs builds `tmux new-session -A -s <session> -c <dir> <command> <args...>`.
 // -A attaches if the session already exists, otherwise creates it.
-func BuildTmuxNewArgs(session string, s Spec) []string {
+func BuildNewArgs(session string, s runner.Spec) []string {
 	args := []string{"new-session", "-A", "-s", session, "-c", s.Dir, s.Command}
 	return append(args, s.Args...)
 }
 
-func BuildTmuxAttachArgs(session string) []string {
+func BuildAttachArgs(session string) []string {
 	return []string{"attach", "-t", session}
 }
 
-type TmuxRunner struct {
+type Runner struct {
 	Session string
 }
 
-func (r TmuxRunner) Launch(s Spec) error {
+func (r Runner) Launch(s runner.Spec) error {
 	fmt.Printf("\n%s\n\n", DetachHint())
 
-	cmd := exec.Command("tmux", BuildTmuxNewArgs(r.Session, s)...)
+	cmd := exec.Command("tmux", BuildNewArgs(r.Session, s)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

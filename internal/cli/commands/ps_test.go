@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroops/sloop/internal/runner"
+	"github.com/stroops/sloop/internal/tmux"
 )
 
 func TestFleetRowsFiltersAndSplits(t *testing.T) {
-	in := []runner.TmuxSession{
+	in := []tmux.Session{
 		{Name: "my_app__claude", Attached: true, Windows: 2},
 		{Name: "backend__cursor", Windows: 1},
 		{Name: "random", Windows: 1}, // not a sloop session
@@ -61,9 +61,9 @@ func TestJumpToFleetBounds(t *testing.T) {
 }
 
 func TestFilterWaitingAndNewlyWaiting(t *testing.T) {
-	waiting := FleetRow{Name: "a__claude", Status: runner.StatusWaiting}
-	working := FleetRow{Name: "b__cursor", Status: runner.StatusWorking}
-	idle := FleetRow{Name: "c__claude", Status: runner.StatusIdle}
+	waiting := FleetRow{Name: "a__claude", Status: tmux.StatusWaiting}
+	working := FleetRow{Name: "b__cursor", Status: tmux.StatusWorking}
+	idle := FleetRow{Name: "c__claude", Status: tmux.StatusIdle}
 
 	got := filterWaiting([]FleetRow{waiting, working, idle})
 	if len(got) != 1 || got[0].Name != "a__claude" {
@@ -75,7 +75,7 @@ func TestFilterWaitingAndNewlyWaiting(t *testing.T) {
 	prev := []FleetRow{waiting, working, idle}
 	curr := []FleetRow{
 		waiting,
-		{Name: "b__cursor", Status: runner.StatusWaiting},
+		{Name: "b__cursor", Status: tmux.StatusWaiting},
 		idle,
 	}
 	nw := newlyWaiting(prev, curr)

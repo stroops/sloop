@@ -6,8 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/stroops/sloop/internal/runner"
+	"github.com/stroops/sloop/internal/tmux"
 )
 
 // resolveTarget maps a user-supplied target to a fleet session. It accepts a
@@ -55,15 +54,15 @@ func RunSend(target, msg string) error {
 	if strings.TrimSpace(msg) == "" {
 		return fmt.Errorf("nothing to send (empty message)")
 	}
-	if !runner.TmuxAvailable() {
+	if !tmux.Available() {
 		return fmt.Errorf("tmux is not installed; `sloop send` needs tmux")
 	}
-	rows := fleetRows(runner.ParseSessions(tmuxList()))
+	rows := fleetRows(tmux.ParseSessions(tmuxList()))
 	row, err := resolveTarget(rows, target)
 	if err != nil {
 		return err
 	}
-	return runner.LaunchSend(row.Name, msg)
+	return tmux.LaunchSend(row.Name, msg)
 }
 
 var sendCmd = &cobra.Command{

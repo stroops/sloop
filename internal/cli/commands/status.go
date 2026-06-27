@@ -11,8 +11,8 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
-	"github.com/stroops/sloop/internal/runner"
 	syncpkg "github.com/stroops/sloop/internal/sync"
+	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
 	"github.com/stroops/sloop/internal/workspace"
 )
@@ -72,9 +72,9 @@ func RunStatus(startDir string, w io.Writer) error {
 	fmt.Fprintf(w, "  hooks:    %s  %s\n", hooksStr, tui.Grey("(sloop hooks list)"))
 
 	// running sessions (best-effort; needs tmux).
-	if runner.TmuxAvailable() {
+	if tmux.Available() {
 		n := 0
-		for _, r := range fleetRows(runner.ParseSessions(tmuxList())) {
+		for _, r := range fleetRows(tmux.ParseSessions(tmuxList())) {
 			if r.Workspace == ws.Name {
 				n++
 			}

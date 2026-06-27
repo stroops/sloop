@@ -58,3 +58,35 @@ func TestRecordAndListSessions(t *testing.T) {
 		t.Fatalf("unexpected sessions: %+v", list)
 	}
 }
+
+func TestMigrationsSetUserVersionAndReopen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sloop.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	var v int
+	if err := s.db.QueryRow("PRAGMA user_version").Scan(&v); err != nil {
+		t.Fatalf("user_version: %v", err)
+	}
+	if v != len(migrations) {
+		t.Fatalf("user_version = %d, want %d", v, len(migrations))
+	}
+	// WAL is active.
+	var mode string
+	_ = s.db.QueryRow("PRAGMA journal_mode").Scan(&mode)
+	if mode != "wal" {
+		t.Fatalf("journal_mode = %q, want wal", mode)
+	}
+	s.Close()
+
+	// Reopen is a no-op (no pending migrations) and still works.
+	s2, err := Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer s2.Close()
+	if _, err := s2.RegisterWorkspace("w", t.TempDir()); err != nil {
+		t.Fatalf("use after reopen: %v", err)
+	}
+}

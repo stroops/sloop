@@ -232,7 +232,12 @@ sloop status             # one-line delivery state
 
 `sloop status` example:
 ```
-⚓ my-service · claude · agents:ok · ctx:ok · skills:linked
+⚓ my-service  ~/code/my-service
+  tools:    claude*, codex, cursor, gemini  (* default)
+  context:  AGENTS.md ok · CLAUDE.md ok
+  skills:   3 in .sloop/skills · linked: claude
+  hooks:    auto: claude, gemini  (sloop hooks list)
+  running:  2 sessions  (sloop ps)
 ```
 
 Delivery is **create-if-missing**: sloop never overwrites a file you hand-authored (it warns).
@@ -312,9 +317,12 @@ question that decides whether the orchestration direction is worth doubling down
 
 ## Limits (today)
 
-- Orchestration (`ps`, `run --split`, `attach`) needs **tmux** → macOS/Linux only. Windows
-  multiplexer support is not built yet.
-- The `ps` glance is a heuristic (last terminal line). Precise "waiting / working / done" status
-  via each tool's own hooks is a planned next step.
+- Orchestration (`ps`, `run --split`, `attach`, `send`) needs **tmux** → macOS/Linux/WSL. On
+  Windows without tmux these features are simply unavailable, but everything else (`init`, `sync`,
+  `skills`, `hooks`, `tools`, `status`, the registry DB) works fine. The tmux backend lives in its own
+  package (`internal/tmux`) behind the `runner.Runner` seam, so a native Windows multiplexer backend
+  can be added later without touching the rest of the code.
+- The `ps` glance is a heuristic by default; install each tool's hooks (`sloop hooks install`) to make
+  status authoritative.
 - `sloop` launches tool binaries directly (no shell), so an adapter's `launch:` must be a plain
   command, not a shell pipeline.

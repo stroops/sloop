@@ -12,6 +12,7 @@ import (
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/session"
+	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/workspace"
 )
 
@@ -104,8 +105,8 @@ func resolveStartDir(cwd, workspaceFlag string) (string, error) {
 
 // selectRunner returns a tmux-backed runner when tmux is available, else exec.
 func selectRunner(workspace, tool string) runner.Runner {
-	if runner.TmuxAvailable() {
-		return runner.TmuxRunner{Session: runner.TmuxSessionName(workspace, tool)}
+	if tmux.Available() {
+		return tmux.Runner{Session: tmux.SessionName(workspace, tool)}
 	}
 	return runner.ExecRunner{}
 }
@@ -117,7 +118,7 @@ func RunSplit(startDir string, tools []string) error {
 	if err != nil {
 		return err
 	}
-	if !runner.TmuxAvailable() {
+	if !tmux.Available() {
 		return fmt.Errorf("--split requires tmux (each pane is a tmux pane); plain `sloop run` works without it")
 	}
 	manifests, err := adapter.Load()
@@ -135,8 +136,8 @@ func RunSplit(startDir string, tools []string) error {
 		}
 		cmds = append(cmds, m.Launch)
 	}
-	session := runner.TmuxSessionName(ws.Name, strings.Join(tools, "_"))
-	return runner.LaunchSplit(session, ws.Root, cmds)
+	session := tmux.SessionName(ws.Name, strings.Join(tools, "_"))
+	return tmux.LaunchSplit(session, ws.Root, cmds)
 }
 
 var (

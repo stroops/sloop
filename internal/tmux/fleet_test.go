@@ -1,4 +1,4 @@
-package runner
+package tmux
 
 import "testing"
 
@@ -23,7 +23,7 @@ func TestParseSessionsSkipsMalformed(t *testing.T) {
 }
 
 func TestBuildTmuxSwitchArgs(t *testing.T) {
-	got := BuildTmuxSwitchArgs("ws__claude")
+	got := BuildSwitchArgs("ws__claude")
 	if len(got) != 3 || got[0] != "switch-client" || got[2] != "ws__claude" {
 		t.Fatalf("got %v", got)
 	}

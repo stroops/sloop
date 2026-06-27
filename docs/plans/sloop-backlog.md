@@ -99,6 +99,16 @@ cross-repo wedge specifically — not generic orchestration.
 
 ---
 
+## Architecture (shipped)
+
+- **`internal/tmux` package** — extracted all tmux/fleet code out of `internal/runner` (which stays
+  the pure `Runner`/`Spec` launch abstraction); de-stuttered API (`tmux.Available`, `tmux.Session`,
+  `tmux.ClassifyStatus`, `tmux.Runner`…). `Notify` folded into `commands`. Windows backend is a future
+  sibling behind the same seam — no stub files (lightweight, no clutter).
+- **SQLite durability** — global `sloop.db` opens with WAL + `busy_timeout` + `foreign_keys`, and a
+  minimal `PRAGMA user_version` migration runner (append-one-string; no framework). Safe for
+  concurrent cross-repo writes.
+
 ## Later / parked
 
 - **`sloop init --scan` LLM enrichment** + **AI `sloop doctor`** — when reached, add a **minimal**
