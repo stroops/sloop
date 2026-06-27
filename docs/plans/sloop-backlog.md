@@ -58,10 +58,12 @@ cross-repo wedge specifically — not generic orchestration.
 
 ## Next actions (post-dogfood, prioritized for the wedge)
 
-1. **Status precision upgrade (provider hooks)** — the capture-pane classifier shipped; make it
-   exact for Claude by installing its own `Stop`/`Notification` hooks (writing a marker `sloop`
-   reads) so "waiting/done" is authoritative, with the heuristic as fallback for other tools. Also
-   a `sloop ps --waiting` filter and watch/auto-refresh once status is trustworthy.
+1. **Fleet intelligence** —
+   - _(shipped, slice 1)_ `ps --waiting` filter; `ps --watch [-n]` live monitor that bells +
+     optional `--notify` (desktop) when an agent **newly** waits; concurrent pane capture for speed.
+   - _(next, slice 2)_ **Status precision via provider hooks** — make it exact for Claude by
+     installing its own `Stop`/`Notification` hooks (writing a marker `sloop` reads) so
+     "waiting/done" is authoritative, heuristic as fallback for other tools.
 2. **Skills lockfile → registry** ⭐ — on-thesis (context portability across tools *and* sources;
    ntm/Squad don't do skills distribution). Path: (a) shipped `skills add <url|github>`;
    (b) a `.sloop/skills.lock` recording each imported skill + source so `skills update` re-fetches

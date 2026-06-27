@@ -119,6 +119,21 @@ sloop ps 2          # attach (or switch-client if you're already inside tmux)
 sloop attach webapp__claude   # attach by full session name
 ```
 
+### Live monitor (`--watch`) and filtering (`--waiting`)
+
+```sh
+sloop ps --waiting             # show only agents waiting on you
+sloop ps --watch               # live monitor: refresh every 2s, ring the bell
+sloop ps --watch -n 5s         # custom interval
+sloop ps --watch --notify      # also fire a desktop notification on new waiting agents
+sloop ps --watch --waiting     # monitor, but only list those that need you
+```
+
+`--watch` turns `ps` from a snapshot into a live board: it re-renders on the interval and,
+whenever a session **newly** starts waiting on you, rings the terminal bell (and, with
+`--notify`, shows an OS notification via `osascript`/`notify-send`). Captures run concurrently,
+so even a large fleet refreshes quickly. Ctrl-C to stop.
+
 ### Answer an agent without attaching (`sloop send`)
 
 When `ps` shows an agent `◆ waiting on you`, reply without switching to it:
