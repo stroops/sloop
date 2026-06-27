@@ -1,0 +1,11 @@
+# golangci-lint v2 config. Explicit so CI and local agree, and so the build-tagged
+# e2e package is analyzed (without this, `golangci-lint run ./...` can error with
+# "no go files to analyze" on the e2e package).
+version: "2"
+
+run:
+  build-tags:
+    - e2e
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
