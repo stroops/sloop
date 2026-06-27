@@ -87,4 +87,7 @@ never intercepted.`,
 	},
 }
 
-func RegisterSend(cmd *cobra.Command) { cmd.AddCommand(sendCmd) }
+func RegisterSend(cmd *cobra.Command) {
+	sendCmd.ValidArgsFunction = completeSendTargets
+	cmd.AddCommand(sendCmd)
+}

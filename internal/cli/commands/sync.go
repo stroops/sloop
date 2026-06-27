@@ -179,5 +179,7 @@ func RegisterSync(cmd *cobra.Command) {
 	syncCmd.Flags().StringVarP(&syncWorkspace, "workspace", "w", "", "target a registered workspace by name")
 	syncCmd.Flags().BoolVarP(&syncAll, "all", "a", false, "sync every enabled tool")
 	syncCmd.Flags().BoolVarP(&syncRepair, "repair", "r", false, "safely repair broken skills links or foreign context files")
+	syncCmd.ValidArgsFunction = completeTools
+	_ = syncCmd.RegisterFlagCompletionFunc("workspace", completeWorkspaces)
 	cmd.AddCommand(syncCmd)
 }

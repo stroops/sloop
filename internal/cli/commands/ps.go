@@ -372,9 +372,10 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 }
 
 func RegisterPs(cmd *cobra.Command) {
-	psCmd.Flags().BoolVarP(&psWatch, "watch", "w", false, "live monitor: refresh on an interval and alert when an agent needs you")
+	psCmd.Flags().BoolVarP(&psWatch, "watch", "f", false, "follow the fleet live: refresh on an interval and alert when an agent needs you")
 	psCmd.Flags().BoolVar(&psWaiting, "waiting", false, "show only sessions waiting on you")
 	psCmd.Flags().BoolVar(&psNotify, "notify", false, "with --watch, also send a desktop notification on new waiting agents")
 	psCmd.Flags().DurationVarP(&psInterval, "interval", "n", 2*time.Second, "refresh interval for --watch")
+	psCmd.ValidArgsFunction = completePsIndex
 	cmd.AddCommand(psCmd)
 }

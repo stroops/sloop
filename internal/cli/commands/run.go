@@ -201,5 +201,7 @@ var runCmd = &cobra.Command{
 func RegisterRun(cmd *cobra.Command) {
 	runCmd.Flags().StringVarP(&runWorkspace, "workspace", "w", "", "target a registered workspace by name")
 	runCmd.Flags().BoolVar(&runSplit, "split", false, "launch multiple tools side-by-side as tmux panes")
+	runCmd.ValidArgsFunction = completeTools
+	_ = runCmd.RegisterFlagCompletionFunc("workspace", completeWorkspaces)
 	cmd.AddCommand(runCmd)
 }
