@@ -103,7 +103,8 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 | `init` | — | `-s/--scan`, `-S/--scaffold` | Scaffold `AGENTS.md` + `.sloop/`, deliver pointers, register the workspace. `--scan` pre-fills `AGENTS.md` from the codebase; `--scaffold` creates each tool's standard folders. |
 | `run [tool]` | `r` | `-w/--workspace`, `--split`, `-- <args>` | Sync context, then launch a tool (in tmux if present). `--split` runs several side by side; `-w` targets a registered workspace from anywhere. |
 | `sync [tool]` | `s` | `-a/--all`, `-r/--repair`, `-w/--workspace` | (Re)deliver pointer files + skills symlinks without launching. `--repair` safely moves a foreign file aside (never deletes). |
-| `ps [#]` | — | `-f/--watch`, `-n/--interval`, `--waiting`, `--notify`, `--all` | The cross-repo fleet. `<#>` jumps; `-f` live-monitors + alerts; `--all` includes idle workspaces. |
+| `ps [#]` | — | `-f/--watch`, `-n/--interval`, `--waiting`, `--notify`, `--all` | The cross-repo fleet. Reads what each agent is asking and shows answer keys; `<#>` jumps; `-f` live-monitors + alerts. |
+| `approve <target>` | — | `--waiting`, `--all`, `--yes` | Send the Yes/Approve answer to waiting agent(s) — one-command approve. |
 | `send <target> <msg>` | — | `--waiting`, `--all`, `--yes` | Reply to a running agent without attaching; `--waiting`/`--all` broadcast. |
 | `kill <target>` | — | `--all`, `--waiting`, `--yes` | End session(s) — confirms (skip with `--yes` or global `-y`). |
 | `attach <session>` | `a` | — | Attach to a session by full name. |

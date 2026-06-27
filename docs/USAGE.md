@@ -126,9 +126,12 @@ jump: sloop ps <#>   ·   send: sloop send <#> "msg"
   needs you first. Install the Claude hooks (below) to make this status **authoritative**
   instead of a heuristic.
 - The `└` line is the session's last terminal output (the glance).
+- sloop **reads what each waiting agent is asking** (from its own pane — no LLM, no API) and shows the
+  question + answer keys, e.g. `Apply changes? · answer: [y]es [n]o` or `[1]Yes [2]No`.
 - On a real terminal, `sloop ps` is a **control center** — `↑/↓` (or `j/k`) to move, then act on the
-  highlighted session in place: `Enter` jumps, `s` sends a quick reply, `x` kills it (with a confirm),
-  `q`/`Esc` quits. Piped/CI prints the plain listing above. Colors honor `NO_COLOR`/`--no-color`.
+  highlighted session in place: press its **answer key** (`y`/`n` or `1`/`2`…) to reply, `Enter` jumps,
+  `s` sends a free-text reply, `x` kills (with a confirm), `q`/`Esc` quits. Piped/CI prints the plain
+  listing. Colors honor `NO_COLOR`/`--no-color`.
 - Jump straight to one:
 
 ```sh
@@ -224,7 +227,9 @@ unblocking an agent across repos without losing your place.
 Broadcast to many at once, or end sessions:
 
 ```sh
-sloop send --waiting "yes, go ahead"   # answer every agent waiting on you
+sloop approve --waiting                # send each waiting agent its Yes/Approve answer (one command)
+sloop approve 1                        # approve just session #1
+sloop send --waiting "yes, go ahead"   # custom reply to every agent waiting on you
 sloop send --all "stash and pause"     # every running session (asks to confirm)
 sloop kill 2                           # end one session (asks to confirm; -y to skip)
 sloop kill --waiting                   # end all that are waiting
