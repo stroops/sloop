@@ -43,12 +43,18 @@ type HooksSpec struct {
 }
 
 type Manifest struct {
-	Name    string      `yaml:"name"`
+	Name string `yaml:"name"`
+	// Detect is the binary name used to detect installation; Launch is the
+	// binary to run (often the same).
 	Detect  string      `yaml:"detect"`
 	Launch  string      `yaml:"launch"`
 	Context ContextSpec `yaml:"context"`
 	Skills  SkillsSpec  `yaml:"skills"`
 	Hooks   HooksSpec   `yaml:"hooks"`
+	// Scaffold lists the tool's standard project dirs that `sloop init --scaffold`
+	// can create (e.g. .claude/skills, .cursor/rules), so users start from the
+	// provider's expected layout instead of an ad-hoc one.
+	Scaffold []string `yaml:"scaffold"`
 }
 
 func LoadBuiltin() (map[string]Manifest, error) {

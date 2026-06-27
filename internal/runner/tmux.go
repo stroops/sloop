@@ -16,6 +16,18 @@ func TmuxSessionName(workspace, tool string) string {
 	return sanitize(workspace) + "__" + sanitize(tool)
 }
 
+// DetachHint is the one place that explains how to detach (hide the agent and
+// return to the terminal), using the user's actual tmux prefix. Shared by run,
+// attach, and ps so the wording stays consistent.
+func DetachHint() string {
+	return fmt.Sprintf("\033[36m💡 detach (hide this agent, keep it running): press \033[1m%s\033[0m\033[36m then \033[1md\033[0m", TmuxPrefix())
+}
+
+// DetachLine is a compact one-liner for menu/list footers.
+func DetachLine() string {
+	return fmt.Sprintf("detach: %s then d", TmuxPrefix())
+}
+
 func TmuxPrefix() string {
 	out, err := exec.Command("tmux", "show-options", "-g", "prefix").Output()
 	if err != nil {
@@ -62,8 +74,7 @@ type TmuxRunner struct {
 }
 
 func (r TmuxRunner) Launch(s Spec) error {
-	fmt.Printf("\n\033[36m💡 SLOOP HINT: To safely hide this agent and return to the terminal,\033[0m\n")
-	fmt.Printf("\033[36m   press \033[1m%s\033[0m\033[36m then press \033[1md\033[0m\n\n", TmuxPrefix())
+	fmt.Printf("\n%s\n\n", DetachHint())
 
 	cmd := exec.Command("tmux", BuildTmuxNewArgs(r.Session, s)...)
 	cmd.Stdin = os.Stdin

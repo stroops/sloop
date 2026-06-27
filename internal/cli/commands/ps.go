@@ -219,7 +219,7 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 			fmt.Fprintf(w, "      └ %s\n", r.Glance)
 		}
 	}
-	fmt.Fprintln(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"")
+	fmt.Fprintf(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"   ·   %s\n", runner.DetachLine())
 	return nil
 }
 
@@ -264,8 +264,7 @@ func jumpToFleet(rows []FleetRow, n int) error {
 	if os.Getenv("TMUX") != "" {
 		args = runner.BuildTmuxSwitchArgs(name)
 	}
-	fmt.Printf("\n\033[36m💡 SLOOP HINT: To safely hide this agent and return to the terminal,\033[0m\n")
-	fmt.Printf("\033[36m   press \033[1m%s\033[0m\033[36m then press \033[1md\033[0m\n\n", runner.TmuxPrefix())
+	fmt.Printf("\n%s\n\n", runner.DetachHint())
 
 	cmd := exec.Command("tmux", args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -377,7 +376,7 @@ var psCmd = &cobra.Command{
 		if waiting > 0 {
 			header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
 		}
-		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · q quit")
+		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · q quit · "+runner.DetachLine())
 
 		selected, err := tui.SelectMenu(prompt, options)
 		if err != nil {

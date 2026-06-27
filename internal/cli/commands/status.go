@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
+	"github.com/stroops/sloop/internal/runner"
 	syncpkg "github.com/stroops/sloop/internal/sync"
+	"github.com/stroops/sloop/internal/tui"
 	"github.com/stroops/sloop/internal/workspace"
 )
 
@@ -22,19 +26,93 @@ func RunStatus(startDir string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	tool := proj.DefaultTool
 	manifests, err := adapter.Load()
 	if err != nil {
 		return err
 	}
-	m := manifests[tool]
-	fmt.Fprintf(w, "⚓ %s · %s · agents:%s · ctx:%s · skills:%s\n",
-		ws.Name, tool,
-		syncpkg.AgentsState(ws.Root),
-		syncpkg.ContextState(ws.Root, m),
-		syncpkg.SkillsState(ws.Root, ws.SloopDir(), m),
-	)
+
+	fmt.Fprintf(w, "⚓ %s  %s\n", tui.Bold(ws.Name), tui.Grey(ws.Root))
+
+	// tools (default marked) + which auto-install hooks + which have skills linked.
+	var tools, autoHooks, linked []string
+	for _, t := range proj.Tools {
+		label := t
+		if t == proj.DefaultTool {
+			label = tui.Bold(t + "*")
+		}
+		tools = append(tools, label)
+		m := manifests[t]
+		if m.Hooks.Install == "settings-json" {
+			autoHooks = append(autoHooks, t)
+		}
+		if m.Skills.Target != "" && syncpkg.SkillsState(ws.Root, ws.SloopDir(), m) == "linked" {
+			linked = append(linked, t)
+		}
+	}
+	fmt.Fprintf(w, "  tools:    %s  %s\n", strings.Join(tools, ", "), tui.Grey("(* default)"))
+
+	// context: AGENTS.md + the default tool's pointer state.
+	dm := manifests[proj.DefaultTool]
+	fmt.Fprintf(w, "  context:  AGENTS.md %s · %s %s\n",
+		stateMark(syncpkg.AgentsState(ws.Root)),
+		ctxName(dm), stateMark(syncpkg.ContextState(ws.Root, dm)))
+
+	// skills.
+	linkedStr := "none"
+	if len(linked) > 0 {
+		linkedStr = strings.Join(linked, ", ")
+	}
+	fmt.Fprintf(w, "  skills:   %d in .sloop/skills · linked: %s\n", skillCount(ws.SloopDir()), linkedStr)
+
+	// hooks.
+	hooksStr := tui.Grey("none installed")
+	if len(autoHooks) > 0 {
+		hooksStr = "auto: " + strings.Join(autoHooks, ", ")
+	}
+	fmt.Fprintf(w, "  hooks:    %s  %s\n", hooksStr, tui.Grey("(sloop hooks list)"))
+
+	// running sessions (best-effort; needs tmux).
+	if runner.TmuxAvailable() {
+		n := 0
+		for _, r := range fleetRows(runner.ParseSessions(tmuxList())) {
+			if r.Workspace == ws.Name {
+				n++
+			}
+		}
+		fmt.Fprintf(w, "  running:  %d sessions  %s\n", n, tui.Grey("(sloop ps)"))
+	}
 	return nil
+}
+
+// stateMark colors a delivery state: healthy states green, anything else yellow.
+func stateMark(s string) string {
+	switch s {
+	case "ok", "linked", "native":
+		return tui.Green(s)
+	default:
+		return tui.Yellow(s)
+	}
+}
+
+func ctxName(m adapter.Manifest) string {
+	if m.Context.Mode == "pointer" && m.Context.File != "" {
+		return m.Context.File
+	}
+	return "native"
+}
+
+func skillCount(sloopDir string) int {
+	entries, err := os.ReadDir(filepath.Join(sloopDir, "skills"))
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			n++
+		}
+	}
+	return n
 }
 
 var statusCmd = &cobra.Command{

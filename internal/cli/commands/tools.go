@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -16,8 +17,8 @@ func RunTools(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(w, "%-10s %-16s %-16s %-9s %-7s %s\n",
-		"KEY", "NAME", "INSTALLED", "CONTEXT", "SKILLS", "HOOKS")
+	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
+	fmt.Fprintln(tw, "KEY\tNAME\tINSTALLED\tCONTEXT\tSKILLS\tHOOKS")
 	for _, s := range detect.Tools(manifests) {
 		status := "missing"
 		if s.Installed {
@@ -27,10 +28,10 @@ func RunTools(w io.Writer) error {
 			}
 		}
 		m := manifests[s.Key]
-		fmt.Fprintf(w, "%-10s %-16s %-16s %-9s %-7s %s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			s.Key, s.Name, status, contextLabel(m), skillsLabel(m), hooksLabel(m))
 	}
-	return nil
+	return tw.Flush()
 }
 
 // shortVersion keeps just the leading version token (e.g. "2.1.195" from

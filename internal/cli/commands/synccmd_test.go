@@ -12,7 +12,7 @@ import (
 func TestRunSyncWritesClaudeMd(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	written, err := RunSync(dir, "claude", false)
@@ -32,7 +32,7 @@ func TestRunSyncWritesClaudeMd(t *testing.T) {
 func TestRunSyncAllDeliversEnabledTools(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	// Enable claude + cursor.
@@ -41,6 +41,8 @@ func TestRunSyncAllDeliversEnabledTools(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// init already delivered; remove the pointer so RunSyncAll has work to report.
+	_ = os.Remove(filepath.Join(dir, "CLAUDE.md"))
 	lines, err := RunSyncAll(dir, false)
 	if err != nil {
 		t.Fatalf("RunSyncAll: %v", err)

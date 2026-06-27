@@ -7,6 +7,8 @@ context:
   file: ""
 skills:
   target: ""
+scaffold:
+  - .codex/skills
 hooks:
   config: ~/.codex/config.toml
   install: ""

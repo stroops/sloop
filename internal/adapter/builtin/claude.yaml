@@ -7,6 +7,9 @@ context:
   file: CLAUDE.md
 skills:
   target: .claude/skills
+scaffold:
+  - .claude/skills
+  - .claude/agents
 hooks:
   config: .claude/settings.local.json
   install: settings-json

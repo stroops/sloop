@@ -15,7 +15,7 @@ func (f *fakeRunner) Launch(s runner.Spec) error { f.got = s; return nil }
 func TestRunRunSyncsAndLaunches(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 
@@ -42,7 +42,7 @@ func TestRunRunSyncsAndLaunches(t *testing.T) {
 func TestRunRunPassesThroughArgs(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 
