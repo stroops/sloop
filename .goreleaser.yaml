@@ -62,8 +62,8 @@ brews:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/stroops/sloop"
-    description: "sloop CLI - a local-first developer workspace for AI coding workflows."
+    homepage: "https://stroops.tech"
+    description: "Sloop - the local-first control layer for your AI coding CLIs."
     license: "MIT"
     install: |
       bin.install "sloop"
