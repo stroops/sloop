@@ -51,6 +51,11 @@ AGENTS.md            # canonical context — YOU write this (the source of truth
   .gitignore
 ```
 
+On a real terminal `sloop init` is **interactive** — it shows the tools it detected and asks whether to
+pre-fill `AGENTS.md` from your codebase, create the standard provider folders, and install status
+hooks, so a newcomer is set up in a few keystrokes. Piped/CI or `--auto`/`-y`/`--no-input` skip the
+prompts and keep the scriptable behavior (flags only).
+
 `init` also **delivers context for every detected tool** right away — it writes the pointer files
 (`CLAUDE.md`, `GEMINI.md`, …) and links `.sloop/skills`, so the workspace is usable immediately
 (no separate `sloop sync` needed first). It prints a per-tool summary of what it created. The personal
