@@ -9,10 +9,10 @@ import (
 func write(t *testing.T, dir, rel, body string) {
 	t.Helper()
 	p := filepath.Join(dir, rel)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -38,10 +38,10 @@ func hasLang(r Report, name string) bool {
 func TestScanGoRepo(t *testing.T) {
 	dir := t.TempDir()
 	write(t, dir, "go.mod", "module github.com/acme/widget\n\ngo 1.26\n")
-	if err := os.MkdirAll(filepath.Join(dir, "cmd"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "cmd"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "internal"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "internal"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	r := Scan(dir)

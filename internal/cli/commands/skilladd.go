@@ -73,10 +73,10 @@ func RunSkillAdd(startDir, url, name string) (string, []string, error) {
 	if len(strings.TrimSpace(string(body))) == 0 {
 		return "", nil, fmt.Errorf("fetched empty content from %s", url)
 	}
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return "", nil, err
 	}
-	if err := os.WriteFile(dst, body, 0o644); err != nil {
+	if err := os.WriteFile(dst, body, 0o600); err != nil {
 		return "", nil, err
 	}
 	return dst, ensureSkillsLinked(ws), nil

@@ -1,0 +1,6 @@
+tools:
+    - claude
+    - codex
+    - cursor
+    - gemini
+default_tool: claude

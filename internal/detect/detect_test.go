@@ -16,7 +16,7 @@ func TestToolsDetectsBinaryOnPath(t *testing.T) {
 	dir := t.TempDir()
 	// Create a fake executable named "faketool".
 	bin := filepath.Join(dir, "faketool")
-	if err := os.WriteFile(bin, []byte("#!/bin/sh\necho v1.2.3\n"), 0o755); err != nil {
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\necho v1.2.3\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
@@ -43,7 +43,7 @@ func TestInstalledKeys(t *testing.T) {
 		t.Skip("unix-only")
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "faketool"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "faketool"), []byte("#!/bin/sh\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)

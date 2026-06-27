@@ -6,15 +6,35 @@ on:
     branches: ["sprint/**", "main"]
 
 jobs:
-  test:
+  lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v6
       
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.26.1' # Fallback to 1.23 for stability in most GH action runners, update as needed.
           
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Check Formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Some files are not formatted correctly. Please run 'go fmt ./...'"
+            gofmt -d .
+            exit 1
+          fi
+
       - name: Run Tests
         run: go test -v -race ./...
+        
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: '1.26.1'

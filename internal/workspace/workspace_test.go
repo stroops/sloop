@@ -9,11 +9,11 @@ import (
 
 func TestResolveWalksUp(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".sloop"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".sloop"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	nested := filepath.Join(root, "a", "b")
-	if err := os.MkdirAll(nested, 0o755); err != nil {
+	if err := os.MkdirAll(nested, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	w, err := Resolve(nested)

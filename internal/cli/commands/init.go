@@ -23,7 +23,7 @@ cache/
 func RunInit(dir string, scan bool) error {
 	sloopDir := filepath.Join(dir, config.SloopDirName)
 	for _, sub := range []string{"skills", "vault", "profiles"} {
-		if err := os.MkdirAll(filepath.Join(sloopDir, sub), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(sloopDir, sub), 0o700); err != nil {
 			return err
 		}
 	}
@@ -59,7 +59,7 @@ func RunInit(dir string, scan bool) error {
 		}
 	}
 	if err := os.WriteFile(filepath.Join(sloopDir, ".gitignore"),
-		[]byte(sloopGitignore), 0o644); err != nil {
+		[]byte(sloopGitignore), 0o600); err != nil {
 		return err
 	}
 	for _, tool := range enabled {

@@ -90,4 +90,3 @@ func Load() (map[string]Manifest, error) {
 	}
 	return out, nil
 }
-

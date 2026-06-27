@@ -67,12 +67,20 @@ var lsCmd = &cobra.Command{
 			return nil
 		}
 
+		nameW := 0
+		for _, ws := range workspaces {
+			if len(ws.Name) > nameW {
+				nameW = len(ws.Name)
+			}
+		}
+
 		var options []string
 		for _, ws := range workspaces {
-			options = append(options, fmt.Sprintf("📁 %-16s \033[90m%s\033[0m", ws.Name, ws.Path))
+			options = append(options, fmt.Sprintf("%-*s  %s", nameW, ws.Name, tui.Grey(ws.Path)))
 		}
-		
-		prompt := "⚓ Sloop Workspaces - Select to jump (↑/↓, Enter to jump, Esc to quit):"
+
+		prompt := fmt.Sprintf("⚓ Sloop workspaces · %d", len(workspaces)) +
+			"\r\n" + tui.Grey("  ↑/↓ move · ⏎ show cd · q quit")
 		selected, err := tui.SelectMenu(prompt, options)
 		if err != nil {
 			return err

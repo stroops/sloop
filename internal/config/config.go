@@ -78,7 +78,7 @@ func SaveGlobal(g *Global) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	path := filepath.Join(dir, "config.yaml")
@@ -86,7 +86,7 @@ func SaveGlobal(g *Global) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644)
+	return os.WriteFile(path, b, 0o600)
 }
 
 // Project is the per-project config stored at <sloopDir>/config.yaml.
@@ -109,12 +109,12 @@ func LoadProject(sloopDir string) (*Project, error) {
 }
 
 func SaveProject(sloopDir string, p *Project) error {
-	if err := os.MkdirAll(sloopDir, 0o755); err != nil {
+	if err := os.MkdirAll(sloopDir, 0o700); err != nil {
 		return err
 	}
 	b, err := yaml.Marshal(p)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(sloopDir, "config.yaml"), b, 0o644)
+	return os.WriteFile(filepath.Join(sloopDir, "config.yaml"), b, 0o600)
 }

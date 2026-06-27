@@ -64,7 +64,7 @@ func TestRunInitScanPopulatesAgents(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module demo\n\ngo 1.26\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module demo\n\ngo 1.26\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := RunInit(dir, true); err != nil {

@@ -26,11 +26,11 @@ func RunSkillNew(startDir, name string) (string, []string, error) {
 	if _, err := os.Stat(path); err == nil {
 		return "", nil, fmt.Errorf("skill %q already exists at %s", name, path)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return "", nil, err
 	}
 	body := fmt.Sprintf("# %s\n\nDescribe the reusable workflow or prompt for %q here.\n", name, name)
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		return "", nil, err
 	}
 	return path, ensureSkillsLinked(ws), nil

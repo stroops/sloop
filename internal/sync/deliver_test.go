@@ -53,7 +53,7 @@ func TestSyncContextPointerCreateIdempotentForeign(t *testing.T) {
 		t.Fatalf("idempotent = %v, want skipped", a)
 	}
 	// User edits it → foreign, left untouched.
-	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("MY OWN CONTENT"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("MY OWN CONTENT"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	a, _ = SyncContext(root, m)
@@ -81,7 +81,7 @@ func TestSyncContextNativeDoesNothing(t *testing.T) {
 func TestSyncSkillsSymlinkThenIdempotent(t *testing.T) {
 	root := t.TempDir()
 	sloopDir := filepath.Join(root, ".sloop")
-	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	m := adapter.Manifest{Skills: adapter.SkillsSpec{Target: ".claude/skills"}}
@@ -103,10 +103,10 @@ func TestSyncSkillsSymlinkThenIdempotent(t *testing.T) {
 func TestSyncSkillsCopyFallback(t *testing.T) {
 	root := t.TempDir()
 	sloopDir := filepath.Join(root, ".sloop")
-	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(sloopDir, "skills", "review.md"), []byte("hi"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(sloopDir, "skills", "review.md"), []byte("hi"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	// Force symlink to fail.
@@ -135,7 +135,7 @@ func TestSyncSkillsNoTarget(t *testing.T) {
 func TestSyncSkillsRelativeLink(t *testing.T) {
 	root := t.TempDir()
 	sloopDir := filepath.Join(root, ".sloop")
-	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	m := adapter.Manifest{Skills: adapter.SkillsSpec{Target: ".claude/skills"}}
@@ -151,11 +151,11 @@ func TestSyncSkillsRelativeLink(t *testing.T) {
 func TestSyncSkillsHealsLegacyAbsoluteLink(t *testing.T) {
 	root := t.TempDir()
 	sloopDir := filepath.Join(root, ".sloop")
-	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(root, ".claude", "skills")
-	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	// Simulate a pre-hardening absolute symlink.
@@ -175,7 +175,7 @@ func TestSyncSkillsHealsLegacyAbsoluteLink(t *testing.T) {
 func TestRepairContextBacksUpForeign(t *testing.T) {
 	root := t.TempDir()
 	m := adapter.Manifest{Name: "Claude Code", Context: adapter.ContextSpec{Mode: "pointer", File: "CLAUDE.md"}}
-	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("MINE"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("MINE"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	a, err := RepairContext(root, m)
@@ -200,14 +200,14 @@ func TestRepairContextBacksUpForeign(t *testing.T) {
 func TestRepairSkillsBacksUpPresentDir(t *testing.T) {
 	root := t.TempDir()
 	sloopDir := filepath.Join(root, ".sloop")
-	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(sloopDir, "skills"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	// A foreign real dir occupies the target.
-	if err := os.MkdirAll(filepath.Join(root, ".claude", "skills"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".claude", "skills"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".claude", "skills", "keep.md"), []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".claude", "skills", "keep.md"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	m := adapter.Manifest{Skills: adapter.SkillsSpec{Target: ".claude/skills"}}

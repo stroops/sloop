@@ -60,7 +60,7 @@ func EnsureAgentsContent(root, content string) (Action, error) {
 	} else if !os.IsNotExist(err) {
 		return ActionSkipped, err
 	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return ActionSkipped, err
 	}
 	return ActionCreated, nil
@@ -91,7 +91,7 @@ func SyncContext(root string, m adapter.Manifest) (Action, error) {
 	want := PointerContent(m.Name, m.Context.File)
 	existing, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(want), 0o600); err != nil {
 			return ActionSkipped, err
 		}
 		return ActionCreated, nil
@@ -132,7 +132,7 @@ func SyncSkills(root, sloopDir string, m adapter.Manifest) (Action, error) {
 		return ActionSkipped, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil {
 		return ActionSkipped, err
 	}
 	if err := symlinkFunc(rel, link); err == nil {
@@ -205,7 +205,7 @@ func copyDir(src, dst string) error {
 		}
 		out := filepath.Join(dst, rel)
 		if info.IsDir() {
-			return os.MkdirAll(out, 0o755)
+			return os.MkdirAll(out, 0o700)
 		}
 		return copyFile(p, out)
 	})
@@ -217,7 +217,7 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer in.Close()
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return err
 	}
 	out, err := os.Create(dst)

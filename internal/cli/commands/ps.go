@@ -197,23 +197,25 @@ var psCmd = &cobra.Command{
 			return RunPs(cmd.OutOrStdout(), rows)
 		}
 
+		wsW, toolW, waiting := columnWidths(rows)
+
 		var options []string
 		for _, r := range rows {
-			stateMark := colorState(r)
-
-			line := fmt.Sprintf("%-16s %-9s %s · %s", r.Workspace, r.Tool, stateMark, humanizeSince(r.Activity))
+			dot, label := statusDot(r)
+			line := fmt.Sprintf("%s %-*s %-*s %-16s %s",
+				dot, wsW, r.Workspace, toolW, r.Tool, label, shortSince(r.Activity))
 			if r.Glance != "" {
-				line += fmt.Sprintf("\r\n       └ \033[90m%s\033[0m", r.Glance)
+				line += "\r\n└ " + tui.Grey(r.Glance)
 			}
 			options = append(options, line)
 		}
 
-		prompt := fmt.Sprintf("⚓ AI fleet — %d running\r\nSelect a session to attach (↑/↓ to navigate, Enter to attach, Esc to quit):", len(rows))
-		
-		// Import tui dynamically since it's an internal package
-		// The import will be added via goimports or explicitly
-		// Actually, I'll need to make sure the import is there.
-		
+		header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
+		if waiting > 0 {
+			header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
+		}
+		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · q quit")
+
 		selected, err := tui.SelectMenu(prompt, options)
 		if err != nil {
 			return err
@@ -225,19 +227,52 @@ var psCmd = &cobra.Command{
 	},
 }
 
-// colorState renders the agent status as a colored chip for the interactive
-// menu: waiting (needs you) in yellow, working in cyan, else attach state.
-func colorState(r FleetRow) string {
+// statusDot renders the agent status as a colored dot plus a label for the
+// interactive menu: waiting (needs you) yellow, working cyan, attached blue,
+// idle green. A filled dot means active; a hollow dot means idle.
+func statusDot(r FleetRow) (dot, label string) {
 	switch r.Status {
 	case runner.StatusWaiting:
-		return "\033[33m◆ waiting on you\033[0m"
+		return tui.Yellow("●"), "waiting on you"
 	case runner.StatusWorking:
-		return "\033[36m▸ working\033[0m"
+		return tui.Cyan("●"), "working"
 	}
 	if r.Attached {
-		return "\033[34m🔵 attached\033[0m"
+		return tui.Blue("●"), "attached"
 	}
-	return "\033[32m🟢 idle\033[0m"
+	return tui.Green("○"), "idle"
+}
+
+// shortSince is a compact relative time ("now", "3m", "2h", "5d").
+func shortSince(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd", int(d.Hours())/24)
+	}
+}
+
+// columnWidths returns the workspace and tool column widths needed to keep the
+// list aligned regardless of name length, plus the count of waiting sessions.
+func columnWidths(rows []FleetRow) (wsW, toolW, waiting int) {
+	for _, r := range rows {
+		if len(r.Workspace) > wsW {
+			wsW = len(r.Workspace)
+		}
+		if len(r.Tool) > toolW {
+			toolW = len(r.Tool)
+		}
+		if r.Status.NeedsAttention() {
+			waiting++
+		}
+	}
+	return wsW, toolW, waiting
 }
 
 func RegisterPs(cmd *cobra.Command) { cmd.AddCommand(psCmd) }

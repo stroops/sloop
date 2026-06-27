@@ -3,12 +3,15 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"golang.org/x/term"
 )
 
-// SelectMenu presents a list of options to the user and lets them select one using arrow keys.
-// Returns the index of the selected option, or -1 if the user cancelled (Esc/Ctrl+C).
+// SelectMenu presents options and lets the user pick one with the arrow keys
+// (or j/k). It returns the selected index, or -1 if cancelled (Esc/Ctrl-C/q) or
+// run without a terminal. An option may contain "\r\n" to add indented
+// continuation lines (e.g. a glance); only its first line gets the pointer.
 func SelectMenu(prompt string, options []string) (int, error) {
 	if len(options) == 0 {
 		return -1, nil
@@ -16,12 +19,13 @@ func SelectMenu(prompt string, options []string) (int, error) {
 
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
-		// Fallback to simple printing if not a terminal
+		// No tty (piped/CI): print a plain listing and return "no selection"
+		// rather than erroring, so callers degrade gracefully.
 		fmt.Println(prompt)
-		for i, opt := range options {
-			fmt.Printf("  %d: %s\n", i+1, opt)
+		for _, opt := range options {
+			fmt.Println("  " + strings.ReplaceAll(opt, "\r\n", "\n  "))
 		}
-		return -1, fmt.Errorf("not a terminal")
+		return -1, nil
 	}
 
 	oldState, err := term.MakeRaw(fd)
@@ -30,40 +34,49 @@ func SelectMenu(prompt string, options []string) (int, error) {
 	}
 	defer term.Restore(fd, oldState)
 
-	// Hide cursor
-	fmt.Print("\033[?25l")
-	defer fmt.Print("\033[?25h")
+	fmt.Print("\033[?25l")       // hide cursor
+	defer fmt.Print("\033[?25h") // restore cursor
 
 	fmt.Printf("%s\r\n\r\n", prompt)
 
 	selected := 0
+	pointer := paint("1;36", "❯") // bold cyan
 
-	draw := func() {
-		// Move cursor to start of options
-		fmt.Printf("\r")
-		linesPrinted := 0
-		for i, opt := range options {
-			if i == selected {
-				// Use bold and cyan background/text inverted or just an arrow
-				// ANSI reverse video is "\033[7m"
-				fmt.Printf("\033[7m ❯ %s \033[0m\r\n", opt)
-			} else {
-				fmt.Printf("   %s \r\n", opt)
+	// render returns the physical lines for one option, with the pointer on the
+	// first line of the selected option and a two-space gutter otherwise.
+	render := func(i int) []string {
+		var out []string
+		for li, ln := range strings.Split(options[i], "\n") {
+			ln = strings.TrimRight(ln, "\r")
+			gutter := "  "
+			if li == 0 && i == selected {
+				gutter = pointer + " "
 			}
-			linesPrinted += 1
-			for i := 0; i < len(opt); i++ {
-				if opt[i] == '\n' {
-					linesPrinted++
-				}
-			}
+			out = append(out, gutter+ln)
 		}
-		// Move cursor back up
-		if linesPrinted > 0 {
-			fmt.Printf("\033[%dA", linesPrinted)
-		}
+		return out
 	}
 
+	// Total physical lines is constant (the pointer doesn't change line count).
+	total := 0
+	for i := range options {
+		total += len(render(i))
+	}
+
+	draw := func() {
+		for i := range options {
+			for _, ln := range render(i) {
+				fmt.Printf("\r\033[K%s\r\n", ln) // clear each line before writing
+			}
+		}
+		fmt.Printf("\033[%dA", total) // back to the top of the list
+	}
 	draw()
+
+	// leave moves the cursor below the (still-drawn) menu before returning.
+	leave := func() {
+		fmt.Printf("\033[%dB\r\n", total)
+	}
 
 	buf := make([]byte, 3)
 	for {
@@ -71,32 +84,30 @@ func SelectMenu(prompt string, options []string) (int, error) {
 		if n == 0 {
 			continue
 		}
-
 		if n == 1 {
 			switch buf[0] {
-			case 3, 4, 27: // Ctrl+C, Ctrl+D, Esc
-				// Move down to the end before exiting
-				fmt.Printf("\033[%dB\r\n", len(options))
+			case 3, 4, 27, 'q': // Ctrl-C, Ctrl-D, Esc, q
+				leave()
 				return -1, nil
 			case 13: // Enter
-				fmt.Printf("\033[%dB\r\n", len(options))
+				leave()
 				return selected, nil
+			case 'k': // vim up
+				selected = (selected - 1 + len(options)) % len(options)
+				draw()
+			case 'j': // vim down
+				selected = (selected + 1) % len(options)
+				draw()
 			}
+			continue
 		}
-
 		if n == 3 && buf[0] == 27 && buf[1] == 91 {
 			switch buf[2] {
 			case 65: // Up
-				selected--
-				if selected < 0 {
-					selected = len(options) - 1
-				}
+				selected = (selected - 1 + len(options)) % len(options)
 				draw()
 			case 66: // Down
-				selected++
-				if selected >= len(options) {
-					selected = 0
-				}
+				selected = (selected + 1) % len(options)
 				draw()
 			}
 		}

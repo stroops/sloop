@@ -28,6 +28,8 @@ Thumbs.db
 *.db
 *.db-journal
 *.sock
+.sloop/cache/
+.sloop/sessions/
 ~/.sloop/
 
 # local settings
