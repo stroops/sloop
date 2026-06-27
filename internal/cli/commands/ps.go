@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/tui"
 )
@@ -67,26 +69,53 @@ func tmuxList() string {
 	return string(out)
 }
 
+// captureTimeout bounds each `tmux capture-pane` so one hung pane can never
+// hang the whole fleet view (important for --watch, which loops forever).
+const captureTimeout = 2 * time.Second
+
 // enrichGlances fills each row's Glance and Status from its terminal, capturing
 // every pane concurrently so the fleet renders fast even with many sessions
 // (best-effort; reads only your own panes, never the provider). Each goroutine
-// writes a distinct index, so no locking is needed.
+// writes a distinct index, so no locking is needed, and each capture is bounded
+// by captureTimeout so a stuck pane can't block. When a fresh hook-written
+// marker exists for a session it overrides the pane heuristic (authoritative).
 func enrichGlances(rows []FleetRow) []FleetRow {
 	var wg sync.WaitGroup
 	for i := range rows {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			out, err := exec.Command("tmux", runner.BuildTmuxCaptureArgs(rows[i].Name)...).Output()
-			if err != nil {
-				return
+
+			marker, hasMarker := fleetstate.Read(rows[i].Name)
+
+			ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
+			defer cancel()
+			out, err := exec.CommandContext(ctx, "tmux", runner.BuildTmuxCaptureArgs(rows[i].Name)...).Output()
+			if err == nil {
+				rows[i].Glance = truncate(runner.LastNonEmptyLine(string(out)), 72)
+				rows[i].Status = runner.ClassifyStatus(string(out))
 			}
-			rows[i].Glance = truncate(runner.LastNonEmptyLine(string(out)), 72)
-			rows[i].Status = runner.ClassifyStatus(string(out))
+			if hasMarker {
+				rows[i].Status = stateToStatus(marker.Status)
+			}
 		}(i)
 	}
 	wg.Wait()
 	return rows
+}
+
+// stateToStatus maps a hook marker's status string to an AgentStatus.
+func stateToStatus(s string) runner.AgentStatus {
+	switch s {
+	case "waiting":
+		return runner.StatusWaiting
+	case "working":
+		return runner.StatusWorking
+	case "idle":
+		return runner.StatusIdle
+	default:
+		return runner.StatusUnknown
+	}
 }
 
 // filterWaiting keeps only sessions waiting on the user.
