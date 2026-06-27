@@ -295,6 +295,26 @@ session name shown next to each `ps` number).
 
 ---
 
+## 8. Hints (learn as you go)
+
+New to tmux/CLI? sloop occasionally prints one short `💡` tip after a command — what "detach" means,
+how `ps` works, that `hooks install` makes status precise. They're **contextual** (tied to the
+command), **throttled** (never more than one every few minutes, no repeats), and **offline** (ship
+with the binary, updated on new releases).
+
+```sh
+sloop hints            # list every tip in your language
+sloop hints off        # turn tips off   (sloop hints on to re-enable)
+SLOOP_LANG=vi sloop …  # tips in Vietnamese (en + vi ship today)
+SLOOP_NO_HINTS=1 …     # one-off: silence tips for a single command
+```
+
+Language is picked from `SLOOP_LANG` → the `lang` field in `~/.sloop/config.yaml` → `$LANG` → English.
+Add a language by adding its key to `internal/hints/hints.yaml`. (A future release may also pull an
+updated hint set from a registry / the global DB — embedded is the source for now.)
+
+---
+
 ## Full dogfood walkthrough
 
 ```sh

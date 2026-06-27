@@ -19,6 +19,8 @@ nature.
 # ~/.sloop/config.yaml
 version: 1
 mode: ask
+lang: vi        # optional: hint language (en/vi); empty = auto from $SLOOP_LANG/$LANG
+hints: false    # optional: turn the 💡 education tips off (omit/true = on)
 ```
 
 ## 2. Local — `.sloop/` (per repo, committed)

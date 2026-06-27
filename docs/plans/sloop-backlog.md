@@ -119,6 +119,14 @@ cross-repo wedge specifically — not generic orchestration.
 - ⚠️ The psmux path is wired but **not yet verified on a real Windows machine** — needs a dogfood pass
   for exact flag/format-variable compatibility (`list-sessions -F`, `capture-pane -p`, etc.).
 
+## Education (shipped)
+
+- **Hints system** (`internal/hints`) — contextual `💡` tips after `init/ps/run/sync/hooks/status/
+  tools`, embed-first (`hints.yaml`, ship with releases), **i18n en+vi** (`SLOOP_LANG`→config `lang`→
+  `LANG`→en), throttled (global 5-min + per-hint 7-day cooldown via `~/.sloop/hints-state.json`),
+  opt-out (`SLOOP_NO_HINTS`, `sloop hints off`). `sloop hints` lists all. Future: registry/global-DB
+  overlay (seam in `Load()`), more languages, tip-of-the-day mode.
+
 ## Later / parked
 
 - **`sloop init --scan` LLM enrichment** + **AI `sloop doctor`** — when reached, add a **minimal**
