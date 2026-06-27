@@ -127,6 +127,13 @@ cross-repo wedge specifically — not generic orchestration.
   opt-out (`SLOOP_NO_HINTS`, `sloop hints off`). `sloop hints` lists all. Future: registry/global-DB
   overlay (seam in `Load()`), more languages, tip-of-the-day mode.
 
+## Fleet actions (shipped)
+
+- **`ps` control center** — in the interactive menu: `Enter` jump, `s` send a quick reply, `x` kill
+  (confirm), via `tui.SelectAction` (returns the action key). **`sloop kill <#|--all|--waiting>`**
+  (confirms; `--yes`/global `-y` skips) and **`sloop send --waiting|--all`** broadcast. Reuses
+  `resolveTarget`/`fleetRows`/`filterWaiting`; `tmux.Kill`.
+
 ## Later / parked
 
 - **`sloop init --scan` LLM enrichment** + **AI `sloop doctor`** — when reached, add a **minimal**

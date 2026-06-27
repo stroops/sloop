@@ -126,9 +126,9 @@ jump: sloop ps <#>   ·   send: sloop send <#> "msg"
   needs you first. Install the Claude hooks (below) to make this status **authoritative**
   instead of a heuristic.
 - The `└` line is the session's last terminal output (the glance).
-- On a real terminal, `sloop ps` opens an interactive menu — `↑/↓` (or `j/k`) to move,
-  `Enter` to jump, `q`/`Esc` to quit. Piped/CI prints the plain listing above. Colors honor
-  `NO_COLOR` and `--no-color`, and turn off automatically when output isn't a terminal.
+- On a real terminal, `sloop ps` is a **control center** — `↑/↓` (or `j/k`) to move, then act on the
+  highlighted session in place: `Enter` jumps, `s` sends a quick reply, `x` kills it (with a confirm),
+  `q`/`Esc` quits. Piped/CI prints the plain listing above. Colors honor `NO_COLOR`/`--no-color`.
 - Jump straight to one:
 
 ```sh
@@ -220,6 +220,16 @@ sloop send webapp "run the tests"               # by workspace (if it has one se
 `send` types the message into that session's pane and presses Enter — exactly as if you
 typed it yourself (via `tmux send-keys`; the provider is never intercepted). Great for
 unblocking an agent across repos without losing your place.
+
+Broadcast to many at once, or end sessions:
+
+```sh
+sloop send --waiting "yes, go ahead"   # answer every agent waiting on you
+sloop send --all "stash and pause"     # every running session (asks to confirm)
+sloop kill 2                           # end one session (asks to confirm; -y to skip)
+sloop kill --waiting                   # end all that are waiting
+sloop kill --all -y                    # clean up everything (global -y = assume yes)
+```
 
 ---
 
