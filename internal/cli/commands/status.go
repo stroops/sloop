@@ -11,6 +11,7 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
+	"github.com/stroops/sloop/internal/hints"
 	syncpkg "github.com/stroops/sloop/internal/sync"
 	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
@@ -124,7 +125,11 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return RunStatus(cwd, cmd.OutOrStdout())
+		if err := RunStatus(cwd, cmd.OutOrStdout()); err != nil {
+			return err
+		}
+		hints.Show(cmd.OutOrStdout(), "status")
+		return nil
 	},
 }
 

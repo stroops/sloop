@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stroops/sloop/internal/adapter"
+	"github.com/stroops/sloop/internal/hints"
 	"github.com/stroops/sloop/internal/workspace"
 )
 
@@ -212,6 +213,7 @@ var hooksInstallCmd = &cobra.Command{
 			cmd.Printf("sloop status hooks already present in %s\n", path)
 		}
 		cmd.Printf("%s will now report waiting/working/idle to `sloop ps`.\n", m.Name)
+		hints.Show(cmd.OutOrStdout(), "hooks")
 		return nil
 	},
 }
@@ -268,6 +270,7 @@ var hooksListCmd = &cobra.Command{
 			cmd.Printf("%-9s %-12s %s\n", tool, auto, m.Hooks.Config)
 		}
 		cmd.Println("\nDetails: sloop hooks print <tool>")
+		hints.Show(cmd.OutOrStdout(), "hooks")
 		return nil
 	},
 }

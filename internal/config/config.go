@@ -46,6 +46,10 @@ const ConfigVersion = 1
 type Global struct {
 	Version int    `yaml:"version"`
 	Mode    string `yaml:"mode"`
+	// Lang is the preferred UI language for hints (e.g. "en", "vi"); empty =
+	// auto from $SLOOP_LANG/$LANG. Hints nil = enabled, false = off.
+	Lang  string `yaml:"lang,omitempty"`
+	Hints *bool  `yaml:"hints,omitempty"`
 }
 
 func GlobalConfigPath() (string, error) {

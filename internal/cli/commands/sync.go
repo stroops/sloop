@@ -8,6 +8,7 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
+	"github.com/stroops/sloop/internal/hints"
 	syncpkg "github.com/stroops/sloop/internal/sync"
 	"github.com/stroops/sloop/internal/workspace"
 )
@@ -166,6 +167,7 @@ var syncCmd = &cobra.Command{
 		for _, w := range written {
 			cmd.Printf("synced %s\n", w)
 		}
+		hints.Show(cmd.OutOrStdout(), "sync")
 		return nil
 	},
 }

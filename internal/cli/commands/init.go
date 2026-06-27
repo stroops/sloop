@@ -9,6 +9,7 @@ import (
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/detect"
+	"github.com/stroops/sloop/internal/hints"
 	scanpkg "github.com/stroops/sloop/internal/scan"
 	"github.com/stroops/sloop/internal/session"
 	syncpkg "github.com/stroops/sloop/internal/sync"
@@ -134,7 +135,8 @@ var initCmd = &cobra.Command{
 		for _, l := range summary {
 			cmd.Printf("  %s\n", l)
 		}
-		cmd.Printf("Next: edit AGENTS.md, then `sloop run`. Tip: `sloop hooks install` for precise `sloop ps` status.\n")
+		cmd.Println("Next: edit AGENTS.md, then `sloop run`.")
+		hints.Show(cmd.OutOrStdout(), "init")
 		return nil
 	},
 }

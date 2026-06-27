@@ -17,6 +17,7 @@ import (
 
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/fleetstate"
+	"github.com/stroops/sloop/internal/hints"
 	"github.com/stroops/sloop/internal/session"
 	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
@@ -356,7 +357,11 @@ var psCmd = &cobra.Command{
 		// Non-interactive (piped, CI): print the plain listing instead of the
 		// raw-mode menu, which can't run without a tty.
 		if !term.IsTerminal(int(os.Stdin.Fd())) {
-			return RunPs(cmd.OutOrStdout(), rows)
+			if err := RunPs(cmd.OutOrStdout(), rows); err != nil {
+				return err
+			}
+			hints.Show(cmd.OutOrStdout(), "ps")
+			return nil
 		}
 
 		wsW, toolW, waiting := columnWidths(rows)
@@ -385,6 +390,7 @@ var psCmd = &cobra.Command{
 		if selected >= 0 {
 			return jumpToFleet(rows, selected+1)
 		}
+		hints.Show(cmd.OutOrStdout(), "ps")
 		return nil
 	},
 }

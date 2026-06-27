@@ -10,6 +10,7 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
+	"github.com/stroops/sloop/internal/hints"
 	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/session"
 	"github.com/stroops/sloop/internal/tmux"
@@ -186,7 +187,11 @@ var runCmd = &cobra.Command{
 			if len(tools) == 0 {
 				tools = []string{proj.DefaultTool}
 			}
-			return RunSplit(startDir, tools)
+			if err := RunSplit(startDir, tools); err != nil {
+				return err
+			}
+			hints.Show(cmd.OutOrStdout(), "run")
+			return nil
 		}
 		target := ""
 		if len(positional) == 1 {
@@ -195,7 +200,11 @@ var runCmd = &cobra.Command{
 		if target == "" {
 			target = proj.DefaultTool
 		}
-		return RunRun(startDir, target, passthrough, selectRunner(ws.Name, target))
+		if err := RunRun(startDir, target, passthrough, selectRunner(ws.Name, target)); err != nil {
+			return err
+		}
+		hints.Show(cmd.OutOrStdout(), "run")
+		return nil
 	},
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/detect"
+	"github.com/stroops/sloop/internal/hints"
 )
 
 func RunTools(w io.Writer) error {
@@ -74,7 +75,11 @@ var toolsCmd = &cobra.Command{
 	Use:   "tools",
 	Short: "List configured AI tool adapters and their install status",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return RunTools(cmd.OutOrStdout())
+		if err := RunTools(cmd.OutOrStdout()); err != nil {
+			return err
+		}
+		hints.Show(cmd.OutOrStdout(), "tools")
+		return nil
 	},
 }
 

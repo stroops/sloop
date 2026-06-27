@@ -29,4 +29,5 @@ func init() {
 	add(RegisterSkill)
 	add(RegisterHook)
 	add(RegisterHooks)
+	add(RegisterHints)
 }

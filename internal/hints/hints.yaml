@@ -1,0 +1,87 @@
+# Contextual education hints, shown occasionally after a command. Each hint has
+# a context (a command name, or "general") and per-language text. Add a language
+# by adding a key under text. Updates ship with new sloop releases.
+hints:
+  - id: agents-md
+    context: init
+    text:
+      en: "AGENTS.md is your project's canonical context — edit it once; every tool reads it (CLAUDE.md/GEMINI.md just point to it)."
+      vi: "AGENTS.md là ngữ cảnh gốc của dự án — chỉ cần sửa một lần; mọi tool đều đọc nó (CLAUDE.md/GEMINI.md chỉ trỏ tới)."
+
+  - id: hooks-install
+    context: init
+    text:
+      en: "Run `sloop hooks install` so `sloop ps` knows exactly when an agent is waiting on you."
+      vi: "Chạy `sloop hooks install` để `sloop ps` biết chính xác khi nào một agent đang chờ bạn."
+
+  - id: detach
+    context: run
+    text:
+      en: "Your agent runs in a tmux session. To step away, press your tmux prefix then d — it keeps running. Come back with `sloop ps`."
+      vi: "Agent chạy trong một tmux session. Muốn rời đi, bấm tmux prefix rồi d — nó vẫn chạy nền. Quay lại bằng `sloop ps`."
+
+  - id: split
+    context: run
+    text:
+      en: "Run two agents side by side: `sloop run --split claude cursor` (one tmux window, two panes)."
+      vi: "Chạy hai agent cạnh nhau: `sloop run --split claude cursor` (một cửa sổ tmux, hai pane)."
+
+  - id: ps-jump
+    context: ps
+    text:
+      en: "`sloop ps <#>` jumps straight to a session; the agents waiting on you float to the top."
+      vi: "`sloop ps <#>` nhảy thẳng tới một session; các agent đang chờ bạn được đẩy lên đầu."
+
+  - id: ps-send
+    context: ps
+    text:
+      en: "Reply to an agent without attaching: `sloop send <#> \"yes, go ahead\"`."
+      vi: "Trả lời một agent mà không cần attach: `sloop send <#> \"ừ, làm tiếp đi\"`."
+
+  - id: ps-watch
+    context: ps
+    text:
+      en: "`sloop ps --watch --notify` rings and desktop-notifies the moment any agent across your repos starts waiting."
+      vi: "`sloop ps --watch --notify` reo chuông và bắn thông báo ngay khi bất kỳ agent nào (mọi repo) bắt đầu chờ."
+
+  - id: sync-repair
+    context: sync
+    text:
+      en: "If a tool file you didn't create blocks delivery, `sloop sync --repair` moves it aside safely — it never deletes."
+      vi: "Nếu một file của tool (không phải bạn tạo) chặn việc đồng bộ, `sloop sync --repair` dời nó ra an toàn — không bao giờ xoá."
+
+  - id: skills-shared
+    context: skills
+    text:
+      en: "Skills in .sloop/skills are shared across every tool — write or import once, all agents see them."
+      vi: "Skills trong .sloop/skills dùng chung cho mọi tool — viết/nhập một lần, mọi agent đều thấy."
+
+  - id: status-vs-ps
+    context: status
+    text:
+      en: "`sloop status` summarizes this workspace; `sloop ps` shows what's running across all your repos."
+      vi: "`sloop status` tóm tắt workspace hiện tại; `sloop ps` cho thấy mọi thứ đang chạy trên tất cả repo."
+
+  - id: tools-default
+    context: tools
+    text:
+      en: "Enable tools in .sloop/config.yaml; `sloop run <tool>` overrides the default for one launch."
+      vi: "Bật tool trong .sloop/config.yaml; `sloop run <tool>` ghi đè tool mặc định cho một lần chạy."
+
+  - id: hooks-multi
+    context: hooks
+    text:
+      en: "`sloop hooks list` shows every provider; claude and gemini auto-install, others print the exact wiring."
+      vi: "`sloop hooks list` liệt kê mọi provider; claude và gemini tự cài, các tool khác in sẵn cách nối."
+
+  - id: detach-general
+    context: general
+    text:
+      en: "Inside a session, detach with your tmux prefix then d — the agent keeps working; reattach with `sloop ps`."
+      vi: "Trong một session, detach bằng tmux prefix rồi d — agent vẫn làm việc; quay lại bằng `sloop ps`."
+
+  - id: lang-toggle
+    context: general
+    text:
+      en: "Prefer another language? Set SLOOP_LANG=vi (or your locale). Turn these tips off with `sloop hints off`."
+      vi: "Muốn ngôn ngữ khác? Đặt SLOOP_LANG=en (hoặc locale của bạn). Tắt các mẹo này bằng `sloop hints off`."
