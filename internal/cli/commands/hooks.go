@@ -5,29 +5,43 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/workspace"
 )
 
-// sloopHooks maps each Claude hook event to the sloop status it records.
-// UserPromptSubmit → the agent started working; Notification → it's blocked on
-// you; Stop → it finished the turn (idle).
-var sloopHooks = map[string]string{
-	"UserPromptSubmit": "working",
-	"Notification":     "waiting",
-	"Stop":             "idle",
-}
+// Hook installation is driven entirely by adapter manifests (the single
+// provider-aware source). A tool's manifest says where its hook config lives,
+// which install strategy applies, and which of its events map to sloop's
+// working/waiting/idle states. Each event calls `sloop hook <state>`, which
+// records a marker `sloop ps` reads.
 
-// hookCommandFor is the shell command Claude runs for an event.
+// hookCommandFor is the shell command a tool runs for a sloop state.
 func hookCommandFor(state string) string { return "sloop hook " + state }
 
-// mergeClaudeHooks adds sloop's status hooks to a Claude settings JSON document
-// (decoded into a generic map) without disturbing existing keys or other hooks.
-// It returns the (possibly unchanged) document and whether anything was added.
-func mergeClaudeHooks(root map[string]any) (map[string]any, bool) {
+// eventCommands turns a manifest's event→state mapping into the event→command
+// map the installers and printers use, skipping states the tool can't signal.
+func eventCommands(h adapter.HooksSpec) map[string]string {
+	m := map[string]string{}
+	add := func(event, state string) {
+		if event != "" {
+			m[event] = hookCommandFor(state)
+		}
+	}
+	add(h.Events.Working, "working")
+	add(h.Events.Waiting, "waiting")
+	add(h.Events.Idle, "idle")
+	return m
+}
+
+// mergeSettingsHooks adds the given event→command hooks to a settings.json-style
+// document (the shape Claude and Gemini share) without disturbing existing keys
+// or other hooks. Returns the (possibly unchanged) document and whether it changed.
+func mergeSettingsHooks(root map[string]any, events map[string]string) (map[string]any, bool) {
 	if root == nil {
 		root = map[string]any{}
 	}
@@ -36,8 +50,7 @@ func mergeClaudeHooks(root map[string]any) (map[string]any, bool) {
 		hooks = map[string]any{}
 	}
 	changed := false
-	for event, state := range sloopHooks {
-		cmd := hookCommandFor(state)
+	for event, cmd := range events {
 		if hasCommandHook(hooks[event], cmd) {
 			continue
 		}
@@ -81,89 +94,77 @@ func hasCommandHook(eventVal any, cmd string) bool {
 	return false
 }
 
-// installClaudeHooks merges sloop's hooks into <root>/.claude/settings.local.json
-// (a per-user, typically un-committed file). Returns the path and whether it changed.
-func installClaudeHooks(root string) (string, bool, error) {
-	claudeDir := filepath.Join(root, ".claude")
-	path := filepath.Join(claudeDir, "settings.local.json")
-
+// installSettingsHooks merges events into the JSON settings file at path,
+// creating it if needed. Returns whether the file changed.
+func installSettingsHooks(path string, events map[string]string) (bool, error) {
 	doc := map[string]any{}
 	if b, err := os.ReadFile(path); err == nil {
 		if err := json.Unmarshal(b, &doc); err != nil {
-			return path, false, fmt.Errorf("%s is not valid JSON: %w", path, err)
+			return false, fmt.Errorf("%s is not valid JSON: %w", path, err)
 		}
 	}
-	merged, changed := mergeClaudeHooks(doc)
+	merged, changed := mergeSettingsHooks(doc, events)
 	if !changed {
-		return path, false, nil
+		return false, nil
 	}
-	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
-		return path, false, err
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, err
 	}
 	out, err := json.MarshalIndent(merged, "", "  ")
 	if err != nil {
-		return path, false, err
+		return false, err
 	}
-	return path, true, os.WriteFile(path, append(out, '\n'), 0o644)
+	return true, os.WriteFile(path, append(out, '\n'), 0o644)
 }
 
-// providerHook describes how one AI tool exposes lifecycle hooks and where its
-// config lives, so sloop's status integration is multi-provider aware. The
-// event names below come from each tool's own docs; `sloop hook <state>` is the
-// command they should call. Only Claude is auto-installed today (its format is
-// verified); the rest are surfaced via `hooks print`/`list` so you can wire
-// them by hand until each installer is added.
-type providerHook struct {
-	Tool        string
-	ConfigPath  string
-	DocsURL     string
-	Working     string // event that means "started working"
-	Waiting     string // event that means "blocked on you"
-	Idle        string // event that means "turn finished"
-	AutoInstall bool
-	Notes       string
-}
-
-var providerHooks = []providerHook{
-	{
-		Tool: "claude", ConfigPath: ".claude/settings.local.json",
-		DocsURL: "https://docs.claude.com/en/docs/claude-code/hooks",
-		Working: "UserPromptSubmit", Waiting: "Notification", Idle: "Stop",
-		AutoInstall: true,
-	},
-	{
-		Tool: "gemini", ConfigPath: ".gemini/settings.json (or ~/.gemini/settings.json)",
-		DocsURL: "https://geminicli.com/docs/hooks/reference/",
-		Working: "BeforeAgent", Waiting: "Notification", Idle: "AfterAgent",
-		Notes: "settings.json hooks; lifecycle matchers are exact strings",
-	},
-	{
-		Tool: "cursor", ConfigPath: ".cursor/hooks.json",
-		DocsURL: "https://cursor.com/docs/hooks",
-		Working: "beforeSubmitPrompt", Waiting: "beforeShellExecution", Idle: "stop",
-		Notes: "CLI hooks since v1.7 (sessionStart/stop/prompt)",
-	},
-	{
-		Tool: "copilot", ConfigPath: "~/.copilot/hooks/notification-hooks.json",
-		DocsURL: "https://docs.github.com/en/copilot/reference/hooks-reference",
-		Working: "userPromptSubmit", Waiting: "(see docs)", Idle: "sessionEnd",
-		Notes: "bash/powershell keys per OS",
-	},
-	{
-		Tool: "codex", ConfigPath: "~/.codex/config.toml  (notify = [...])",
-		DocsURL: "https://developers.openai.com/codex/config-advanced",
-		Working: "—", Waiting: "approval-requested", Idle: "agent-turn-complete",
-		Notes: "one notify program for all events; external notify currently fires turn-complete reliably",
-	},
-}
-
-func hookByTool(tool string) (providerHook, bool) {
-	for _, p := range providerHooks {
-		if p.Tool == tool {
-			return p, true
+// resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
+// expands to the home dir, absolute paths pass through, and a repo-relative path
+// is joined to the workspace root.
+func resolveHookConfigPath(root, cfg string) (string, error) {
+	if strings.HasPrefix(cfg, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
 		}
+		return filepath.Join(home, cfg[2:]), nil
 	}
-	return providerHook{}, false
+	if filepath.IsAbs(cfg) {
+		return cfg, nil
+	}
+	return filepath.Join(root, cfg), nil
+}
+
+// hookTools returns the adapter keys, sorted, for completion and listing.
+func hookTools() []string {
+	manifests, err := adapter.Load()
+	if err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(manifests))
+	for k := range manifests {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
+}
+
+func manifestForTool(tool string) (adapter.Manifest, error) {
+	manifests, err := adapter.Load()
+	if err != nil {
+		return adapter.Manifest{}, err
+	}
+	m, ok := manifests[tool]
+	if !ok {
+		return adapter.Manifest{}, fmt.Errorf("unknown tool %q (have: %s)", tool, strings.Join(hookTools(), ", "))
+	}
+	return m, nil
 }
 
 var hooksCmd = &cobra.Command{
@@ -172,22 +173,21 @@ var hooksCmd = &cobra.Command{
 }
 
 var hooksInstallCmd = &cobra.Command{
-	Use:       "install [tool]",
-	Short:     "Install sloop status hooks (auto for claude; others: see `hooks print`)",
-	Args:      cobra.MaximumNArgs(1),
-	ValidArgs: hookTools(),
+	Use:   "install [tool]",
+	Short: "Install sloop status hooks (auto for settings-json tools; others: see `hooks print`)",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tool := "claude"
 		if len(args) == 1 {
 			tool = args[0]
 		}
-		p, ok := hookByTool(tool)
-		if !ok {
-			return fmt.Errorf("unknown tool %q (have: %s)", tool, strings.Join(hookTools(), ", "))
+		m, err := manifestForTool(tool)
+		if err != nil {
+			return err
 		}
-		if !p.AutoInstall {
+		if m.Hooks.Install != "settings-json" {
 			cmd.Printf("auto-install isn't available for %s yet.\n", tool)
-			cmd.Printf("Run `sloop hooks print %s` for the exact events to wire in %s.\n", tool, p.ConfigPath)
+			cmd.Printf("Run `sloop hooks print %s` for the exact events to wire in %s.\n", tool, m.Hooks.Config)
 			return nil
 		}
 		cwd, err := os.Getwd()
@@ -198,7 +198,11 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		path, changed, err := installClaudeHooks(ws.Root)
+		path, err := resolveHookConfigPath(ws.Root, m.Hooks.Config)
+		if err != nil {
+			return err
+		}
+		changed, err := installSettingsHooks(path, eventCommands(m.Hooks))
 		if err != nil {
 			return err
 		}
@@ -207,39 +211,40 @@ var hooksInstallCmd = &cobra.Command{
 		} else {
 			cmd.Printf("sloop status hooks already present in %s\n", path)
 		}
-		cmd.Println("Claude will now report waiting/working/idle to `sloop ps`.")
+		cmd.Printf("%s will now report waiting/working/idle to `sloop ps`.\n", m.Name)
 		return nil
 	},
 }
 
 var hooksPrintCmd = &cobra.Command{
-	Use:       "print [tool]",
-	Short:     "Print how to wire a tool's hooks to sloop (default: claude JSON snippet)",
-	Args:      cobra.MaximumNArgs(1),
-	ValidArgs: hookTools(),
+	Use:   "print [tool]",
+	Short: "Print how to wire a tool's hooks to sloop (settings-json tools print a JSON snippet)",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tool := "claude"
 		if len(args) == 1 {
 			tool = args[0]
 		}
-		p, ok := hookByTool(tool)
-		if !ok {
-			return fmt.Errorf("unknown tool %q (have: %s)", tool, strings.Join(hookTools(), ", "))
+		m, err := manifestForTool(tool)
+		if err != nil {
+			return err
 		}
-		if tool == "claude" {
-			doc, _ := mergeClaudeHooks(nil)
+		if m.Hooks.Install == "settings-json" {
+			doc, _ := mergeSettingsHooks(nil, eventCommands(m.Hooks))
 			out, _ := json.MarshalIndent(doc, "", "  ")
-			cmd.Printf("# %s — add to %s\n%s\n", tool, p.ConfigPath, string(out))
+			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
 			return nil
 		}
-		cmd.Printf("# %s hooks → call these from %s\n", tool, p.ConfigPath)
-		cmd.Printf("  working : on %-22s → run: %s\n", p.Working, hookCommandFor("working"))
-		cmd.Printf("  waiting : on %-22s → run: %s\n", p.Waiting, hookCommandFor("waiting"))
-		cmd.Printf("  idle    : on %-22s → run: %s\n", p.Idle, hookCommandFor("idle"))
-		if p.Notes != "" {
-			cmd.Printf("  note    : %s\n", p.Notes)
+		cmd.Printf("# %s hooks → call these from %s\n", tool, m.Hooks.Config)
+		cmd.Printf("  working : on %-22s → run: %s\n", orDash(m.Hooks.Events.Working), hookCommandFor("working"))
+		cmd.Printf("  waiting : on %-22s → run: %s\n", orDash(m.Hooks.Events.Waiting), hookCommandFor("waiting"))
+		cmd.Printf("  idle    : on %-22s → run: %s\n", orDash(m.Hooks.Events.Idle), hookCommandFor("idle"))
+		if m.Hooks.Notes != "" {
+			cmd.Printf("  note    : %s\n", m.Hooks.Notes)
 		}
-		cmd.Printf("  docs    : %s\n", p.DocsURL)
+		if m.Hooks.Docs != "" {
+			cmd.Printf("  docs    : %s\n", m.Hooks.Docs)
+		}
 		return nil
 	},
 }
@@ -249,28 +254,28 @@ var hooksListCmd = &cobra.Command{
 	Short: "Show hook support and event mapping for every AI provider",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		manifests, err := adapter.Load()
+		if err != nil {
+			return err
+		}
 		cmd.Printf("%-9s %-12s %s\n", "TOOL", "AUTO-INSTALL", "CONFIG")
-		for _, p := range providerHooks {
+		for _, tool := range hookTools() {
+			m := manifests[tool]
 			auto := "print+paste"
-			if p.AutoInstall {
+			if m.Hooks.Install == "settings-json" {
 				auto = "yes"
 			}
-			cmd.Printf("%-9s %-12s %s\n", p.Tool, auto, p.ConfigPath)
+			cmd.Printf("%-9s %-12s %s\n", tool, auto, m.Hooks.Config)
 		}
 		cmd.Println("\nDetails: sloop hooks print <tool>")
 		return nil
 	},
 }
 
-func hookTools() []string {
-	out := make([]string, 0, len(providerHooks))
-	for _, p := range providerHooks {
-		out = append(out, p.Tool)
-	}
-	return out
-}
-
 func RegisterHooks(cmd *cobra.Command) {
+	tools := hookTools()
+	hooksInstallCmd.ValidArgs = tools
+	hooksPrintCmd.ValidArgs = tools
 	hooksCmd.AddCommand(hooksInstallCmd)
 	hooksCmd.AddCommand(hooksPrintCmd)
 	hooksCmd.AddCommand(hooksListCmd)

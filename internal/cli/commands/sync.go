@@ -3,33 +3,28 @@ package commands
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
-	"github.com/stroops/sloop/internal/profile"
 	syncpkg "github.com/stroops/sloop/internal/sync"
 	"github.com/stroops/sloop/internal/workspace"
 )
 
-func resolveProfile(sloopDir, target, defaultTool string) (profile.Profile, error) {
+// resolveTool picks the target tool: the given target, or the project default.
+// (Enabled tools live in .sloop/config.yaml; there is no per-tool profile file.)
+func resolveTool(target, defaultTool string) (string, error) {
 	if target == "" {
 		target = defaultTool
 	}
 	if target == "" {
-		return profile.Profile{}, fmt.Errorf("no target tool or profile given and no default_tool set")
+		return "", fmt.Errorf("no target tool given and no default_tool set")
 	}
-	// A profile file wins over a bare tool name.
-	profPath := filepath.Join(sloopDir, "profiles", target+".yaml")
-	if _, err := os.Stat(profPath); err == nil {
-		return profile.Load(profPath)
-	}
-	return profile.Default(target), nil
+	return target, nil
 }
 
-// RunSync resolves the workspace + profile and synchronizes v2 context.
+// RunSync resolves the workspace + tool and synchronizes v2 context.
 func RunSync(startDir, target string, repair bool) ([]string, error) {
 	ws, err := workspace.Resolve(startDir)
 	if err != nil {
@@ -39,7 +34,7 @@ func RunSync(startDir, target string, repair bool) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	prof, err := resolveProfile(ws.SloopDir(), target, proj.DefaultTool)
+	tool, err := resolveTool(target, proj.DefaultTool)
 	if err != nil {
 		return nil, err
 	}
@@ -47,9 +42,9 @@ func RunSync(startDir, target string, repair bool) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, ok := manifests[prof.Tool]
+	m, ok := manifests[tool]
 	if !ok {
-		return nil, fmt.Errorf("unknown tool %q (no adapter)", prof.Tool)
+		return nil, fmt.Errorf("unknown tool %q (no adapter)", tool)
 	}
 
 	return syncOne(ws.Root, ws.SloopDir(), m, repair)

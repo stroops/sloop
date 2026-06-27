@@ -7,3 +7,11 @@ context:
   file: CLAUDE.md
 skills:
   target: .claude/skills
+hooks:
+  config: .claude/settings.local.json
+  install: settings-json
+  docs: https://docs.claude.com/en/docs/claude-code/hooks
+  events:
+    working: UserPromptSubmit
+    waiting: Notification
+    idle: Stop

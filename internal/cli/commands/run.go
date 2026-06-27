@@ -24,7 +24,7 @@ func RunRun(startDir, target string, extraArgs []string, r runner.Runner) error 
 	if err != nil {
 		return err
 	}
-	prof, err := resolveProfile(ws.SloopDir(), target, proj.DefaultTool)
+	tool, err := resolveTool(target, proj.DefaultTool)
 	if err != nil {
 		return err
 	}
@@ -32,9 +32,9 @@ func RunRun(startDir, target string, extraArgs []string, r runner.Runner) error 
 	if err != nil {
 		return err
 	}
-	m, ok := manifests[prof.Tool]
+	m, ok := manifests[tool]
 	if !ok {
-		return fmt.Errorf("unknown tool %q (no adapter)", prof.Tool)
+		return fmt.Errorf("unknown tool %q (no adapter)", tool)
 	}
 
 	// Sync native files before launch.
@@ -43,7 +43,7 @@ func RunRun(startDir, target string, extraArgs []string, r runner.Runner) error 
 	}
 
 	// Record session (best-effort: never block the launch).
-	sessID, store := recordSessionBestEffort(ws, prof.Tool, target)
+	sessID, store := recordSessionBestEffort(ws, tool, target)
 	if store != nil {
 		defer store.Close()
 	}

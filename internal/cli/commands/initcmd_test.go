@@ -27,7 +27,6 @@ func TestRunInitScaffolds(t *testing.T) {
 
 	for _, p := range []string{
 		".sloop/config.yaml",
-		".sloop/profiles/claude.yaml",
 		".sloop/.gitignore",
 	} {
 		if _, err := os.Stat(filepath.Join(dir, p)); err != nil {
@@ -39,6 +38,10 @@ func TestRunInitScaffolds(t *testing.T) {
 			t.Fatalf("expected dir %s: %v", d, err)
 		}
 	}
+	// Profiles were removed: init must NOT scaffold per-tool profile files.
+	if _, err := os.Stat(filepath.Join(dir, ".sloop", "profiles")); !os.IsNotExist(err) {
+		t.Fatalf(".sloop/profiles should not be created")
+	}
 }
 
 func TestRunInitFallsBackToClaude(t *testing.T) {
@@ -48,15 +51,15 @@ func TestRunInitFallsBackToClaude(t *testing.T) {
 	if err := RunInit(dir, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".sloop", "profiles", "claude.yaml")); err != nil {
-		t.Fatalf("expected claude fallback profile: %v", err)
-	}
 	p, err := config.LoadProject(filepath.Join(dir, ".sloop"))
 	if err != nil {
 		t.Fatalf("LoadProject: %v", err)
 	}
 	if p.DefaultTool != "claude" {
 		t.Fatalf("want default claude, got %q", p.DefaultTool)
+	}
+	if !contains(p.Tools, "claude") {
+		t.Fatalf("want claude enabled, got %v", p.Tools)
 	}
 }
 

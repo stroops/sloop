@@ -7,3 +7,11 @@ context:
   file: GEMINI.md
 skills:
   target: ""
+hooks:
+  config: .gemini/settings.json
+  install: settings-json
+  docs: https://geminicli.com/docs/hooks/reference/
+  events:
+    working: BeforeAgent
+    waiting: Notification
+    idle: AfterAgent

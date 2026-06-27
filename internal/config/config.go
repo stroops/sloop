@@ -38,9 +38,14 @@ func UserAdaptersDir() (string, error) {
 	return filepath.Join(d, "adapters"), nil
 }
 
+// ConfigVersion is the current config schema version, written to new config
+// files so future schema changes can migrate safely.
+const ConfigVersion = 1
+
 // Global is the machine-local config at ~/.sloop/config.yaml.
 type Global struct {
-	Mode string `yaml:"mode"`
+	Version int    `yaml:"version"`
+	Mode    string `yaml:"mode"`
 }
 
 func GlobalConfigPath() (string, error) {
@@ -58,7 +63,7 @@ func LoadGlobal() (*Global, error) {
 	}
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return &Global{Mode: ModeAsk}, nil
+		return &Global{Version: ConfigVersion, Mode: ModeAsk}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -67,6 +72,9 @@ func LoadGlobal() (*Global, error) {
 	if err := yaml.Unmarshal(b, &g); err != nil {
 		return nil, err
 	}
+	if g.Version == 0 {
+		g.Version = ConfigVersion
+	}
 	if g.Mode == "" {
 		g.Mode = ModeAsk
 	}
@@ -74,6 +82,9 @@ func LoadGlobal() (*Global, error) {
 }
 
 func SaveGlobal(g *Global) error {
+	if g.Version == 0 {
+		g.Version = ConfigVersion
+	}
 	dir, err := GlobalDir()
 	if err != nil {
 		return err
@@ -91,6 +102,7 @@ func SaveGlobal(g *Global) error {
 
 // Project is the per-project config stored at <sloopDir>/config.yaml.
 type Project struct {
+	Version     int      `yaml:"version"`
 	Tools       []string `yaml:"tools"`
 	DefaultTool string   `yaml:"default_tool"`
 	Mode        string   `yaml:"mode,omitempty"`
@@ -105,10 +117,16 @@ func LoadProject(sloopDir string) (*Project, error) {
 	if err := yaml.Unmarshal(b, &p); err != nil {
 		return nil, err
 	}
+	if p.Version == 0 {
+		p.Version = ConfigVersion
+	}
 	return &p, nil
 }
 
 func SaveProject(sloopDir string, p *Project) error {
+	if p.Version == 0 {
+		p.Version = ConfigVersion
+	}
 	if err := os.MkdirAll(sloopDir, 0o700); err != nil {
 		return err
 	}

@@ -9,7 +9,6 @@ import (
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/detect"
-	"github.com/stroops/sloop/internal/profile"
 	scanpkg "github.com/stroops/sloop/internal/scan"
 	"github.com/stroops/sloop/internal/session"
 	syncpkg "github.com/stroops/sloop/internal/sync"
@@ -22,7 +21,7 @@ cache/
 
 func RunInit(dir string, scan bool) error {
 	sloopDir := filepath.Join(dir, config.SloopDirName)
-	for _, sub := range []string{"skills", "vault", "profiles"} {
+	for _, sub := range []string{"skills", "vault"} {
 		if err := os.MkdirAll(filepath.Join(sloopDir, sub), 0o700); err != nil {
 			return err
 		}
@@ -61,12 +60,6 @@ func RunInit(dir string, scan bool) error {
 	if err := os.WriteFile(filepath.Join(sloopDir, ".gitignore"),
 		[]byte(sloopGitignore), 0o600); err != nil {
 		return err
-	}
-	for _, tool := range enabled {
-		if err := profile.Save(filepath.Join(sloopDir, "profiles", tool+".yaml"),
-			profile.Default(tool)); err != nil {
-			return err
-		}
 	}
 
 	dbPath, err := config.GlobalDBPath()

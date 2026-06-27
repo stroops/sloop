@@ -7,3 +7,12 @@ context:
   file: ""
 skills:
   target: ""
+hooks:
+  config: ~/.copilot/hooks/notification-hooks.json
+  install: ""
+  docs: https://docs.github.com/en/copilot/reference/hooks-reference
+  notes: bash/powershell keys per OS
+  events:
+    working: userPromptSubmit
+    waiting: ""
+    idle: sessionEnd

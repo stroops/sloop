@@ -23,12 +23,32 @@ type SkillsSpec struct {
 	Target string `yaml:"target"` // dir to link .sloop/skills into; empty = none
 }
 
+// HookEvents maps each sloop status to the tool's own lifecycle event name.
+// An empty event means the tool has no signal for that state.
+type HookEvents struct {
+	Working string `yaml:"working"` // tool started working
+	Waiting string `yaml:"waiting"` // tool is blocked on the user
+	Idle    string `yaml:"idle"`    // tool finished the turn
+}
+
+// HooksSpec captures how a tool exposes lifecycle hooks for precise status. It
+// keeps per-provider hook knowledge in the manifest (the single provider-aware
+// source), not hardcoded in commands.
+type HooksSpec struct {
+	Config  string     `yaml:"config"`  // config file (repo-relative or ~/…)
+	Install string     `yaml:"install"` // installer strategy: "settings-json" | "" (manual)
+	Docs    string     `yaml:"docs"`
+	Notes   string     `yaml:"notes"`
+	Events  HookEvents `yaml:"events"`
+}
+
 type Manifest struct {
 	Name    string      `yaml:"name"`
 	Detect  string      `yaml:"detect"`
 	Launch  string      `yaml:"launch"`
 	Context ContextSpec `yaml:"context"`
 	Skills  SkillsSpec  `yaml:"skills"`
+	Hooks   HooksSpec   `yaml:"hooks"`
 }
 
 func LoadBuiltin() (map[string]Manifest, error) {

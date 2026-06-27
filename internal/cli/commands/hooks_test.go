@@ -7,8 +7,22 @@ import (
 	"testing"
 )
 
-func TestMergeClaudeHooksIdempotent(t *testing.T) {
-	// Pre-existing unrelated content must be preserved.
+// claudeEvents mirrors the claude manifest's event→command mapping.
+var claudeEvents = map[string]string{
+	"UserPromptSubmit": "sloop hook working",
+	"Notification":     "sloop hook waiting",
+	"Stop":             "sloop hook idle",
+}
+
+// geminiEvents mirrors the gemini manifest's mapping (different event names,
+// same settings.json shape) — proves the installer is multi-provider.
+var geminiEvents = map[string]string{
+	"BeforeAgent":  "sloop hook working",
+	"Notification": "sloop hook waiting",
+	"AfterAgent":   "sloop hook idle",
+}
+
+func TestMergeSettingsHooksIdempotentAndPreserving(t *testing.T) {
 	root := map[string]any{
 		"model": "opus",
 		"hooks": map[string]any{
@@ -19,38 +33,34 @@ func TestMergeClaudeHooksIdempotent(t *testing.T) {
 			},
 		},
 	}
-	merged, changed := mergeClaudeHooks(root)
+	merged, changed := mergeSettingsHooks(root, claudeEvents)
 	if !changed {
 		t.Fatal("expected first merge to change")
 	}
 	if merged["model"] != "opus" {
 		t.Fatal("existing key dropped")
 	}
-	// All three sloop hooks present.
 	hooks := merged["hooks"].(map[string]any)
-	for event, state := range sloopHooks {
-		if !hasCommandHook(hooks[event], hookCommandFor(state)) {
-			t.Fatalf("missing sloop hook for %s", event)
+	for event, cmd := range claudeEvents {
+		if !hasCommandHook(hooks[event], cmd) {
+			t.Fatalf("missing hook for %s", event)
 		}
 	}
-	// Existing Stop hook preserved alongside sloop's.
 	if !hasCommandHook(hooks["Stop"], "echo keepme") {
 		t.Fatal("foreign Stop hook clobbered")
 	}
-	// Second merge is a no-op.
-	if _, changed := mergeClaudeHooks(merged); changed {
+	if _, changed := mergeSettingsHooks(merged, claudeEvents); changed {
 		t.Fatal("second merge should not change")
 	}
 }
 
-func TestInstallClaudeHooksWritesFile(t *testing.T) {
+func TestInstallSettingsHooksGemini(t *testing.T) {
 	dir := t.TempDir()
-	path, changed, err := installClaudeHooks(dir)
+	path := filepath.Join(dir, ".gemini", "settings.json")
+
+	changed, err := installSettingsHooks(path, geminiEvents)
 	if err != nil || !changed {
 		t.Fatalf("install: changed=%v err=%v", changed, err)
-	}
-	if path != filepath.Join(dir, ".claude", "settings.local.json") {
-		t.Fatalf("path = %s", path)
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -60,8 +70,22 @@ func TestInstallClaudeHooksWritesFile(t *testing.T) {
 	if err := json.Unmarshal(b, &doc); err != nil {
 		t.Fatalf("written file not valid JSON: %v", err)
 	}
+	hooks := doc["hooks"].(map[string]any)
+	if !hasCommandHook(hooks["Notification"], "sloop hook waiting") {
+		t.Fatal("gemini Notification hook missing")
+	}
 	// Re-install is idempotent.
-	if _, changed, _ := installClaudeHooks(dir); changed {
+	if changed, _ := installSettingsHooks(path, geminiEvents); changed {
 		t.Fatal("re-install should not change")
+	}
+}
+
+func TestResolveHookConfigPath(t *testing.T) {
+	if p, _ := resolveHookConfigPath("/repo", ".claude/settings.local.json"); p != "/repo/.claude/settings.local.json" {
+		t.Fatalf("repo-relative = %q", p)
+	}
+	home, _ := os.UserHomeDir()
+	if p, _ := resolveHookConfigPath("/repo", "~/.codex/config.toml"); p != filepath.Join(home, ".codex/config.toml") {
+		t.Fatalf("home-relative = %q", p)
 	}
 }
