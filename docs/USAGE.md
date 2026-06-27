@@ -47,6 +47,19 @@ AGENTS.md            # canonical context — YOU write this (the source of truth
   .gitignore
 ```
 
+`init` also **delivers context for every detected tool** right away — it writes the pointer files
+(`CLAUDE.md`, `GEMINI.md`, …) and links `.sloop/skills`, so the workspace is usable immediately
+(no separate `sloop sync` needed first). It prints a per-tool summary of what it created. The personal
+`vault/` is gitignored; `config.yaml` and `skills/` are committed (shared with your team).
+
+Add `--scaffold` (`-S`) to also create each enabled tool's **standard folders** (e.g. `.claude/skills`,
+`.claude/agents`, `.cursor/rules`, `.codex/skills`) — driven by the adapter manifests, so you start
+from the provider's expected layout:
+
+```sh
+sloop init --scaffold
+```
+
 Or let sloop pre-fill `AGENTS.md` from the existing codebase (language, build/test/lint commands —
 a `Makefile` target wins — project layout, and a README seed) instead of an empty starter:
 
