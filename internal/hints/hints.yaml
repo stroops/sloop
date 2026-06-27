@@ -38,6 +38,18 @@ hints:
       en: "Reply to an agent without attaching: `sloop send <#> \"yes, go ahead\"`."
       vi: "Trả lời một agent mà không cần attach: `sloop send <#> \"ừ, làm tiếp đi\"`."
 
+  - id: ps-answer
+    context: ps
+    text:
+      en: "`sloop ps` reads what each agent is asking and shows its keys — press y/n or 1/2 to answer the highlighted one in place."
+      vi: "`sloop ps` đọc câu hỏi của từng agent và hiện phím — bấm y/n hoặc 1/2 để trả lời ngay session đang chọn."
+
+  - id: approve-waiting
+    context: ps
+    text:
+      en: "Approve everyone at once: `sloop approve --waiting` sends the Yes/Approve answer to every agent waiting on you."
+      vi: "Duyệt tất cả cùng lúc: `sloop approve --waiting` gửi câu trả lời Yes/Approve cho mọi agent đang chờ bạn."
+
   - id: ps-actions
     context: ps
     text:

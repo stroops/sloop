@@ -1,6 +1,9 @@
 package tmux
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // AgentStatus is a best-effort classification of what an AI session is doing,
 // derived only from the visible content of your own pane (capture-pane). It is a
@@ -84,6 +87,117 @@ func ClassifyStatus(pane string) AgentStatus {
 		return StatusWorking
 	}
 	return StatusIdle
+}
+
+// Answer is a choice the agent is offering at a blocking prompt. Key is what to
+// send to pick it ("y", "n", "1"…); Key "" means "just press Enter".
+type Answer struct {
+	Key   string
+	Label string
+}
+
+// numberedChoice matches a menu line like "❯ 1. Yes" or "  2) No".
+var numberedChoice = regexp.MustCompile(`^[❯›>*•\-\s]*([0-9])[.)]\s+(\S.*)$`)
+
+// ynPatterns are lowercased yes/no prompt markers (covers [y/N], (Y/n), etc.).
+var ynPatterns = []string{"(y/n)", "[y/n]", "y/n)", "(yes/no)", "[yes/no]"}
+
+// ParseAnswers extracts the choices an agent is offering at a blocking prompt,
+// heuristically, from the tail of its own pane. Empty when nothing recognized.
+func ParseAnswers(pane string) []Answer {
+	lines := tailLines(pane, 12)
+
+	var numbered []Answer
+	seen := map[string]bool{}
+	for _, ln := range lines {
+		if m := numberedChoice.FindStringSubmatch(strings.TrimSpace(ln)); m != nil && !seen[m[1]] {
+			seen[m[1]] = true
+			numbered = append(numbered, Answer{Key: m[1], Label: cleanLabel(m[2])})
+		}
+	}
+	if len(numbered) >= 2 {
+		return numbered
+	}
+
+	low := strings.ToLower(strings.Join(lines, "\n"))
+	for _, p := range ynPatterns {
+		if strings.Contains(low, p) {
+			return []Answer{{Key: "y", Label: "Yes"}, {Key: "n", Label: "No"}}
+		}
+	}
+	if strings.Contains(low, "press enter") || strings.Contains(low, "to continue") {
+		return []Answer{{Key: "", Label: "continue"}}
+	}
+	return nil
+}
+
+// PromptLine returns the question the agent is blocked on (best-effort).
+func PromptLine(pane string) string {
+	lines := tailLines(pane, 12)
+	for i := len(lines) - 1; i >= 0; i-- {
+		if t := strings.TrimSpace(lines[i]); strings.HasSuffix(t, "?") {
+			return cleanLabel(t)
+		}
+	}
+	for i, ln := range lines {
+		if numberedChoice.MatchString(strings.TrimSpace(ln)) {
+			if i > 0 {
+				return cleanLabel(strings.TrimSpace(lines[i-1]))
+			}
+			break
+		}
+	}
+	if len(lines) > 0 {
+		return cleanLabel(strings.TrimSpace(lines[len(lines)-1]))
+	}
+	return ""
+}
+
+// AffirmativeAnswer returns the "approve/yes" choice among answers, if any.
+func AffirmativeAnswer(answers []Answer) (Answer, bool) {
+	for _, a := range answers {
+		l := strings.ToLower(a.Label)
+		if strings.HasPrefix(l, "yes") || strings.HasPrefix(l, "approve") ||
+			strings.HasPrefix(l, "accept") || strings.HasPrefix(l, "confirm") ||
+			strings.HasPrefix(l, "allow") {
+			return a, true
+		}
+	}
+	for _, a := range answers {
+		if a.Key == "y" {
+			return a, true
+		}
+	}
+	for _, a := range answers {
+		if a.Key == "" { // press-Enter continue
+			return a, true
+		}
+	}
+	return Answer{}, false
+}
+
+// cleanLabel trims surrounding decoration and caps length for display.
+func cleanLabel(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimRight(s, " .")
+	if r := []rune(s); len(r) > 60 {
+		s = string(r[:59]) + "…"
+	}
+	return s
+}
+
+// tailLines returns the last n non-empty lines in original (top-to-bottom) order.
+func tailLines(s string, n int) []string {
+	var nonEmpty []string
+	for _, ln := range strings.Split(s, "\n") {
+		if strings.TrimSpace(ln) != "" {
+			nonEmpty = append(nonEmpty, ln)
+		}
+	}
+	if len(nonEmpty) > n {
+		nonEmpty = nonEmpty[len(nonEmpty)-n:]
+	}
+	return nonEmpty
 }
 
 // lastLines returns the last n non-empty (trimmed) lines of s, joined by "\n".

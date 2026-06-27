@@ -34,6 +34,8 @@ type FleetRow struct {
 	Glance    string           // last line of the session's own terminal output (best-effort)
 	Status    tmux.AgentStatus // waiting / working / idle, classified from the pane
 	Path      string           // repo path from the registry (cross-repo context)
+	Prompt    string           // the question the agent is blocked on (when waiting)
+	Answers   []tmux.Answer    // parsed choices the agent offers (answer in one key)
 }
 
 // registryPaths maps each registered workspace name to its repo path, so the
@@ -132,6 +134,11 @@ func enrichGlances(rows []FleetRow) []FleetRow {
 			if hasMarker {
 				rows[i].Status = stateToStatus(marker.Status)
 			}
+			// When the agent is waiting, read what it's asking + the choices.
+			if rows[i].Status == tmux.StatusWaiting && err == nil {
+				rows[i].Prompt = tmux.PromptLine(string(out))
+				rows[i].Answers = tmux.ParseAnswers(string(out))
+			}
 		}(i)
 	}
 	wg.Wait()
@@ -216,8 +223,8 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 	for i, r := range rows {
 		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-9s %s · %s\n",
 			i+1, r.Workspace, r.Tool, stateLabel(r), humanizeSince(r.Activity))
-		if r.Glance != "" {
-			_, _ = fmt.Fprintf(w, "      └ %s\n", r.Glance)
+		if b := bottomLine(r); b != "" {
+			_, _ = fmt.Fprintf(w, "      └ %s\n", b)
 		}
 	}
 	_, _ = fmt.Fprintf(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"   ·   %s\n", tmux.DetachLine())
@@ -371,8 +378,8 @@ var psCmd = &cobra.Command{
 			dot, label := statusDot(r)
 			line := fmt.Sprintf("%s %-*s %-*s %-16s %s",
 				dot, wsW, r.Workspace, toolW, r.Tool, label, shortSince(r.Activity))
-			if r.Glance != "" {
-				line += "\r\n└ " + tui.Grey(r.Glance)
+			if b := bottomLine(r); b != "" {
+				line += "\r\n└ " + tui.Grey(b)
 			}
 			options = append(options, line)
 		}
@@ -381,9 +388,10 @@ var psCmd = &cobra.Command{
 		if waiting > 0 {
 			header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
 		}
-		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · s send · x kill · q quit")
+		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q quit")
 
-		idx, key, err := tui.SelectAction(prompt, options, []byte{'s', 'x'})
+		actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
+		idx, key, err := tui.SelectAction(prompt, options, actionKeys)
 		if err != nil {
 			return err
 		}
@@ -394,10 +402,65 @@ var psCmd = &cobra.Command{
 			return promptAndSend(cmd, rows[idx])
 		case 'x': // kill the highlighted session (with confirm)
 			return confirmAndKill(cmd, rows[idx])
+		default:
+			if a, ok := matchAnswer(rows[idx], key); ok { // one-key answer
+				return sendAnswer(cmd, rows[idx], a)
+			}
 		}
 		hints.Show(cmd.OutOrStdout(), "ps")
 		return nil
 	},
+}
+
+// answerHint renders parsed choices as "[y]es [n]o" / "[1]Yes [2]No" / "[⏎]continue".
+func answerHint(answers []tmux.Answer) string {
+	if len(answers) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(answers))
+	for _, a := range answers {
+		key := a.Key
+		if key == "" {
+			key = "⏎"
+		}
+		parts = append(parts, "["+key+"]"+a.Label)
+	}
+	return strings.Join(parts, " ")
+}
+
+// bottomLine is the indented detail under a fleet row: the agent's question +
+// answer keys when waiting, else the last output glance.
+func bottomLine(r FleetRow) string {
+	if r.Status == tmux.StatusWaiting && (r.Prompt != "" || len(r.Answers) > 0) {
+		s := r.Prompt
+		if h := answerHint(r.Answers); h != "" {
+			if s != "" {
+				s += "  ·  "
+			}
+			s += "answer: " + h
+		}
+		return s
+	}
+	return r.Glance
+}
+
+// matchAnswer returns the row's Answer whose Key equals the pressed key.
+func matchAnswer(r FleetRow, key byte) (tmux.Answer, bool) {
+	for _, a := range r.Answers {
+		if a.Key == string(key) {
+			return a, true
+		}
+	}
+	return tmux.Answer{}, false
+}
+
+// sendAnswer types the chosen answer into the session.
+func sendAnswer(cmd *cobra.Command, row FleetRow, a tmux.Answer) error {
+	if err := tmux.LaunchSend(row.Name, a.Key); err != nil {
+		return err
+	}
+	cmd.Printf("answered %s: %s\n", row.Name, a.Label)
+	return nil
 }
 
 // promptAndSend asks for a line and sends it to the row (used by the ps `s` key).

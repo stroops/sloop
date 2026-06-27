@@ -45,3 +45,44 @@ func TestAgentStatusString(t *testing.T) {
 		t.Fatal("NeedsAttention wrong")
 	}
 }
+
+func TestParseAnswers(t *testing.T) {
+	yn := ParseAnswers("Apply changes to main.go? (y/n)")
+	if len(yn) != 2 || yn[0].Key != "y" || yn[1].Key != "n" {
+		t.Fatalf("y/n: %+v", yn)
+	}
+	menu := ParseAnswers("Edit main.go?\n❯ 1. Yes\n  2. No, keep it\n  3. Always allow")
+	if len(menu) != 3 || menu[0].Key != "1" || menu[0].Label != "Yes" || menu[2].Key != "3" {
+		t.Fatalf("menu: %+v", menu)
+	}
+	cont := ParseAnswers("Done.\nPress Enter to continue")
+	if len(cont) != 1 || cont[0].Key != "" {
+		t.Fatalf("continue: %+v", cont)
+	}
+	if a := ParseAnswers("just some output, no prompt"); a != nil {
+		t.Fatalf("none expected, got %+v", a)
+	}
+}
+
+func TestPromptLine(t *testing.T) {
+	if p := PromptLine("blah\nApply changes to main.go?\n(y/n)"); p != "Apply changes to main.go?" {
+		t.Fatalf("question: %q", p)
+	}
+	if p := PromptLine("Choose:\n  1. Yes\n  2. No"); p != "Choose:" {
+		t.Fatalf("above-choice: %q", p)
+	}
+}
+
+func TestAffirmativeAnswer(t *testing.T) {
+	a, ok := AffirmativeAnswer([]Answer{{Key: "1", Label: "Yes"}, {Key: "2", Label: "No"}})
+	if !ok || a.Key != "1" {
+		t.Fatalf("numbered yes: %+v %v", a, ok)
+	}
+	a, ok = AffirmativeAnswer([]Answer{{Key: "y", Label: "Yes"}, {Key: "n", Label: "No"}})
+	if !ok || a.Key != "y" {
+		t.Fatalf("yn: %+v %v", a, ok)
+	}
+	if _, ok := AffirmativeAnswer([]Answer{{Key: "3", Label: "Cancel"}}); ok {
+		t.Fatal("no affirmative expected")
+	}
+}

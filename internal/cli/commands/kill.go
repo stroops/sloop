@@ -37,8 +37,10 @@ func rowNames(rows []FleetRow) []string {
 	return out
 }
 
-// targetsToKill resolves which sessions a kill request refers to (pure).
-func targetsToKill(rows []FleetRow, targets []string, all, waiting bool) ([]FleetRow, error) {
+// selectSessions resolves which sessions a fleet action refers to (pure):
+// every row (--all), waiting rows (--waiting), or each explicit target. Shared
+// by `kill` and `approve`.
+func selectSessions(rows []FleetRow, targets []string, all, waiting bool) ([]FleetRow, error) {
 	switch {
 	case all:
 		if len(rows) == 0 {
@@ -75,7 +77,7 @@ func RunKill(w io.Writer, in io.Reader, targets []string, all, waiting, yes bool
 	if waiting {
 		rows = enrichGlances(rows) // need status to find who's waiting
 	}
-	victims, err := targetsToKill(rows, targets, all, waiting)
+	victims, err := selectSessions(rows, targets, all, waiting)
 	if err != nil {
 		return nil, err
 	}

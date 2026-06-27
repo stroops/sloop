@@ -15,22 +15,22 @@ func sampleRows() []FleetRow {
 	}
 }
 
-func TestTargetsToKill(t *testing.T) {
+func TestSelectSessions(t *testing.T) {
 	rows := sampleRows()
 
-	if v, err := targetsToKill(rows, nil, true, false); err != nil || len(v) != 2 {
+	if v, err := selectSessions(rows, nil, true, false); err != nil || len(v) != 2 {
 		t.Fatalf("--all: %v / %d", err, len(v))
 	}
-	if v, err := targetsToKill(rows, nil, false, true); err != nil || len(v) != 1 || v[0].Name != "api__claude" {
+	if v, err := selectSessions(rows, nil, false, true); err != nil || len(v) != 1 || v[0].Name != "api__claude" {
 		t.Fatalf("--waiting: %v / %+v", err, v)
 	}
-	if v, err := targetsToKill(rows, []string{"2"}, false, false); err != nil || v[0].Name != "web__cursor" {
+	if v, err := selectSessions(rows, []string{"2"}, false, false); err != nil || v[0].Name != "web__cursor" {
 		t.Fatalf("by number: %v / %+v", err, v)
 	}
-	if _, err := targetsToKill(rows, nil, false, false); err == nil {
+	if _, err := selectSessions(rows, nil, false, false); err == nil {
 		t.Fatal("expected error with no target and no flags")
 	}
-	if _, err := targetsToKill(rows, []string{"nope"}, false, false); err == nil {
+	if _, err := selectSessions(rows, []string{"nope"}, false, false); err == nil {
 		t.Fatal("expected unknown-target error")
 	}
 }
