@@ -16,10 +16,10 @@ jobs:
         with:
           fetch-depth: 0 # Required for Goreleaser to generate changelog from git history
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          go-version: "1.26.4"
+          go-version: stable
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
