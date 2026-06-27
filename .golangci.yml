@@ -9,3 +9,5 @@ run:
 
 linters:
   default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - gofmt
