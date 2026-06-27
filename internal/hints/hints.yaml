@@ -38,6 +38,12 @@ hints:
       en: "Reply to an agent without attaching: `sloop send <#> \"yes, go ahead\"`."
       vi: "Trả lời một agent mà không cần attach: `sloop send <#> \"ừ, làm tiếp đi\"`."
 
+  - id: popup
+    context: run
+    text:
+      en: "Run `sloop popup setup` once, then press your tmux prefix + g to pop the cross-repo fleet over any agent — glance, answer, jump, and it closes back."
+      vi: "Chạy `sloop popup setup` một lần, rồi bấm tmux prefix + g để bật fleet cross-repo nổi lên trên bất kỳ agent nào — xem, trả lời, jump, rồi đóng lại."
+
   - id: adopt
     context: ps
     text:

@@ -13,6 +13,9 @@ build-cgo:
 test:
 	go test -v ./...
 
+e2e:
+	go test -tags e2e -count=1 ./e2e/...
+
 fmt:
 	go fmt ./...
 
