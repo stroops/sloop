@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/tui"
@@ -24,7 +25,8 @@ type FleetRow struct {
 	Attached  bool
 	Windows   int
 	Activity  time.Time
-	Glance    string // last line of the session's own terminal output (best-effort)
+	Glance    string             // last line of the session's own terminal output (best-effort)
+	Status    runner.AgentStatus // waiting / working / idle, classified from the pane
 }
 
 // fleetRows keeps only sloop-named sessions (`<workspace>__<tool>`), splitting
@@ -73,8 +75,17 @@ func enrichGlances(rows []FleetRow) []FleetRow {
 			continue
 		}
 		rows[i].Glance = truncate(runner.LastNonEmptyLine(string(out)), 72)
+		rows[i].Status = runner.ClassifyStatus(string(out))
 	}
 	return rows
+}
+
+// sortNeedsAttention floats sessions waiting on the user to the top, then keeps
+// the stable workspace/tool order — so the agents that need you are listed first.
+func sortNeedsAttention(rows []FleetRow) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		return rows[i].Status.NeedsAttention() && !rows[j].Status.NeedsAttention()
+	})
 }
 
 func truncate(s string, n int) string {
@@ -90,20 +101,41 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 		fmt.Fprintln(w, "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
 		return nil
 	}
-	fmt.Fprintf(w, "⚓ AI fleet — %d running\n\n", len(rows))
-	for i, r := range rows {
-		state := "○ idle"
-		if r.Attached {
-			state = "● attached"
+	waiting := 0
+	for _, r := range rows {
+		if r.Status.NeedsAttention() {
+			waiting++
 		}
+	}
+	header := fmt.Sprintf("⚓ AI fleet — %d running", len(rows))
+	if waiting > 0 {
+		header += fmt.Sprintf(", %d waiting on you", waiting)
+	}
+	fmt.Fprintf(w, "%s\n\n", header)
+	for i, r := range rows {
 		fmt.Fprintf(w, "  %-3d %-16s %-9s %s · %s\n",
-			i+1, r.Workspace, r.Tool, state, humanizeSince(r.Activity))
+			i+1, r.Workspace, r.Tool, stateLabel(r), humanizeSince(r.Activity))
 		if r.Glance != "" {
 			fmt.Fprintf(w, "      └ %s\n", r.Glance)
 		}
 	}
-	fmt.Fprintln(w, "\njump: sloop ps <#>   (switches client if you're already in tmux)")
+	fmt.Fprintln(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"")
 	return nil
+}
+
+// stateLabel combines attach state with the classified agent status, leading
+// with whichever matters most (a session waiting on you wins).
+func stateLabel(r FleetRow) string {
+	switch r.Status {
+	case runner.StatusWaiting:
+		return "◆ waiting on you"
+	case runner.StatusWorking:
+		return "▸ working"
+	}
+	if r.Attached {
+		return "● attached"
+	}
+	return "○ idle"
 }
 
 func humanizeSince(t time.Time) string {
@@ -157,13 +189,17 @@ var psCmd = &cobra.Command{
 		}
 
 		rows = enrichGlances(rows)
+		sortNeedsAttention(rows)
+
+		// Non-interactive (piped, CI): print the plain listing instead of the
+		// raw-mode menu, which can't run without a tty.
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			return RunPs(cmd.OutOrStdout(), rows)
+		}
 
 		var options []string
 		for _, r := range rows {
-			stateMark := "\033[32m🟢 idle\033[0m"
-			if r.Attached {
-				stateMark = "\033[34m🔵 attached\033[0m"
-			}
+			stateMark := colorState(r)
 
 			line := fmt.Sprintf("%-16s %-9s %s · %s", r.Workspace, r.Tool, stateMark, humanizeSince(r.Activity))
 			if r.Glance != "" {
@@ -187,6 +223,21 @@ var psCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// colorState renders the agent status as a colored chip for the interactive
+// menu: waiting (needs you) in yellow, working in cyan, else attach state.
+func colorState(r FleetRow) string {
+	switch r.Status {
+	case runner.StatusWaiting:
+		return "\033[33m◆ waiting on you\033[0m"
+	case runner.StatusWorking:
+		return "\033[36m▸ working\033[0m"
+	}
+	if r.Attached {
+		return "\033[34m🔵 attached\033[0m"
+	}
+	return "\033[32m🟢 idle\033[0m"
 }
 
 func RegisterPs(cmd *cobra.Command) { cmd.AddCommand(psCmd) }

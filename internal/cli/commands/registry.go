@@ -25,5 +25,6 @@ func init() {
 	add(RegisterStatus)
 	add(RegisterLs)
 	add(RegisterPs)
+	add(RegisterSend)
 	add(RegisterSkill)
 }
