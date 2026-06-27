@@ -16,6 +16,23 @@ func TmuxSessionName(workspace, tool string) string {
 	return sanitize(workspace) + "__" + sanitize(tool)
 }
 
+func TmuxPrefix() string {
+	out, err := exec.Command("tmux", "show-options", "-g", "prefix").Output()
+	if err != nil {
+		return "Ctrl+b"
+	}
+	s := strings.TrimSpace(string(out))
+	parts := strings.Split(s, " ")
+	if len(parts) == 2 {
+		p := parts[1]
+		if strings.HasPrefix(p, "C-") {
+			return "Ctrl+" + p[2:]
+		}
+		return p
+	}
+	return "Ctrl+b"
+}
+
 func sanitize(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -46,7 +63,7 @@ type TmuxRunner struct {
 
 func (r TmuxRunner) Launch(s Spec) error {
 	fmt.Printf("\n\033[36m💡 SLOOP HINT: To safely hide this agent and return to the terminal,\033[0m\n")
-	fmt.Printf("\033[36m   press \033[1mCtrl+b\033[0m\033[36m then press \033[1md\033[0m\n\n")
+	fmt.Printf("\033[36m   press \033[1m%s\033[0m\033[36m then press \033[1md\033[0m\n\n", TmuxPrefix())
 
 	cmd := exec.Command("tmux", BuildTmuxNewArgs(r.Session, s)...)
 	cmd.Stdin = os.Stdin

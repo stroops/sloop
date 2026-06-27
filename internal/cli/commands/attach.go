@@ -22,7 +22,7 @@ func RunAttach(session string) error {
 	}
 	
 	fmt.Printf("\n\033[36m💡 SLOOP HINT: To safely hide this agent and return to the terminal,\033[0m\n")
-	fmt.Printf("\033[36m   press \033[1mCtrl+b\033[0m\033[36m then press \033[1md\033[0m\n\n")
+	fmt.Printf("\033[36m   press \033[1m%s\033[0m\033[36m then press \033[1md\033[0m\n\n", runner.TmuxPrefix())
 
 	cmd := exec.Command("tmux", runner.BuildTmuxAttachArgs(session)...)
 	cmd.Stdin = os.Stdin

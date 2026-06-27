@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -66,18 +67,55 @@ func tmuxList() string {
 	return string(out)
 }
 
-// enrichGlances fills each row's Glance with the last line of its terminal
-// (best-effort; reads only your own panes, never the provider).
+// enrichGlances fills each row's Glance and Status from its terminal, capturing
+// every pane concurrently so the fleet renders fast even with many sessions
+// (best-effort; reads only your own panes, never the provider). Each goroutine
+// writes a distinct index, so no locking is needed.
 func enrichGlances(rows []FleetRow) []FleetRow {
+	var wg sync.WaitGroup
 	for i := range rows {
-		out, err := exec.Command("tmux", runner.BuildTmuxCaptureArgs(rows[i].Name)...).Output()
-		if err != nil {
-			continue
-		}
-		rows[i].Glance = truncate(runner.LastNonEmptyLine(string(out)), 72)
-		rows[i].Status = runner.ClassifyStatus(string(out))
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			out, err := exec.Command("tmux", runner.BuildTmuxCaptureArgs(rows[i].Name)...).Output()
+			if err != nil {
+				return
+			}
+			rows[i].Glance = truncate(runner.LastNonEmptyLine(string(out)), 72)
+			rows[i].Status = runner.ClassifyStatus(string(out))
+		}(i)
 	}
+	wg.Wait()
 	return rows
+}
+
+// filterWaiting keeps only sessions waiting on the user.
+func filterWaiting(rows []FleetRow) []FleetRow {
+	var out []FleetRow
+	for _, r := range rows {
+		if r.Status.NeedsAttention() {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// newlyWaiting returns the names of sessions waiting now that were not waiting
+// in the previous snapshot — the agents that just started needing you.
+func newlyWaiting(prev, curr []FleetRow) []string {
+	was := make(map[string]bool)
+	for _, r := range prev {
+		if r.Status.NeedsAttention() {
+			was[r.Name] = true
+		}
+	}
+	var out []string
+	for _, r := range curr {
+		if r.Status.NeedsAttention() && !was[r.Name] {
+			out = append(out, r.Name)
+		}
+	}
+	return out
 }
 
 // sortNeedsAttention floats sessions waiting on the user to the top, then keeps
@@ -165,12 +203,19 @@ func jumpToFleet(rows []FleetRow, n int) error {
 		args = runner.BuildTmuxSwitchArgs(name)
 	}
 	fmt.Printf("\n\033[36m💡 SLOOP HINT: To safely hide this agent and return to the terminal,\033[0m\n")
-	fmt.Printf("\033[36m   press \033[1mCtrl+b\033[0m\033[36m then press \033[1md\033[0m\n\n")
+	fmt.Printf("\033[36m   press \033[1m%s\033[0m\033[36m then press \033[1md\033[0m\n\n", runner.TmuxPrefix())
 
 	cmd := exec.Command("tmux", args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
 }
+
+var (
+	psWatch    bool
+	psWaiting  bool
+	psNotify   bool
+	psInterval time.Duration
+)
 
 var psCmd = &cobra.Command{
 	Use:   "ps [#]",
@@ -186,6 +231,10 @@ var psCmd = &cobra.Command{
 			return jumpToFleet(rows, n)
 		}
 
+		if psWatch {
+			return runWatch(cmd.OutOrStdout(), psInterval, psWaiting, psNotify)
+		}
+
 		if len(rows) == 0 {
 			fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
 			return nil
@@ -193,6 +242,13 @@ var psCmd = &cobra.Command{
 
 		rows = enrichGlances(rows)
 		sortNeedsAttention(rows)
+		if psWaiting {
+			rows = filterWaiting(rows)
+			if len(rows) == 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), "⚓ No agents waiting on you.")
+				return nil
+			}
+		}
 
 		// Non-interactive (piped, CI): print the plain listing instead of the
 		// raw-mode menu, which can't run without a tty.
@@ -278,4 +334,47 @@ func columnWidths(rows []FleetRow) (wsW, toolW, waiting int) {
 	return wsW, toolW, waiting
 }
 
-func RegisterPs(cmd *cobra.Command) { cmd.AddCommand(psCmd) }
+// runWatch re-renders the fleet on an interval (until Ctrl-C), ringing the
+// terminal bell — and optionally a desktop notification — whenever a session
+// newly starts waiting on you. This turns `ps` from a snapshot into a live
+// monitor: you no longer have to keep re-running it to catch who needs you.
+func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) error {
+	if interval <= 0 {
+		interval = 2 * time.Second
+	}
+	var prev []FleetRow
+	for {
+		rows := enrichGlances(fleetRows(runner.ParseSessions(tmuxList())))
+		sortNeedsAttention(rows)
+
+		shown := rows
+		if waitingOnly {
+			shown = filterWaiting(rows)
+		}
+
+		fmt.Fprint(w, "\033[H\033[2J") // home + clear screen
+		if waitingOnly && len(shown) == 0 {
+			fmt.Fprintln(w, "⚓ No agents waiting on you.")
+		} else {
+			_ = RunPs(w, shown)
+		}
+		fmt.Fprintf(w, "\nwatching every %s · Ctrl-C to stop\n", interval)
+
+		for _, name := range newlyWaiting(prev, rows) {
+			fmt.Fprint(w, "\a") // bell
+			if notify {
+				runner.Notify("sloop", name+" is waiting on you")
+			}
+		}
+		prev = rows
+		time.Sleep(interval)
+	}
+}
+
+func RegisterPs(cmd *cobra.Command) {
+	psCmd.Flags().BoolVarP(&psWatch, "watch", "w", false, "live monitor: refresh on an interval and alert when an agent needs you")
+	psCmd.Flags().BoolVar(&psWaiting, "waiting", false, "show only sessions waiting on you")
+	psCmd.Flags().BoolVar(&psNotify, "notify", false, "with --watch, also send a desktop notification on new waiting agents")
+	psCmd.Flags().DurationVarP(&psInterval, "interval", "n", 2*time.Second, "refresh interval for --watch")
+	cmd.AddCommand(psCmd)
+}
