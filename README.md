@@ -23,6 +23,25 @@ Running AI coding agents is powerful but quickly gets messy:
 - **Per-tool knobs everywhere** — skills, hooks, and standard folders differ per provider, so setup is
   ad-hoc and hard to share with a team.
 
+Concretely, running two AI CLIs (say Claude and Cursor's `agent`) in one project today means juggling
+tmux by hand:
+
+```
+# The manual way — fiddly and easy to mix up
+Terminal 1 → tmux new -s claude_api → cd ~/code/api → claude
+Terminal 2 → tmux new -s cursor_api → cd ~/code/api → agent
+# …now switch between them yourself, and remember which window is which,
+#    across every repo, while CLAUDE.md and AGENTS.md drift apart.
+```
+
+```
+# With sloop — named sessions per workspace+tool, one fleet view, one context
+cd ~/code/api
+sloop run claude            # session api__claude, sees AGENTS.md
+sloop run cursor            # session api__cursor, same context
+sloop ps                    # one board: who's waiting, who's working — jump/reply/kill in place
+```
+
 Sloop fixes these with three ideas:
 
 1. **Portable context** — write guidance once in `AGENTS.md`; every tool reads it (natively, or via a
@@ -111,7 +130,7 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 | `restore` | — | `--resume`, `--yes` | Relaunch your recent agents (detached) after a reboot / tmux restart. `--resume` continues each tool's prior conversation. |
 | `popup` / `popup setup` | `hud` | `--key` | Open the fleet `ps` as a floating tmux popup / HUD; `setup` binds a key. Needs tmux ≥ 3.2. |
 | `statusline setup` | — | — | Show a session's live status (`⚓ repo tool ◆ waiting`) in its tmux status bar. |
-| `attach <session>` | `a` | — | Attach to a session by full name. |
+| `attach [session]` | `a` | — | Attach to a session by name, or `sloop a` (no name) to pick from the fleet. |
 | `skills new\|add <…>` | `sk`, `skill` | `new`→`n`, `add`→`import` | Scaffold or import a reusable skill (shared across every tool). |
 | `hooks install\|list\|print [tool]` | — | — | Wire a tool's own hooks so `ps` status is authoritative. |
 | `tools` | — | — | Capability matrix (context / skills / hooks per tool). |
