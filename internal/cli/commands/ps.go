@@ -461,6 +461,7 @@ var psCmd = &cobra.Command{
 		// header, so the fleet redraws in place; it's re-read every pass, so kills
 		// and new sessions show immediately.
 		var notice string
+		detach := tui.Grey("  ⏎ enters an agent — to come back, detach (keeps it running): " + tmux.PrefixRaw() + " d")
 		for {
 			tui.Clear()
 			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
@@ -508,7 +509,7 @@ var psCmd = &cobra.Command{
 			if notice != "" {
 				prompt += "\r\n" + notice
 			}
-			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
+			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n" + detach + "\r\n\r\n" + cols
 			notice = "" // consumed; the handler below sets a fresh one for next pass
 
 			actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
