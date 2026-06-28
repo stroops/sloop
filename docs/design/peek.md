@@ -47,14 +47,16 @@ a **fleet-wide waiting count** on the home-base session's status line, e.g.
 The status line is drawn on every window/client the user looks at, so this
 signal "follows the user" for free, on any tmux version, with zero interruption.
 
-- New hidden render command (called by tmux `#()`), parallel to the existing
-  per-session `statusline` (`internal/cli/commands/statusline.go`). Proposed:
-  `sloop statusline fleet` → counts `waiting` across all sloop sessions
-  (`tmux.ParseSessions(tmuxList())` + `fleetstate.Read`, with the same
-  capture-pane fallback `renderStatusline` already uses) and prints a short
-  badge to stdout (empty string when zero).
-- A setup path adds it to `status-right` of the home-base session, mirroring the
-  existing `statusline setup` that sets `status-left`-style per-session output.
+- **Mechanism (refined for simplicity):** rather than a separate command + a
+  new setup step, we **append the badge to the existing per-session
+  `renderStatusline`** (`internal/cli/commands/statusline.go`). Every sloop
+  session already points its `status-right` at `sloop statusline <session>`
+  (`tmux.SetStatusLine`), so the badge appears on every session's bar
+  automatically — it "follows you" for free with zero new setup.
+- The badge counts sessions whose **fresh** marker is `waiting`
+  (`fleetstate.Read`, markers only — no capture-pane), **excluding the current
+  session** so it reads "others need you." Empty string when zero, so the bar
+  stays clean. Markers-only keeps this cheap enough to run every status-interval.
 
 ### Layer B — Act (`sloop peek`)
 
@@ -117,8 +119,7 @@ bind-key p display-popup -w 90% -h 80% -E "<sloop> peek --in-popup"
 | `Peek(session)` | `internal/tmux/popup.go` | Run the outer `display-popup` wrapping the inner command. |
 | peek target resolver | `internal/cli/commands/` | 0/1/many-waiting → direct or picker. Reuses `pickFleetSession` + `fleetstate`. |
 | `peek` cobra command (+`--in-popup`, `setup`) | `internal/cli/commands/peek.go` | Wire the above; require tmux + `PopupSupported()`. |
-| fleet waiting-count render | `internal/cli/commands/statusline.go` | `sloop statusline fleet` badge (empty when zero). |
-| fleet statusline setup | `internal/cli/commands/statusline.go` | Add the badge to home-base `status-right`. |
+| fleet waiting badge | `internal/cli/commands/statusline.go` | Append a fleet-wide `⏳ N waiting` badge (empty when zero, excludes self) to the existing per-session `renderStatusline` — no new command or setup. |
 
 ## Error & edge handling
 
