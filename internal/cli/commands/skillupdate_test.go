@@ -23,7 +23,7 @@ func TestSkillAddRecordsLock(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	addLockedSkill(t, dir, "# Review\n\nv1\n")
@@ -45,7 +45,7 @@ func TestRunSkillUpdateRefetches(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	addLockedSkill(t, dir, "# Review\n\nv1\n")
@@ -81,7 +81,7 @@ func TestRunSkillUpdateUnknownName(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	if _, err := RunSkillUpdate(dir, []string{"nope"}); err == nil {
@@ -93,7 +93,7 @@ func TestRunSkillUpdateEmptyLock(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	res, err := RunSkillUpdate(dir, nil)

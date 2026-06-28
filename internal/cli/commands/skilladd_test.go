@@ -27,7 +27,7 @@ func TestRunSkillAddFetchesAndLinks(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir()) // claude fallback (has .claude/skills target)
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 
