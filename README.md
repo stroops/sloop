@@ -108,7 +108,8 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 | `send <target> <msg>` | — | `--waiting`, `--all`, `--yes` | Reply to a running agent without attaching; `--waiting`/`--all` broadcast. |
 | `kill <target>` | — | `--all`, `--waiting`, `--yes` | End session(s) — confirms (skip with `--yes` or global `-y`). |
 | `adopt <tmux-session>` | — | `-w/--workspace`, `--as` | Bring an external tmux session (one you started yourself) into the fleet. |
-| `popup` / `popup setup` | — | `--key` | Open the fleet `ps` as a floating tmux popup (HUD); `setup` binds a key. Needs tmux ≥ 3.2. |
+| `restore` | — | `--resume`, `--yes` | Relaunch your recent agents (detached) after a reboot / tmux restart. `--resume` continues each tool's prior conversation. |
+| `popup` / `popup setup` | `hud` | `--key` | Open the fleet `ps` as a floating tmux popup / HUD; `setup` binds a key. Needs tmux ≥ 3.2. |
 | `statusline setup` | — | — | Show a session's live status (`⚓ repo tool ◆ waiting`) in its tmux status bar. |
 | `attach <session>` | `a` | — | Attach to a session by full name. |
 | `skills new\|add <…>` | `sk`, `skill` | `new`→`n`, `add`→`import` | Scaffold or import a reusable skill (shared across every tool). |
