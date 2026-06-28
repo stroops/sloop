@@ -22,12 +22,12 @@ contribution starts from a clear contract. For the shipped detail of each releas
 
 | Pillar | What it is | Design doc | Status |
 |---|---|---|---|
-| **Portable context** | `AGENTS.md` canonical; pointer files + skills delivered to every tool | [docs/ADAPTERS.md](docs/ADAPTERS.md) | shipped (v0.0.1) |
+| **Portable context** | `AGENTS.md` canonical; pointer files + skills delivered to every tool | [docs/ADAPTERS.md](docs/ADAPTERS.md) | shipped (v0.1.0) |
 | **Skills** | reusable prompts/workflows shared across tools *and* sources | [docs/skills.md](docs/skills.md) | shipping incrementally |
-| **Cross-repo fleet** | every running agent across all repos; triage who needs you | [docs/USAGE.md](docs/USAGE.md) | shipped (v0.0.1) |
+| **Cross-repo fleet** | every running agent across all repos; triage who needs you | [docs/USAGE.md](docs/USAGE.md) | shipped (v0.1.0) |
 | **Hooks** | precise agent status today; a portable workflow-hook library next | [docs/hooks.md](docs/hooks.md) | status hooks shipped; workflow hooks → v0.2.0 |
 
-## Now (v0.0.x — validating the wedge)
+## Now (v0.1.x — validating the wedge)
 
 - Dogfood `sloop ps` across repos: does the cross-repo view triage "which agent needs me" better than
   single-project tools and raw tmux?

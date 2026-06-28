@@ -18,7 +18,7 @@ import (
 // Hook installation is driven entirely by adapter manifests (the single
 // provider-aware source). A tool's manifest says where its hook config lives,
 // which install strategy applies, and which of its events map to sloop's
-// working/waiting/idle states. Each event calls `sloop hook <state>`, which
+// working/waiting/idle states. Each event calls `sloop hooks emit <state>`, which
 // records a marker `sloop ps` reads.
 
 // hookCommandFor is the shell command a tool runs for a sloop state. It is the

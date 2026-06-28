@@ -57,7 +57,7 @@ func hookRunE(cmd *cobra.Command, args []string) error {
 	return RunHook(state)
 }
 
-// hooksEmitCmd is the canonical internal callback an AI tool's own hooks invoke
+// hooksEmitCmd is the internal callback an AI tool's own hooks invoke
 // (`sloop hooks emit <state>`). It lives under the `hooks` namespace for
 // consistency with `skills`; it is hidden because users never type it — it is
 // wired into a provider's hook config by `sloop hooks install`.
@@ -68,16 +68,3 @@ var hooksEmitCmd = &cobra.Command{
 	Args:   cobra.ExactArgs(1),
 	RunE:   hookRunE,
 }
-
-// hookCmd is the deprecated pre-namespace spelling, kept so hook configs written
-// by older sloop versions keep reporting status. New installs write
-// `hooks emit`. TODO(0.2.0): remove once the old spelling is no longer in use.
-var hookCmd = &cobra.Command{
-	Use:    "hook <waiting|working|idle>",
-	Short:  "Deprecated: use `sloop hooks emit` (kept for hook configs from older versions)",
-	Hidden: true,
-	Args:   cobra.ExactArgs(1),
-	RunE:   hookRunE,
-}
-
-func RegisterHook(cmd *cobra.Command) { cmd.AddCommand(hookCmd) }

@@ -3,7 +3,7 @@
 All notable changes to Sloop are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## v0.0.1 — first release
+## v0.1.0 — first release
 
 The initial public release: the local-first control layer for your AI coding CLIs.
 
