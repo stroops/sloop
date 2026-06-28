@@ -46,6 +46,7 @@ run:                           # `sloop run` model/effort knobs (all optional) �
   effort_flag: ""              #   how to pass reasoning effort; "" = unsupported
   effort_values: {}            #   low|medium|high → the CLI's own token (e.g. -c model_reasoning_effort=high)
   models: [opus, sonnet]       #   aliases for completion + bare-model resolution (forwarded as-is)
+  prompt: positional           #   how `run -t "task"` is passed: "positional" | a flag | "" (none)
 
 heuristics:                    # OPTIONAL fallback status markers (see below) — usually omit
   waiting: ["shall I apply"]   #   tool-specific phrasing the cross-tool defaults miss

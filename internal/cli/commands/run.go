@@ -120,10 +120,10 @@ func isToolToken(token string, manifests map[string]adapter.Manifest) bool {
 	return ok
 }
 
-// buildRunArgs turns a resolved model/effort into the CLI's own flags (from its
-// manifest), then appends passthrough. Errors clearly if the CLI lacks a knob
-// the user asked for. The model string is forwarded as-is — never validated.
-func buildRunArgs(m adapter.Manifest, model, effort string, passthrough []string) ([]string, error) {
+// buildRunArgs turns a resolved model/effort/task into the CLI's own flags (from
+// its manifest), then appends passthrough. Errors clearly if the CLI lacks a
+// knob the user asked for. The model string is forwarded as-is — never validated.
+func buildRunArgs(m adapter.Manifest, model, effort, task string, passthrough []string) ([]string, error) {
 	var args []string
 	if model != "" {
 		if m.Run.ModelFlag == "" {
@@ -143,12 +143,22 @@ func buildRunArgs(m adapter.Manifest, model, effort string, passthrough []string
 		}
 		args = append(args, m.Run.EffortFlag, tok)
 	}
+	if task != "" {
+		switch m.Run.Prompt {
+		case "":
+			return nil, fmt.Errorf("%s has no initial-task support via sloop — launch it and type the task", m.Name)
+		case "positional":
+			args = append(args, task) // e.g. `claude "task"` / `agent "task"`
+		default:
+			args = append(args, m.Run.Prompt, task) // flag form: `<flag> <task>`
+		}
+	}
 	return append(args, passthrough...), nil
 }
 
-// RunRun resolves the target + model/effort flags, syncs context, then launches
-// the CLI with the right flags in a managed session.
-func RunRun(startDir, target, provider, model, effort string, passthrough []string, r runner.Runner) error {
+// RunRun resolves the target + model/effort/task flags, syncs context, then
+// launches the CLI with the right flags in a managed session.
+func RunRun(startDir, target, provider, model, effort, task string, passthrough []string, r runner.Runner) error {
 	ws, err := workspace.Resolve(startDir)
 	if err != nil {
 		return err
@@ -166,7 +176,7 @@ func RunRun(startDir, target, provider, model, effort string, passthrough []stri
 		return err
 	}
 	m := manifests[plan.toolKey]
-	args, err := buildRunArgs(m, plan.model, plan.effort, passthrough)
+	args, err := buildRunArgs(m, plan.model, plan.effort, task, passthrough)
 	if err != nil {
 		return err
 	}
@@ -279,6 +289,7 @@ var (
 	runProvider  string
 	runModel     string
 	runEffort    string
+	runTask      string
 )
 
 var runCmd = &cobra.Command{
@@ -343,7 +354,7 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := RunRun(startDir, target, runProvider, runModel, runEffort, passthrough, selectRunner(ws.Name, plan.toolKey)); err != nil {
+		if err := RunRun(startDir, target, runProvider, runModel, runEffort, runTask, passthrough, selectRunner(ws.Name, plan.toolKey)); err != nil {
 			return err
 		}
 		hints.Show(cmd.OutOrStdout(), "run")
@@ -357,6 +368,7 @@ func RegisterRun(cmd *cobra.Command) {
 	runCmd.Flags().StringVarP(&runProvider, "provider", "p", "", "AI CLI to launch (overrides the positional target)")
 	runCmd.Flags().StringVarP(&runModel, "model", "m", "", "model to pass to the CLI (forwarded as-is, not validated)")
 	runCmd.Flags().StringVarP(&runEffort, "effort", "e", "", "reasoning effort: low|medium|high (if the CLI supports it)")
+	runCmd.Flags().StringVarP(&runTask, "task", "t", "", "hand the agent an initial task — launches an interactive session already working on it")
 	runCmd.ValidArgsFunction = completeTools
 	_ = runCmd.RegisterFlagCompletionFunc("workspace", completeWorkspaces)
 	_ = runCmd.RegisterFlagCompletionFunc("provider", completeTools)

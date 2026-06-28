@@ -20,7 +20,7 @@ func TestRunRunSyncsAndLaunches(t *testing.T) {
 	}
 
 	fr := &fakeRunner{}
-	if err := RunRun(dir, "claude", "", "", "", nil, fr); err != nil {
+	if err := RunRun(dir, "claude", "", "", "", "", nil, fr); err != nil {
 		t.Fatalf("RunRun: %v", err)
 	}
 
@@ -47,7 +47,7 @@ func TestRunRunPassesThroughArgs(t *testing.T) {
 	}
 
 	fr := &fakeRunner{}
-	if err := RunRun(dir, "claude", "", "", "", []string{"--foo", "bar"}, fr); err != nil {
+	if err := RunRun(dir, "claude", "", "", "", "", []string{"--foo", "bar"}, fr); err != nil {
 		t.Fatalf("RunRun: %v", err)
 	}
 	if len(fr.got.Args) != 2 || fr.got.Args[0] != "--foo" || fr.got.Args[1] != "bar" {

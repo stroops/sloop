@@ -133,6 +133,11 @@ and parked**; curated aliases cover the common case at zero runtime cost.
   parsing (`planLaunch`/`buildRunArgs`).
 - **Phase 2 — smart positional.** _(shipped)_ Classifies `T` as tool | binary | model alias by
   reverse-indexing manifest `run.models` (`modelHomeTool`), so `sloop run opus` → `claude --model opus`.
+- **Initial task.** _(shipped)_ `-t/--task "…"` seeds an **interactive** session already working on
+  the task (so it lives in the fleet), delivered per `run.prompt` (positional for claude/cursor —
+  `claude "task"` / `agent "task"`; their `-p` is the non-interactive print mode, which sloop does not
+  use). A CLI without `run.prompt` errors clearly. (Headless one-shot is parked — it doesn't live in
+  the fleet, so it adds little over calling the CLI directly.)
 - **Phase 3 — profiles & session identity.** User aliases (`sloop run myopus`), and session naming that
   includes the model so two Claude sessions (opus + sonnet) can coexist in one repo (today the session
   is `<workspace>__<tool>`, which would collide).

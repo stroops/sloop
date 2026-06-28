@@ -56,7 +56,7 @@ func TestPlanLaunch(t *testing.T) {
 }
 
 func TestBuildRunArgs(t *testing.T) {
-	claude := adapter.Manifest{Name: "Claude", Run: adapter.RunSpec{ModelFlag: "--model"}}
+	claude := adapter.Manifest{Name: "Claude", Run: adapter.RunSpec{ModelFlag: "--model", Prompt: "positional"}}
 	codex := adapter.Manifest{Name: "Codex", Run: adapter.RunSpec{
 		ModelFlag:    "--model",
 		EffortFlag:   "-c",
@@ -65,7 +65,7 @@ func TestBuildRunArgs(t *testing.T) {
 	noKnobs := adapter.Manifest{Name: "Agy"}
 
 	t.Run("model forwarded", func(t *testing.T) {
-		got, err := buildRunArgs(claude, "opus", "", []string{"--foo"})
+		got, err := buildRunArgs(claude, "opus", "", "", []string{"--foo"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,7 +75,7 @@ func TestBuildRunArgs(t *testing.T) {
 		}
 	})
 	t.Run("effort forwarded", func(t *testing.T) {
-		got, err := buildRunArgs(codex, "", "high", nil)
+		got, err := buildRunArgs(codex, "", "high", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,23 +84,38 @@ func TestBuildRunArgs(t *testing.T) {
 			t.Fatalf("got %v want %v", got, want)
 		}
 	})
+	t.Run("task seeds positional after model", func(t *testing.T) {
+		got, err := buildRunArgs(claude, "opus", "", "fix the auth bug", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"--model", "opus", "fix the auth bug"}
+		if !eqStrs(got, want) {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	})
+	t.Run("task unsupported errors", func(t *testing.T) {
+		if _, err := buildRunArgs(codex, "", "", "do a thing", nil); err == nil {
+			t.Fatal("want error for task on a CLI with no prompt support")
+		}
+	})
 	t.Run("model unsupported errors", func(t *testing.T) {
-		if _, err := buildRunArgs(noKnobs, "opus", "", nil); err == nil {
+		if _, err := buildRunArgs(noKnobs, "opus", "", "", nil); err == nil {
 			t.Fatal("want error for model on a CLI with no model_flag")
 		}
 	})
 	t.Run("effort unsupported errors", func(t *testing.T) {
-		if _, err := buildRunArgs(claude, "", "high", nil); err == nil {
+		if _, err := buildRunArgs(claude, "", "high", "", nil); err == nil {
 			t.Fatal("want error for effort on a CLI with no effort_flag")
 		}
 	})
 	t.Run("bad effort value errors", func(t *testing.T) {
-		if _, err := buildRunArgs(codex, "", "turbo", nil); err == nil {
+		if _, err := buildRunArgs(codex, "", "turbo", "", nil); err == nil {
 			t.Fatal("want error for effort not in low|medium|high")
 		}
 	})
 	t.Run("passthrough only", func(t *testing.T) {
-		got, err := buildRunArgs(noKnobs, "", "", []string{"--help"})
+		got, err := buildRunArgs(noKnobs, "", "", "", []string{"--help"})
 		if err != nil || !eqStrs(got, []string{"--help"}) {
 			t.Fatalf("got %v err %v", got, err)
 		}

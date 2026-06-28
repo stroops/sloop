@@ -20,3 +20,4 @@ hooks:
     idle: stop
 run:
   model_flag: "--model"   # e.g. agent --model gpt-5 (Cursor is multi-vendor; no bare-model home)
+  prompt: positional      # `agent "task"` seeds an interactive session (agent -p is print mode)

@@ -19,9 +19,10 @@ The initial public release: the local-first control layer for your AI coding CLI
 ### Launch
 - `sloop run` syncs context, then launches in a managed session. The target can be a
   tool (`claude`), its binary (`agent` → cursor), or a model alias (`opus` → its vendor's
-  home CLI). Flags: `-m/--model`, `-e/--effort` (low|medium|high), `-p/--provider`. The
-  model is forwarded to the CLI as-is, never validated. `--split` runs several tools side
-  by side; `-w` targets a registered workspace from anywhere.
+  home CLI). Flags: `-m/--model`, `-e/--effort` (low|medium|high), `-p/--provider`, and
+  `-t/--task` to hand the agent an initial task (interactive session already working on it,
+  visible in `sloop ps`). The model is forwarded to the CLI as-is, never validated.
+  `--split` runs several tools side by side; `-w` targets a registered workspace.
 
 ### Cross-repo fleet
 - `sloop ps` — every running agent across all your repos; agents waiting on you float

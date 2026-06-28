@@ -69,6 +69,10 @@ type RunSpec struct {
 	// Models are the model aliases this CLI serves (completion + bare-model
 	// resolution). Not exhaustive; full API ids still work via forward.
 	Models []string `yaml:"models"`
+	// Prompt is how an initial interactive task (`sloop run … -t "…"`) is passed:
+	// "positional" appends it as a bare arg, a flag string passes `<flag> <task>`,
+	// "" = the CLI has no initial-task support via sloop.
+	Prompt string `yaml:"prompt"`
 }
 
 type Manifest struct {
