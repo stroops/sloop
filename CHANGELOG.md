@@ -3,7 +3,10 @@
 All notable changes to Sloop are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## v0.1.1 — 2026-06-28
+
+Run more than one agent per repo, peek into a waiting agent without leaving your
+screen, and a sharper first-run experience — all on top of v0.1.0.
 
 ### Run multiple agents & accounts
 - Named instances: `sloop run claude@review` / `-n/--name` runs a second agent of the same tool in one
@@ -17,6 +20,13 @@ All notable changes to Sloop are documented here. This project adheres to
 - `sloop peek` floats a waiting agent's live pane over your current screen so you can answer it and
   drop back without `switch-client` swapping your whole screen; `sloop peek setup` binds a key. Needs
   tmux ≥ 3.2. Every status bar gains a fleet-wide `⏳ N waiting` badge.
+
+### Sharper onboarding (init / check / doctor)
+- `sloop init` is provider-respecting: it asks about the tools you actually use (Claude-first order),
+  prompts honestly and skips work that is already done, selects tools per workspace, and no longer
+  offers to scaffold a provider's folders for it.
+- `sloop check` gains more AI-readiness criteria, sourced from each tool's adapter manifest.
+- `sloop doctor` groups and colors its output and explains the `mode` line.
 
 ## v0.1.0 — first release
 
