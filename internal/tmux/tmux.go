@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 
@@ -82,6 +83,44 @@ func Available() bool {
 
 func SessionName(workspace, tool string) string {
 	return sanitize(workspace) + "__" + sanitize(tool)
+}
+
+// InstanceName is SessionName plus an optional instance suffix; instance=="" is
+// the default session (byte-identical to SessionName), so a second agent of the
+// same provider in one workspace gets a distinct `ws__tool__instance` name.
+func InstanceName(workspace, tool, instance string) string {
+	base := SessionName(workspace, tool)
+	if instance == "" {
+		return base
+	}
+	return base + "__" + sanitize(instance)
+}
+
+// envPrefix returns ["env","K1=V1",…] in sorted key order, or nil when empty, so
+// a launched command can carry extra env (e.g. CLAUDE_CONFIG_DIR for a second
+// account) on any tmux version — no dependency on `new-session -e`.
+func envPrefix(env map[string]string) []string {
+	if len(env) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := []string{"env"}
+	for _, k := range keys {
+		out = append(out, k+"="+env[k])
+	}
+	return out
+}
+
+// buildNewDetachedArgs builds `new-session -d -s <s> -c <dir> [env K=V…] cmd args…`.
+func buildNewDetachedArgs(session, dir string, env map[string]string, command string, cmdArgs []string) []string {
+	args := []string{"new-session", "-d", "-s", session, "-c", dir}
+	args = append(args, envPrefix(env)...)
+	args = append(args, command)
+	return append(args, cmdArgs...)
 }
 
 // DetachHint is the one place that explains how to detach (hide the agent and
@@ -206,7 +245,7 @@ func (r Runner) Launch(s runner.Spec) error {
 	// Create the session detached so we can give it sloop's own status bar
 	// before attaching; then attach (or switch if already inside tmux).
 	if !hasSession(r.Session) {
-		create := append([]string{"new-session", "-d", "-s", r.Session, "-c", s.Dir, s.Command}, s.Args...)
+		create := buildNewDetachedArgs(r.Session, s.Dir, s.Env, s.Command, s.Args)
 		if err := Run(create...); err != nil {
 			return err
 		}

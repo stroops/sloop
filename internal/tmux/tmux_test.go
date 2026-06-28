@@ -15,6 +15,42 @@ func TestTmuxSessionNameSanitizes(t *testing.T) {
 	}
 }
 
+func TestInstanceName(t *testing.T) {
+	if got := InstanceName("repo", "claude", ""); got != "repo__claude" {
+		t.Fatalf("empty instance: got %s", got)
+	}
+	if got := InstanceName("repo", "claude", "sec"); got != "repo__claude__sec" {
+		t.Fatalf("named instance: got %s", got)
+	}
+	if got := InstanceName("repo", "claude", "a b"); got != "repo__claude__a_b" {
+		t.Fatalf("sanitized instance: got %s", got)
+	}
+}
+
+func TestEnvPrefix(t *testing.T) {
+	if envPrefix(nil) != nil {
+		t.Fatal("empty env should yield nil prefix")
+	}
+	got := envPrefix(map[string]string{"B": "2", "A": "1"})
+	want := []string{"env", "A=1", "B=2"} // sorted by key
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v want %v", got, want)
+	}
+}
+
+func TestBuildNewDetachedArgs(t *testing.T) {
+	plain := buildNewDetachedArgs("repo__claude", "/tmp/repo", nil, "claude", []string{"--resume"})
+	wantPlain := []string{"new-session", "-d", "-s", "repo__claude", "-c", "/tmp/repo", "claude", "--resume"}
+	if !reflect.DeepEqual(plain, wantPlain) {
+		t.Fatalf("plain: got %v want %v", plain, wantPlain)
+	}
+	withEnv := buildNewDetachedArgs("repo__claude__sec", "/tmp/repo", map[string]string{"CLAUDE_CONFIG_DIR": "/x"}, "claude", nil)
+	wantEnv := []string{"new-session", "-d", "-s", "repo__claude__sec", "-c", "/tmp/repo", "env", "CLAUDE_CONFIG_DIR=/x", "claude"}
+	if !reflect.DeepEqual(withEnv, wantEnv) {
+		t.Fatalf("withEnv: got %v want %v", withEnv, wantEnv)
+	}
+}
+
 func TestBuildTmuxNewArgs(t *testing.T) {
 	args := BuildNewArgs("backend__claude", runner.Spec{Dir: "/tmp/backend", Command: "claude", Args: []string{"--resume"}})
 	want := []string{"new-session", "-A", "-s", "backend__claude", "-c", "/tmp/backend", "claude", "--resume"}
