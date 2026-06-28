@@ -35,6 +35,13 @@ contribution starts from a clear contract. For the shipped detail of each releas
 - **Skills:** lockfile (`.sloop/skills.lock`) + `skills update` for reproducible team skills. *(shipped)*
 - **Hooks (status):** auto-installers per provider — claude, gemini, cursor done; copilot/codex need a
   matcher-aware model (see the hooks doc).
+- **`sloop restore`** _(planned)_ — relaunch the sessions that were running before a shutdown. The DB
+  already marks them (`ended_at` is NULL for sessions that never exited cleanly); `restore` would
+  `run -w` each, optionally passing the provider's resume flag to continue the conversation. Note:
+  *auto*-restore on boot would need a shell-init hook (no daemon), so the first cut is a manual command.
+- **`sloop tmux setup`** _(planned)_ — opt-in, append a managed/idempotent block to `~/.tmux.conf` for
+  the bits that need to survive a tmux restart (popup keybind, optional global status line). Default
+  stays per-session and non-invasive; this is **not** folded into `hooks` (which is AI-provider status).
 
 ## Next (v0.2.0 — workflow hooks)
 

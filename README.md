@@ -159,6 +159,11 @@ Machine-local state lives under `~/.sloop/`: the workspaces registry + session h
 SQLite with WAL), hook status markers (`state/`), and any user adapter manifests (`adapters/*.yaml`).
 Config layering is documented in **[docs/reference/CONFIG.md](docs/reference/CONFIG.md)**.
 
+**Across restarts.** tmux sessions live in memory, so a reboot ends them (sloop is not tmux-resurrect).
+What sloop keeps is the **registry**: after a restart your workspaces and recent sessions are still
+there, so `sloop ls` / `sloop ps --all` show them and `sloop run -w <name>` relaunches from anywhere.
+The agent's own conversation is the provider's to resume (e.g. `claude` continues a prior session).
+
 ---
 
 ## Provider-aware adapters
