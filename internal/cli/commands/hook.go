@@ -40,8 +40,8 @@ func RunHook(state string) error {
 }
 
 // hookRunE validates the state argument, drains any hook payload on stdin, and
-// records the marker. Shared by the canonical `hooks emit` and the deprecated
-// top-level `hook`.
+// records the marker. It backs the hidden `hooks emit` callback that a provider's
+// own lifecycle hooks invoke.
 func hookRunE(cmd *cobra.Command, args []string) error {
 	// Drain any hook payload the tool sends on stdin; we don't need it, but
 	// reading avoids a broken pipe on the tool's side.

@@ -187,7 +187,7 @@ sloop hooks print       # or print the JSON snippet to add by hand
 ```
 
 This registers three of Claude's documented hooks — `UserPromptSubmit` → working,
-`Notification` → waiting on you, `Stop` → idle — each calling `sloop hook <state>`, which
+`Notification` → waiting on you, `Stop` → idle — each calling `sloop hooks emit <state>`, which
 records the session's status under `~/.sloop/state`. `sloop ps` then **prefers that marker**
 over the heuristic (falling back to the heuristic if no fresh marker exists). This stays
 within the provider's rules: Claude calls sloop through its **own** hook mechanism; sloop
@@ -195,7 +195,7 @@ never intercepts or injects. Markers older than 15 min are ignored so a crashed 
 can't get stuck "waiting".
 
 **Multi-provider:** every major CLI now has a hook/notify system. `sloop hooks list` shows the
-matrix, and `sloop hooks print <tool>` prints the exact event → `sloop hook <state>` wiring for
+matrix, and `sloop hooks print <tool>` prints the exact event → `sloop hooks emit <state>` wiring for
 each (Claude and Gemini auto-install; Cursor/Copilot/Codex are print-and-paste for now):
 
 ```

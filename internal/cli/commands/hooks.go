@@ -257,7 +257,13 @@ func manifestForTool(tool string) (adapter.Manifest, error) {
 var hooksCmd = &cobra.Command{
 	Use:     "hooks",
 	Aliases: []string{"hk"},
-	Short:   "Install AI tool hooks so `sloop ps` knows agent status precisely",
+	Short:   "Wire a tool's status hooks so `sloop ps` knows agent state precisely",
+	Long: `Manage status hooks: each tool calls sloop from its own lifecycle events so
+sloop ps reports waiting/working/idle precisely (not just a screen guess).
+
+These are status hooks (for the fleet view). Portable workflow hooks —
+format/lint/policy automation installed into each tool — are a v0.2.0 proposal;
+see docs/design/hooks.md.`,
 }
 
 var hooksInstallCmd = &cobra.Command{
@@ -347,13 +353,14 @@ var hooksPrintCmd = &cobra.Command{
 
 var hooksListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "Show hook support and event mapping for every AI provider",
+	Short: "Show status-hook support and event mapping for every AI provider",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manifests, err := adapter.Load()
 		if err != nil {
 			return err
 		}
+		cmd.Println("Status hooks — report waiting/working/idle to `sloop ps`:")
 		cmd.Printf("%-9s %-12s %s\n", "TOOL", "AUTO-INSTALL", "CONFIG")
 		for _, tool := range hookTools() {
 			m := manifests[tool]
@@ -364,6 +371,7 @@ var hooksListCmd = &cobra.Command{
 			cmd.Printf("%-9s %-12s %s\n", tool, auto, m.Hooks.Config)
 		}
 		cmd.Println("\nDetails: sloop hooks print <tool>")
+		cmd.Println("(Workflow hooks — format/lint/policy — are v0.2.0; see docs/design/hooks.md.)")
 		hints.Show(cmd.OutOrStdout(), "hooks")
 		return nil
 	},
