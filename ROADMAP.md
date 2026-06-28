@@ -22,7 +22,7 @@ contribution starts from a clear contract. For the shipped detail of each releas
 
 | Pillar | What it is | Design doc | Status |
 |---|---|---|---|
-| **Launch (`run`)** | one friendly target → the right CLI, model and effort, in a managed session | [docs/design/run.md](docs/design/run.md) | tool launch shipped; model/effort → next |
+| **Launch (`run`)** | one friendly target → the right CLI, model and effort, in a managed session | [docs/design/run.md](docs/design/run.md) | tool · model · effort shipped (Phase 1–2) |
 | **Portable context** | `AGENTS.md` canonical; pointer files + skills delivered to every tool | [docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md) | shipped (v0.1.0) |
 | **Skills** | reusable prompts/workflows shared across tools *and* sources | [docs/design/skills.md](docs/design/skills.md) | shipping incrementally |
 | **Cross-repo fleet** | every running agent across all repos; triage who needs you | [docs/guide/USAGE.md](docs/guide/USAGE.md) | shipped (v0.1.0) |

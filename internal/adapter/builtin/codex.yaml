@@ -18,3 +18,12 @@ hooks:
     working: ""
     waiting: approval-requested
     idle: agent-turn-complete
+run:
+  vendor: openai
+  default_for: [openai]
+  model_flag: "--model"
+  effort_flag: "-c"   # codex takes reasoning effort as a config override
+  effort_values:
+    low: model_reasoning_effort=low
+    medium: model_reasoning_effort=medium
+    high: model_reasoning_effort=high

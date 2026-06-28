@@ -39,6 +39,14 @@ hooks:                         # status hooks for `sloop ps` (see docs/guide/USA
     waiting: Notification
     idle: Stop
 
+run:                           # `sloop run` model/effort knobs (all optional) — see docs/design/run.md
+  vendor: anthropic            #   model vendor this CLI natively serves
+  default_for: [anthropic]     #   vendors this CLI is the home launcher for (bare `sloop run opus`)
+  model_flag: "--model"        #   how to pass a model; "" = no model selection
+  effort_flag: ""              #   how to pass reasoning effort; "" = unsupported
+  effort_values: {}            #   low|medium|high → the CLI's own token (e.g. -c model_reasoning_effort=high)
+  models: [opus, sonnet]       #   aliases for completion + bare-model resolution (forwarded as-is)
+
 heuristics:                    # OPTIONAL fallback status markers (see below) — usually omit
   waiting: ["shall I apply"]   #   tool-specific phrasing the cross-tool defaults miss
   working: ["indexing repo"]
@@ -50,6 +58,7 @@ heuristics:                    # OPTIONAL fallback status markers (see below) �
 |---|---|---|
 | detect / `sloop tools` | `detect.Tools` | `detect` |
 | `sloop run` launch | `run.go` | `launch` |
+| `sloop run` model/effort | `run.go` (`planLaunch`/`buildRunArgs`) | `run.*` |
 | `sloop sync` context | `sync` | `context.mode/file` |
 | skills symlink | `sync` | `skills.target` |
 | `sloop hooks` + status | `hooks.go` | `hooks.*` |

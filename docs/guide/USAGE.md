@@ -87,9 +87,22 @@ Either way, then edit `AGENTS.md` with the rest of your guidance (overview, conv
 ```sh
 sloop run                 # launch the default tool, context synced first
 sloop run claude          # launch a specific tool
-sloop run claude -- --model opus     # everything after -- is passed to the tool
+sloop run agent           # binary alias works too (agent → cursor)
+sloop run -m sonnet       # a model: -m forwards it to the tool (default tool)
+sloop run opus            # a bare model → its vendor's home CLI (opus → claude --model opus)
+sloop run claude -m sonnet -e high   # tool + model + reasoning effort (low|medium|high)
+sloop run -p cursor -m opus          # name the CLI explicitly with --provider/-p
+sloop run claude -- --resume         # everything after -- is passed straight to the tool
 sloop run -w my-service claude       # target a registered workspace from anywhere (no cd)
 ```
+
+**Picking a tool / model / effort.** `run <token>` accepts a tool (`claude`), its binary
+(`agent`→cursor), or a model alias (`opus`→its home CLI). Flags are explicit: `-p/--provider` the CLI,
+`-m/--model` the model, `-e/--effort` (`low|medium|high`). sloop **forwards the model string as-is and
+never validates it** — the CLI accepts or rejects it; selection is the CLI's own step, sloop just makes
+it a one-liner. If a CLI has no model/effort knob, `-m`/`-e` errors clearly (run it and pick inside, or
+pass flags after `--`). `-m <Tab>` completes the known aliases. Which knobs each CLI exposes lives in
+its adapter manifest — see [run.md](../design/run.md) and [ADAPTERS.md](../reference/ADAPTERS.md).
 
 What `run` does: ensures `AGENTS.md`, writes pointer files (e.g. `CLAUDE.md` → `AGENTS.md`),
 symlinks `.sloop/skills` into the tool's skills dir, records the session, then launches —

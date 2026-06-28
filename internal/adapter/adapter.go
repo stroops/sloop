@@ -50,6 +50,27 @@ type HeuristicsSpec struct {
 	Waiting []string `yaml:"waiting"`
 }
 
+// RunSpec declares how `sloop run` launches a tool with an optional model and
+// reasoning effort. Every field is optional: an empty flag means the CLI has no
+// such knob, and sloop errors clearly if the user asks for it. sloop never
+// validates the model — it forwards the string and lets the CLI accept/reject it.
+type RunSpec struct {
+	// Vendor is the model vendor this CLI natively serves (e.g. "anthropic").
+	Vendor string `yaml:"vendor"`
+	// DefaultFor lists vendors this CLI is the canonical launcher for, so a bare
+	// model (`sloop run opus`) resolves to it.
+	DefaultFor []string `yaml:"default_for"`
+	// ModelFlag is how the CLI selects a model (e.g. "--model"); "" = unsupported.
+	ModelFlag string `yaml:"model_flag"`
+	// EffortFlag + EffortValues express reasoning effort: low|medium|high mapped
+	// to the CLI's own token. "" flag = the CLI has no effort knob.
+	EffortFlag   string            `yaml:"effort_flag"`
+	EffortValues map[string]string `yaml:"effort_values"`
+	// Models are the model aliases this CLI serves (completion + bare-model
+	// resolution). Not exhaustive; full API ids still work via forward.
+	Models []string `yaml:"models"`
+}
+
 type Manifest struct {
 	Name string `yaml:"name"`
 	// Detect is the binary name used to detect installation; Launch is the
@@ -59,6 +80,8 @@ type Manifest struct {
 	Context ContextSpec `yaml:"context"`
 	Skills  SkillsSpec  `yaml:"skills"`
 	Hooks   HooksSpec   `yaml:"hooks"`
+	// Run declares model/effort launch knobs for `sloop run`.
+	Run RunSpec `yaml:"run"`
 	// Fallback text-parsing rules for status (paving the way for AI-driven awareness)
 	Heuristics HeuristicsSpec `yaml:"heuristics"`
 	// Scaffold lists the tool's standard project dirs that `sloop init --scaffold`

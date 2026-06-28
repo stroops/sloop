@@ -15,3 +15,7 @@ hooks:
     working: BeforeAgent
     waiting: Notification
     idle: AfterAgent
+run:
+  vendor: google
+  default_for: [google]
+  model_flag: "--model"

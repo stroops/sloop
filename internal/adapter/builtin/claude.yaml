@@ -18,6 +18,11 @@ hooks:
     working: UserPromptSubmit
     waiting: Notification
     idle: Stop
+run:
+  vendor: anthropic
+  default_for: [anthropic]
+  model_flag: "--model"   # accepts opus/sonnet/haiku/fable or a full id (claude-opus-4-8)
+  models: [opus, sonnet, haiku, fable]
 # No `heuristics:` block: Claude's prompts use the cross-tool defaults (see
 # defaultWaitingMarkers/defaultWorkingMarkers in internal/tmux/status.go).
 # Precise status comes from the hooks above; heuristics are only the fallback.

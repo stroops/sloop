@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,7 +18,137 @@ import (
 	"github.com/stroops/sloop/internal/workspace"
 )
 
-func RunRun(startDir, target string, extraArgs []string, r runner.Runner) error {
+// launchPlan is the resolved outcome of a `sloop run` target + flags.
+type launchPlan struct {
+	toolKey string // a real manifest key (binary aliases already resolved)
+	model   string // model to forward ("" = the CLI's own default)
+	effort  string // low|medium|high ("" = none)
+}
+
+// toolKeyFor resolves a token to a manifest key: an exact key, else a tool whose
+// detect/launch binary matches — so `sloop run agent` == `sloop run cursor`.
+func toolKeyFor(token string, manifests map[string]adapter.Manifest) (string, bool) {
+	if _, ok := manifests[token]; ok {
+		return token, true
+	}
+	for key, m := range manifests {
+		if m.Detect == token || filepath.Base(m.Launch) == token {
+			return key, true
+		}
+	}
+	return "", false
+}
+
+// modelHomeTool finds the CLI that should launch a bare model alias: the tool
+// listing it in run.models that is the canonical launcher for its own vendor
+// (run.default_for). Falls back to any tool that serves the alias.
+func modelHomeTool(model string, manifests map[string]adapter.Manifest) (string, bool) {
+	var fallback string
+	for key, m := range manifests {
+		for _, a := range m.Run.Models {
+			if a != model {
+				continue
+			}
+			if m.Run.Vendor != "" && sliceHas(m.Run.DefaultFor, m.Run.Vendor) {
+				return key, true
+			}
+			if fallback == "" {
+				fallback = key
+			}
+		}
+	}
+	return fallback, fallback != ""
+}
+
+func sliceHas(ss []string, s string) bool {
+	for _, x := range ss {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+// planLaunch resolves the positional target + flags into a CLI, model, and
+// effort. Precedence for the positional token: tool key → binary alias → model
+// alias. Naming a CLI (positional tool or --provider) wins; a bare model
+// resolves to its vendor's home CLI.
+func planLaunch(target, provider, model, effort, defaultTool string, manifests map[string]adapter.Manifest) (launchPlan, error) {
+	p := launchPlan{model: model, effort: effort}
+	cli := provider
+
+	if target != "" {
+		switch {
+		case isToolToken(target, manifests):
+			key, _ := toolKeyFor(target, manifests)
+			if cli != "" {
+				if k2, _ := toolKeyFor(cli, manifests); k2 != key {
+					return p, fmt.Errorf("conflicting tools: %q and --provider %q", target, provider)
+				}
+			}
+			cli = key
+		default:
+			home, ok := modelHomeTool(target, manifests)
+			if !ok {
+				return p, fmt.Errorf("unknown tool or model %q (try `sloop run <tool> -m <model>`)", target)
+			}
+			if p.model == "" {
+				p.model = target
+			}
+			if cli == "" {
+				cli = home
+			}
+		}
+	}
+
+	if cli == "" {
+		cli = defaultTool
+	}
+	if cli == "" {
+		return p, fmt.Errorf("no tool given and no default_tool set")
+	}
+	key, ok := toolKeyFor(cli, manifests)
+	if !ok {
+		return p, fmt.Errorf("unknown tool %q (no adapter)", cli)
+	}
+	p.toolKey = key
+	return p, nil
+}
+
+func isToolToken(token string, manifests map[string]adapter.Manifest) bool {
+	_, ok := toolKeyFor(token, manifests)
+	return ok
+}
+
+// buildRunArgs turns a resolved model/effort into the CLI's own flags (from its
+// manifest), then appends passthrough. Errors clearly if the CLI lacks a knob
+// the user asked for. The model string is forwarded as-is — never validated.
+func buildRunArgs(m adapter.Manifest, model, effort string, passthrough []string) ([]string, error) {
+	var args []string
+	if model != "" {
+		if m.Run.ModelFlag == "" {
+			return nil, fmt.Errorf("%s has no model selection via sloop — run it and pick the model inside, or pass flags after `--`", m.Name)
+		}
+		args = append(args, m.Run.ModelFlag, model)
+	}
+	if effort != "" {
+		switch effort {
+		case "low", "medium", "high":
+		default:
+			return nil, fmt.Errorf("--effort must be low|medium|high, got %q", effort)
+		}
+		tok, ok := m.Run.EffortValues[effort]
+		if m.Run.EffortFlag == "" || !ok {
+			return nil, fmt.Errorf("%s has no %q reasoning effort via sloop", m.Name, effort)
+		}
+		args = append(args, m.Run.EffortFlag, tok)
+	}
+	return append(args, passthrough...), nil
+}
+
+// RunRun resolves the target + model/effort flags, syncs context, then launches
+// the CLI with the right flags in a managed session.
+func RunRun(startDir, target, provider, model, effort string, passthrough []string, r runner.Runner) error {
 	ws, err := workspace.Resolve(startDir)
 	if err != nil {
 		return err
@@ -26,31 +157,32 @@ func RunRun(startDir, target string, extraArgs []string, r runner.Runner) error 
 	if err != nil {
 		return err
 	}
-	tool, err := resolveTool(target, proj.DefaultTool)
-	if err != nil {
-		return err
-	}
 	manifests, err := adapter.Load()
 	if err != nil {
 		return err
 	}
-	m, ok := manifests[tool]
-	if !ok {
-		return fmt.Errorf("unknown tool %q (no adapter)", tool)
+	plan, err := planLaunch(target, provider, model, effort, proj.DefaultTool, manifests)
+	if err != nil {
+		return err
+	}
+	m := manifests[plan.toolKey]
+	args, err := buildRunArgs(m, plan.model, plan.effort, passthrough)
+	if err != nil {
+		return err
 	}
 
 	// Sync native files before launch.
-	if _, err := RunSync(startDir, target, false); err != nil {
+	if _, err := RunSync(startDir, plan.toolKey, false); err != nil {
 		return err
 	}
 
 	// Record session (best-effort: never block the launch).
-	sessID, store := recordSessionBestEffort(ws, tool, target)
+	sessID, store := recordSessionBestEffort(ws, plan.toolKey, target)
 	if store != nil {
 		defer func() { _ = store.Close() }()
 	}
 
-	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch, Args: extraArgs})
+	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch, Args: args})
 
 	if store != nil && sessID > 0 {
 		_ = store.EndSession(sessID, time.Now())
@@ -144,6 +276,9 @@ func RunSplit(startDir string, tools []string) error {
 var (
 	runWorkspace string
 	runSplit     bool
+	runProvider  string
+	runModel     string
+	runEffort    string
 )
 
 var runCmd = &cobra.Command{
@@ -197,10 +332,18 @@ var runCmd = &cobra.Command{
 		if len(positional) == 1 {
 			target = positional[0]
 		}
-		if target == "" {
-			target = proj.DefaultTool
+		// Resolve the plan up front so the session is named by the real tool key
+		// (e.g. `run agent`/`run opus` both land in the canonical cursor/claude
+		// session), not the raw token.
+		manifests, err := adapter.Load()
+		if err != nil {
+			return err
 		}
-		if err := RunRun(startDir, target, passthrough, selectRunner(ws.Name, target)); err != nil {
+		plan, err := planLaunch(target, runProvider, runModel, runEffort, proj.DefaultTool, manifests)
+		if err != nil {
+			return err
+		}
+		if err := RunRun(startDir, target, runProvider, runModel, runEffort, passthrough, selectRunner(ws.Name, plan.toolKey)); err != nil {
 			return err
 		}
 		hints.Show(cmd.OutOrStdout(), "run")
@@ -211,7 +354,12 @@ var runCmd = &cobra.Command{
 func RegisterRun(cmd *cobra.Command) {
 	runCmd.Flags().StringVarP(&runWorkspace, "workspace", "w", "", "target a registered workspace by name")
 	runCmd.Flags().BoolVar(&runSplit, "split", false, "launch multiple tools side-by-side as tmux panes")
+	runCmd.Flags().StringVarP(&runProvider, "provider", "p", "", "AI CLI to launch (overrides the positional target)")
+	runCmd.Flags().StringVarP(&runModel, "model", "m", "", "model to pass to the CLI (forwarded as-is, not validated)")
+	runCmd.Flags().StringVarP(&runEffort, "effort", "e", "", "reasoning effort: low|medium|high (if the CLI supports it)")
 	runCmd.ValidArgsFunction = completeTools
 	_ = runCmd.RegisterFlagCompletionFunc("workspace", completeWorkspaces)
+	_ = runCmd.RegisterFlagCompletionFunc("provider", completeTools)
+	_ = runCmd.RegisterFlagCompletionFunc("model", completeModels)
 	cmd.AddCommand(runCmd)
 }

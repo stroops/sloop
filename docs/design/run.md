@@ -127,12 +127,12 @@ and parked**; curated aliases cover the common case at zero runtime cost.
 
 ## Staged plan
 
-- **Phase 1 — explicit flags (deterministic).** `-p/--provider`, `-m/--model`, `-e/--effort` forwarded
-  via manifest `run.*`; plus binary-alias resolution (`run agent` == `run cursor`). No inference, so no
-  ambiguity — and it forces the `run.*` schema that Phase 2 builds on. **Zero new files, zero new
-  dependencies** — just new manifest fields (already embedded) and flag parsing.
-- **Phase 2 — smart positional.** Classify `T` as tool | model | alias by reverse-indexing manifest
-  `run.models`, so `sloop run opus` / `sloop run sonnet` work. Still no new files.
+- **Phase 1 — explicit flags (deterministic).** _(shipped)_ `-p/--provider`, `-m/--model`,
+  `-e/--effort` forwarded via manifest `run.*`; plus binary-alias resolution (`run agent` ==
+  `run cursor`). Zero new files, zero new dependencies — just manifest fields (embedded) and flag
+  parsing (`planLaunch`/`buildRunArgs`).
+- **Phase 2 — smart positional.** _(shipped)_ Classifies `T` as tool | binary | model alias by
+  reverse-indexing manifest `run.models` (`modelHomeTool`), so `sloop run opus` → `claude --model opus`.
 - **Phase 3 — profiles & session identity.** User aliases (`sloop run myopus`), and session naming that
   includes the model so two Claude sessions (opus + sonnet) can coexist in one repo (today the session
   is `<workspace>__<tool>`, which would collide).
