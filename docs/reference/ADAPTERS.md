@@ -51,6 +51,16 @@ run:                           # `sloop run` model/effort knobs (all optional) �
 heuristics:                    # OPTIONAL fallback status markers (see below) — usually omit
   waiting: ["shall I apply"]   #   tool-specific phrasing the cross-tool defaults miss
   working: ["indexing repo"]
+
+readiness:                     # OPTIONAL extra `sloop check` best practices, sourced from the
+  docs: https://…              #   provider's own guidance (cited so it's not sloop's opinion)
+  checks:                      #   only filesystem-detectable practices; behavioral tips don't belong
+    - id: subagents
+      label: "Subagents folder (.claude/agents)"
+      kind: dir-exists         #   "file-exists" | "dir-exists" | "git-tracked"
+      path: .claude/agents     #   repo-relative
+      fix: "sloop init --scaffold"
+      optional: true           #   missing → advisory info (•), not a counted gap (✗)
 ```
 
 ## Which features are manifest-driven
@@ -64,6 +74,7 @@ heuristics:                    # OPTIONAL fallback status markers (see below) �
 | skills symlink | `sync` | `skills.target` |
 | `sloop hooks` + status | `hooks.go` | `hooks.*` |
 | `sloop ps` status fallback | `tmux.ClassifyStatus` | `heuristics.*` (additive; see below) |
+| `sloop check` readiness | `check.go` | `readiness.*` (optional; provider-sourced) |
 | shell completion | `completion.go` | manifest keys |
 
 The runtime view of all of this is **`sloop tools`** (capability matrix:

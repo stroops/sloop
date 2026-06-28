@@ -38,6 +38,19 @@ func TestRenderStatusline(t *testing.T) {
 	}
 }
 
+func TestWaitingBadge(t *testing.T) {
+	if got := waitingBadge(0); got != "" {
+		t.Fatalf("zero should be empty, got %q", got)
+	}
+	if got := waitingBadge(-1); got != "" {
+		t.Fatalf("negative should be empty, got %q", got)
+	}
+	got := waitingBadge(2)
+	if !strings.Contains(got, "2 waiting") || !strings.Contains(got, "fg=yellow") {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestTmuxStatusLabel(t *testing.T) {
 	w := tmuxStatusLabel(tmux.StatusWaiting)
 	if !strings.Contains(w, "waiting") || !strings.Contains(w, "fg=yellow") {

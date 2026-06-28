@@ -68,7 +68,7 @@ func RunKill(w io.Writer, in io.Reader, targets []string, all, waiting, yes bool
 		return nil, fmt.Errorf("tmux is not installed; `sloop kill` needs tmux")
 	}
 	manifests, _ := adapter.Load()
-	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
 	if len(rows) == 0 {
 		rows = enrichGlances(rows, manifests) // need status to find who's waiting
 	}

@@ -366,12 +366,18 @@ var hooksPrintCmd = &cobra.Command{
 		switch m.Hooks.Install {
 		case "settings-json":
 			doc, _ := mergeSettingsHooks(nil, eventCommands(m.Hooks))
-			out, _ := json.MarshalIndent(doc, "", "  ")
+			out, err := json.MarshalIndent(doc, "", "  ")
+			if err != nil {
+				return err
+			}
 			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
 			return nil
 		case "cursor-json":
 			doc, _ := mergeCursorHooks(nil, eventCommands(m.Hooks))
-			out, _ := json.MarshalIndent(doc, "", "  ")
+			out, err := json.MarshalIndent(doc, "", "  ")
+			if err != nil {
+				return err
+			}
 			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
 			return nil
 		}

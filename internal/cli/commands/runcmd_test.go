@@ -15,12 +15,13 @@ func (f *fakeRunner) Launch(s runner.Spec) error { f.got = s; return nil }
 func TestRunRunSyncsAndLaunches(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	// Two tools → canonical workspace, so the CLAUDE.md pointer is delivered.
+	if _, err := RunInit(dir, []string{"claude", "cursor"}, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 
 	fr := &fakeRunner{}
-	if err := RunRun(dir, "claude", "", "", "", "", nil, fr); err != nil {
+	if err := RunRun(dir, "claude", "", "", "", "", nil, nil, "", fr); err != nil {
 		t.Fatalf("RunRun: %v", err)
 	}
 
@@ -42,15 +43,31 @@ func TestRunRunSyncsAndLaunches(t *testing.T) {
 func TestRunRunPassesThroughArgs(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 
 	fr := &fakeRunner{}
-	if err := RunRun(dir, "claude", "", "", "", "", []string{"--foo", "bar"}, fr); err != nil {
+	if err := RunRun(dir, "claude", "", "", "", "", []string{"--foo", "bar"}, nil, "", fr); err != nil {
 		t.Fatalf("RunRun: %v", err)
 	}
 	if len(fr.got.Args) != 2 || fr.got.Args[0] != "--foo" || fr.got.Args[1] != "bar" {
 		t.Fatalf("want passthrough args [--foo bar], got %v", fr.got.Args)
+	}
+}
+
+func TestRunRunInjectsEnv(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	if _, err := RunInit(dir, nil, false); err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+	fr := &fakeRunner{}
+	env := map[string]string{"CLAUDE_CONFIG_DIR": "/x"}
+	if err := RunRun(dir, "claude", "", "", "", "", nil, env, "sec", fr); err != nil {
+		t.Fatalf("RunRun: %v", err)
+	}
+	if fr.got.Env["CLAUDE_CONFIG_DIR"] != "/x" {
+		t.Fatalf("env not passed to Spec: %v", fr.got.Env)
 	}
 }

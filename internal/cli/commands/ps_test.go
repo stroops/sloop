@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/tmux"
 )
 
@@ -15,7 +16,7 @@ func TestFleetRowsFiltersAndSplits(t *testing.T) {
 		{Name: "backend__cursor", Windows: 1},
 		{Name: "random", Windows: 1}, // not a sloop session
 	}
-	rows := fleetRows(in)
+	rows := fleetRows(in, nil)
 	if len(rows) != 2 {
 		t.Fatalf("want 2 sloop rows, got %d (%+v)", len(rows), rows)
 	}
@@ -25,6 +26,39 @@ func TestFleetRowsFiltersAndSplits(t *testing.T) {
 	}
 	if rows[1].Workspace != "my_app" || rows[1].Tool != "claude" || !rows[1].Attached {
 		t.Fatalf("row1 = %+v", rows[1])
+	}
+}
+
+func TestSplitSession(t *testing.T) {
+	m := map[string]adapter.Manifest{"claude": {}, "cursor": {}}
+	cases := []struct {
+		name                    string
+		in                      string
+		manifests               map[string]adapter.Manifest
+		wantWs, wantTool, wInst string
+	}{
+		{"legacy two-segment", "repo__claude", m, "repo", "claude", ""},
+		{"named instance", "repo__claude__sec", m, "repo", "claude", "sec"},
+		{"numeric instance", "repo__claude__2", m, "repo", "claude", "2"},
+		{"workspace with __", "a__b__claude", m, "a__b", "claude", ""},
+		{"unknown tool falls back", "repo__weird", nil, "repo", "weird", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ws, tool, inst := splitSession(c.in, c.manifests)
+			if ws != c.wantWs || tool != c.wantTool || inst != c.wInst {
+				t.Fatalf("got (%q,%q,%q) want (%q,%q,%q)", ws, tool, inst, c.wantWs, c.wantTool, c.wInst)
+			}
+		})
+	}
+}
+
+func TestToolNameWithInstance(t *testing.T) {
+	if got := (FleetRow{Tool: "claude", Instance: "sec"}).toolName(); got != "claude·sec" {
+		t.Fatalf("got %q", got)
+	}
+	if got := (FleetRow{Tool: "claude"}).toolName(); got != "claude" {
+		t.Fatalf("got %q", got)
 	}
 }
 

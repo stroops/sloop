@@ -83,7 +83,7 @@ func completeSessionNames(_ *cobra.Command, args []string, _ string) ([]string, 
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+	rows := fleetRows(tmux.ParseSessions(tmuxList()), nil) // only r.Name is used
 	names := make([]string, 0, len(rows))
 	for _, r := range rows {
 		names = append(names, r.Name)
@@ -97,7 +97,8 @@ func completePsIndex(_ *cobra.Command, args []string, _ string) ([]string, cobra
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+	manifests, _ := adapter.Load()
+	rows := fleetRows(tmux.ParseSessions(tmuxList()), manifests) // same order as `ps`
 	out := make([]string, 0, len(rows))
 	for i, r := range rows {
 		out = append(out, fmt.Sprintf("%d\t%s", i+1, r.Name)) // value<TAB>description
@@ -111,7 +112,7 @@ func completeSendTargets(_ *cobra.Command, args []string, _ string) ([]string, c
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+	rows := fleetRows(tmux.ParseSessions(tmuxList()), nil) // only r.Name is used
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, r.Name)

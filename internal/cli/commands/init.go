@@ -26,9 +26,22 @@ cache/
 vault/
 `
 
-// RunInit scaffolds the workspace and delivers context for every enabled tool,
-// returning a human-readable summary of what it created/linked.
-func RunInit(dir string, scan bool) ([]string, error) {
+// defaultPrimary is the single tool a bare `init` enables — the user's installed
+// default (claude when present), keeping a fresh workspace minimal rather than
+// turning on every CLI on the machine.
+func defaultPrimary(manifests map[string]adapter.Manifest) string {
+	detected := detect.InstalledKeys(manifests)
+	if len(detected) == 0 || contains(detected, fallbackTool) {
+		return fallbackTool
+	}
+	return detected[0]
+}
+
+// RunInit scaffolds the workspace and enables the given tools (nil = a minimal
+// single-tool default), delivering context only when the workspace actually
+// needs sloop's portable layer (see needsCanonical). Returns a summary of what
+// it created/linked.
+func RunInit(dir string, tools []string, scan bool) ([]string, error) {
 	sloopDir := filepath.Join(dir, config.SloopDirName)
 	for _, sub := range []string{"skills", "vault"} {
 		if err := os.MkdirAll(filepath.Join(sloopDir, sub), 0o700); err != nil {
@@ -36,33 +49,30 @@ func RunInit(dir string, scan bool) ([]string, error) {
 		}
 	}
 
-	// Detect installed known tools; always ensure claude is usable.
 	manifests, err := adapter.Load()
 	if err != nil {
 		return nil, err
 	}
-	enabled := detect.InstalledKeys(manifests)
-	if len(enabled) == 0 {
-		enabled = []string{fallbackTool}
+	if len(tools) == 0 {
+		tools = []string{defaultPrimary(manifests)}
 	}
-	defaultTool := fallbackTool
-	if !contains(enabled, fallbackTool) {
-		defaultTool = enabled[0]
+	defaultTool := tools[0]
+	if contains(tools, fallbackTool) {
+		defaultTool = fallbackTool
 	}
 
 	if err := config.SaveProject(sloopDir, &config.Project{
-		Tools:       enabled,
+		Tools:       tools,
 		DefaultTool: defaultTool,
 	}); err != nil {
 		return nil, err
 	}
 
-	if scan {
+	// The portable-context layer (AGENTS.md + pointers) is only set up when the
+	// workspace needs it; a lone pointer-mode tool keeps its own context file.
+	canonical := needsCanonical(tools, manifests)
+	if canonical && scan {
 		if _, err := syncpkg.EnsureAgentsContent(dir, scanpkg.Scan(dir).AgentsMarkdown()); err != nil {
-			return nil, err
-		}
-	} else {
-		if _, err := syncpkg.EnsureAgents(dir); err != nil {
 			return nil, err
 		}
 	}
@@ -71,16 +81,15 @@ func RunInit(dir string, scan bool) ([]string, error) {
 		return nil, err
 	}
 
-	// Deliver native context (pointer files like CLAUDE.md + skills links) for
-	// every enabled tool, so the workspace is usable right after init — not only
-	// after the first `sloop sync`/`run`. Best-effort per tool.
+	// Deliver context (when canonical) + skills links for every enabled tool, so
+	// the workspace is usable right after init. Best-effort per tool.
 	var summary []string
-	for _, tool := range enabled {
+	for _, tool := range tools {
 		m, ok := manifests[tool]
 		if !ok {
 			continue
 		}
-		log, err := syncOne(dir, sloopDir, m, false)
+		log, err := syncOne(dir, sloopDir, m, false, canonical)
 		if err != nil {
 			return nil, err
 		}
@@ -90,6 +99,9 @@ func RunInit(dir string, scan bool) ([]string, error) {
 		if initScaffold {
 			for _, d := range m.Scaffold {
 				target := filepath.Join(dir, d)
+				if _, err := os.Stat(target); err == nil {
+					continue // already there — don't claim to have scaffolded it
+				}
 				if err := os.MkdirAll(target, 0o755); err != nil {
 					return nil, err
 				}
@@ -121,7 +133,85 @@ func RunInit(dir string, scan bool) ([]string, error) {
 var (
 	initScan     bool
 	initScaffold bool
+	initTools    string
 )
+
+// resolveInitTools decides which tools `init` enables: the explicit --tools list
+// if given, else an interactive per-tool prompt (every detected tool is asked, the
+// primary defaulted on), else a minimal single-tool default. r==nil means
+// non-interactive. Keeps a fresh workspace from turning on every CLI installed.
+func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest, r *bufio.Reader, ix Interaction) []string {
+	if initTools != "" {
+		var out []string
+		for _, t := range strings.Split(initTools, ",") {
+			t = strings.TrimSpace(t)
+			if t == "" {
+				continue
+			}
+			if _, has := manifests[t]; !has {
+				cmd.Printf("%s\n", tui.Grey("ignoring unknown tool: "+t))
+				continue
+			}
+			if !contains(out, t) {
+				out = append(out, t)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+
+	detected := detect.InstalledKeys(manifests)
+	if len(detected) == 0 {
+		detected = []string{fallbackTool}
+	}
+	primary := defaultPrimary(manifests)
+
+	if r == nil {
+		return []string{primary} // minimal default
+	}
+
+	// Ask about every detected tool (including the primary — it isn't always
+	// Claude), primary first and defaulted on so a quick Enter keeps it simple.
+	cmd.Printf("Detected tools: %s\n", strings.Join(detected, ", "))
+	var selected []string
+	for _, t := range primaryFirst(detected, primary) {
+		if ix.Ask("Use "+displayTool(t, manifests)+" in this workspace?", t == primary, r, cmd.OutOrStdout()) {
+			selected = append(selected, t)
+		}
+	}
+	if len(selected) == 0 {
+		cmd.Println(tui.Grey("none selected — enabling " + displayTool(primary, manifests)))
+		selected = []string{primary}
+	}
+	return selected
+}
+
+// primaryFirst returns detected tools with the primary moved to the front, so the
+// most-likely tool (e.g. Claude) is the first one init asks about.
+func primaryFirst(detected []string, primary string) []string {
+	out := make([]string, 0, len(detected))
+	if contains(detected, primary) {
+		out = append(out, primary)
+	}
+	for _, t := range detected {
+		if t != primary {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// hooksNeeded reports whether any enabled tool's status hooks aren't installed.
+func hooksNeeded(root string, tools []string, manifests map[string]adapter.Manifest) bool {
+	for _, t := range tools {
+		m := manifests[t]
+		if hookInstaller(m.Hooks.Install) != nil && !hooksInstalledFor(root, m) {
+			return true
+		}
+	}
+	return false
+}
 
 var initCmd = &cobra.Command{
 	Use:   "init",
@@ -131,27 +221,34 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		manifests, _ := adapter.Load()
 
-		// Interactive onboarding: when on a real terminal and not under
-		// --auto/--no-input, walk a new user through the choices. Otherwise keep
-		// the scriptable behavior (flags only).
-		wantHooks := false
+		// One reader for the whole interactive flow (two readers on stdin would
+		// race over buffered input).
+		var r *bufio.Reader
+		var ix Interaction
 		if interactiveInit(cmd) {
-			r := bufio.NewReader(os.Stdin)
-			ix := initInteraction(cmd)
-			manifests, _ := adapter.Load()
-			det := detect.InstalledKeys(manifests)
-			if len(det) == 0 {
-				det = []string{fallbackTool}
+			r = bufio.NewReader(os.Stdin)
+			ix = initInteraction(cmd)
+		}
+		tools := resolveInitTools(cmd, manifests, r, ix)
+		canonical := needsCanonical(tools, manifests)
+
+		// Only ask about work that isn't already done.
+		wantHooks := false
+		if r != nil {
+			if canonical && syncpkg.AgentsState(cwd) != "ok" {
+				initScan = ix.Ask("Pre-fill AGENTS.md from your codebase?", true, r, cmd.OutOrStdout())
 			}
-			cmd.Printf("Detected tools: %s\n", strings.Join(det, ", "))
-			cmd.Println(tui.Grey("(edit .sloop/config.yaml later to change which are enabled)"))
-			initScan = ix.Ask("Pre-fill AGENTS.md from your codebase?", true, r, cmd.OutOrStdout())
-			initScaffold = ix.Ask("Create each tool's standard folders?", false, r, cmd.OutOrStdout())
-			wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())
+			// Scaffolding provider folders isn't asked: tools create their own
+			// layout, and sloop already creates the skills dir it needs. It stays
+			// available as the explicit `--scaffold` opt-in.
+			if hooksNeeded(cwd, tools, manifests) {
+				wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())
+			}
 		}
 
-		summary, err := RunInit(cwd, initScan)
+		summary, err := RunInit(cwd, tools, initScan)
 		if err != nil {
 			return err
 		}
@@ -164,7 +261,12 @@ var initCmd = &cobra.Command{
 				cmd.Printf("  %s\n", l)
 			}
 		}
-		cmd.Println("Next: edit AGENTS.md, then `sloop run`.")
+		if canonical {
+			cmd.Println("Next: edit AGENTS.md, then `sloop run`.")
+		} else {
+			cmd.Printf("Next: %s keeps its own context (e.g. run it and `/init`). sloop manages the fleet & skills here.\n",
+				displayTool(tools[0], manifests))
+		}
 		hints.Show(cmd.OutOrStdout(), "init")
 		return nil
 	},
@@ -218,7 +320,8 @@ func installHooksForEnabled(root string) []string {
 
 func RegisterInit(cmd *cobra.Command) {
 	initCmd.Flags().BoolVarP(&initScan, "scan", "s", false, "scan the existing codebase to pre-fill AGENTS.md")
-	initCmd.Flags().BoolVarP(&initScaffold, "scaffold", "S", false, "also create each enabled tool's standard folders (.claude/skills, .cursor/rules, …)")
+	initCmd.Flags().BoolVarP(&initScaffold, "scaffold", "S", false, "opt-in: also create each enabled tool's standard folders (.claude/skills, .cursor/rules, …); off by default since tools create their own")
+	initCmd.Flags().StringVar(&initTools, "tools", "", "comma-separated tools to enable for this workspace (default: your primary tool)")
 	cmd.AddCommand(initCmd)
 }
 

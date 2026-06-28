@@ -12,7 +12,8 @@ import (
 func TestRunSyncWritesClaudeMd(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	// Two tools → canonical, so claude gets a CLAUDE.md pointer to AGENTS.md.
+	if _, err := RunInit(dir, []string{"claude", "cursor"}, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	written, err := RunSync(dir, "claude", false)
@@ -32,7 +33,7 @@ func TestRunSyncWritesClaudeMd(t *testing.T) {
 func TestRunSyncAllDeliversEnabledTools(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	// Enable claude + cursor.

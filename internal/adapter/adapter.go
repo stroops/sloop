@@ -95,6 +95,30 @@ type Manifest struct {
 	// can create (e.g. .claude/skills, .cursor/rules), so users start from the
 	// provider's expected layout instead of an ad-hoc one.
 	Scaffold []string `yaml:"scaffold"`
+	// Readiness declares extra best-practice checks for `sloop check`, sourced
+	// from the provider's own docs — so the checklist deepens by editing data.
+	Readiness ReadinessSpec `yaml:"readiness"`
+}
+
+// ReadinessSpec is a provider's best-practice checklist for `sloop check`. Docs
+// is the source these criteria come from (the provider's own guidance), so each
+// check is attributable, not sloop's opinion.
+type ReadinessSpec struct {
+	Docs   string           `yaml:"docs"`
+	Checks []ReadinessCheck `yaml:"checks"`
+}
+
+// ReadinessCheck is one declarative, filesystem-detectable best practice. Kind is
+// "file-exists" | "dir-exists" | "git-tracked"; Path is repo-relative. Optional
+// checks surface as advisory info (not counted as a gap) so power-user features
+// don't nag a basic setup.
+type ReadinessCheck struct {
+	ID       string `yaml:"id"`
+	Label    string `yaml:"label"`
+	Kind     string `yaml:"kind"`
+	Path     string `yaml:"path"`
+	Fix      string `yaml:"fix"`
+	Optional bool   `yaml:"optional"`
 }
 
 func LoadBuiltin() (map[string]Manifest, error) {

@@ -8,7 +8,7 @@ import (
 func TestRunStatusShowsWorkspaceAndStale(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	var b strings.Builder
@@ -24,7 +24,7 @@ func TestRunStatusShowsWorkspaceAndStale(t *testing.T) {
 func TestRunLsListsWorkspace(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 	var b strings.Builder

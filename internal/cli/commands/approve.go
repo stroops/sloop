@@ -23,7 +23,7 @@ func RunApprove(w io.Writer, in io.Reader, targets []string, all, waiting, yes b
 	// Enrich first so each row has a Status; selectSessions does its own
 	// filterWaiting for the --waiting case (mirrors kill). Pre-filtering here
 	// would run before Status is set and drop every row.
-	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
 	sel, err := selectSessions(rows, targets, all, waiting)
 	if err != nil {
 		return nil, err

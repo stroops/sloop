@@ -59,7 +59,8 @@ func RunSend(target, msg string) error {
 	if !tmux.Available() {
 		return fmt.Errorf("tmux is not installed; `sloop send` needs tmux")
 	}
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+	manifests, _ := adapter.Load()
+	rows := fleetRows(tmux.ParseSessions(tmuxList()), manifests)
 	row, err := resolveTarget(rows, target)
 	if err != nil {
 		return err
@@ -77,7 +78,7 @@ func RunSendBroadcast(msg string, all, waiting bool) (int, error) {
 		return 0, fmt.Errorf("tmux is not installed; `sloop send` needs tmux")
 	}
 	manifests, _ := adapter.Load()
-	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
 	if waiting {
 		rows = filterWaiting(rows)
 	}

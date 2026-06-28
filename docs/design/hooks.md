@@ -1,14 +1,24 @@
 # Hooks — status today, portable workflow automation next
 
 AI CLIs expose **hooks**: events that fire at points in a session (per-session, per-turn, per
-tool-call) where a command can observe, react, or block. Sloop uses hooks two ways — and keeping the
-two cleanly separated is the whole design.
+tool-call) where a command can observe, react, or block. Sloop uses hooks three ways — and keeping
+them cleanly separated is the whole design:
 
-> **Status hooks** ship today. **Workflow hooks** are a v0.2.0 proposal — this doc is the contract to
-> review *before* it's built. Command reference for status hooks: [USAGE.md](../guide/USAGE.md); the install
-> mechanism: [ADAPTERS.md §Hook install strategies](../reference/ADAPTERS.md).
+1. **Status hooks** (shipped) — observe state for `sloop ps`.
+2. **Workflow hooks** (v0.2.0 proposal) — run the user's portable automation.
+3. **Context-inject hooks** (proposal) — deliver sloop's portable context / memory into a session at
+   `SessionStart`, without writing into the tool's own context file.
 
-## Two kinds of hook (don't conflate them)
+> **Status hooks** ship today. **Workflow hooks** and **context-inject hooks** are proposals — this doc
+> is the contract to review *before* they're built. Command reference for status hooks:
+> [USAGE.md](../guide/USAGE.md); the install mechanism:
+> [ADAPTERS.md §Hook install strategies](../reference/ADAPTERS.md).
+
+## Status vs. workflow hooks (don't conflate them)
+
+These two write into the *same* provider config, so the bulk of the design is keeping them apart.
+(Context-inject hooks live on a different event and are read-only, so they don't share this hazard —
+see their own section below.)
 
 | | **Status hooks** (shipped) | **Workflow hooks** (v0.2.0) |
 |---|---|---|
@@ -40,6 +50,28 @@ writes a short-lived marker under `~/.sloop/state` that `sloop ps` prefers over 
 (15-min TTL, so it never goes stale). Per-provider event→state mapping and the install strategy live
 in the adapter manifest. Auto-install today: **claude, gemini, cursor**; **copilot, codex** are
 `print+paste` pending a matcher-aware model (below). See [ADAPTERS.md](../reference/ADAPTERS.md).
+
+### Privacy: status hooks never read your session
+
+This is a deliberate boundary and a promise we make to users. Sloop's status hook emits **one state
+word** — `waiting` / `working` / `idle` plus a timestamp — into a local marker file. It does **not**:
+
+- read the prompt or the model's response,
+- read file contents or tool inputs,
+- make any network call.
+
+Contrast a typical lifecycle bridge (e.g. the `claude-code-warp` plugin), whose `Stop` hook *reads the
+session, extracts the last prompt + response, and ships a summary* to an external notification center.
+That is a real content-exfiltration surface; sloop's fleet awareness deliberately stays at the
+state-enum level, so "sloop knows an agent is idle" never means "sloop read what it was doing."
+
+The wiring is auditable end to end: `sloop hooks print` shows the exact line that gets added, the
+command is literally `sloop hooks emit <state>`, it installs into `settings.local.json` (not
+committed), the merge is idempotent, and any hand-written ("foreign") hooks in the file are preserved.
+
+The only surface that *does* execute arbitrary code is **workflow hooks** (below) — which is exactly
+why they are gated behind a lockfile + checksum + review-before-run, and why the internal status
+callback is namespaced as `hooks emit` rather than a bare top-level `hook`.
 
 ## Workflow hooks (v0.2.0 proposal)
 
@@ -93,6 +125,43 @@ runs on a teammate's machine. So, unlike skills, the library needs:
 - Commit-policy hooks go through standard **git hooks** (`.git/hooks/commit-msg`), not by wrapping the
   AI tool.
 - Each definition declares its target mechanism; sloop installs into that and nowhere else.
+
+## Context-inject hooks — the memory/vault bridge (proposal)
+
+Today sloop delivers portable context by **writing files**: `AGENTS.md` plus per-tool pointers
+(`CLAUDE.md`, etc.). That works, but it has two limits: it touches files the provider considers its
+own, and it's static — it can't reflect what the workspace has *learned* between sessions.
+
+A `SessionStart` hook is the third delivery channel, and it's the one that unlocks the **memory /
+vault** direction (design to live in `docs/design/memory.md`). The pattern is the
+Superpowers one: register a single read-only hook that, at session start, prints sloop's relevant
+context to stdout — the provider injects that into the session as additional context. Sloop never
+rewrites the user's prompt and never edits the tool's `CLAUDE.md`; it speaks through the provider's
+**own** `SessionStart` mechanism.
+
+```text
+SessionStart  →  `sloop context emit`  →  prints relevant vault/AGENTS context  →  provider injects it
+```
+
+Why this is the right shape for memory:
+
+- **Dynamic, not static.** The hook runs each session, so it can surface what was learned/saved since
+  last time — the static `AGENTS.md` can't.
+- **Provider-respecting.** It's the *third* way the user asked about ("write into AGENTS.md, or
+  CLAUDE.md, or through our hooks") — and the only one that doesn't write into the tool's files.
+- **Same trust posture as status hooks.** Injection is **read-only and outbound-only**: sloop emits
+  context it already owns under `.sloop/`; it does not read the session. No new exfiltration surface.
+- **No bundled LLM.** Selection of "relevant" context stays plumbing (recency, the active workspace,
+  simple matching). Any real retrieval is delegated to the agent — sloop is not the model.
+
+Open design questions specific to this channel (to be settled in `docs/design/memory.md`, not here):
+
+- What "relevant context" means at session start (whole vault vs. a recency/scoped slice) and the
+  token budget for an injection.
+- How memory gets *written* (a `SessionEnd`/`Stop` capture hook? an explicit `sloop remember`?) — the
+  write path is a separate decision from this read path.
+- Per-provider `SessionStart` support + payload shape in the adapter manifest (which CLIs expose it,
+  and whether non-supporting tools fall back to the file-pointer delivery).
 
 ## Open questions (feedback wanted before the build)
 

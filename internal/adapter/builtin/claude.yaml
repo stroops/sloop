@@ -25,6 +25,19 @@ run:
   models: [opus, sonnet, haiku, fable]
   prompt: positional      # `claude "task"` seeds an interactive session (claude -p exits)
   resume_flag: "--continue"  # `claude --continue` resumes the repo's most recent conversation
+# Extra `sloop check` best practices, sourced from Claude Code's own guidance.
+# These are the filesystem-detectable ones; behavioral tips (explore→plan→code,
+# /clear, verification loops) are intentionally NOT here — they can't be checked
+# mechanically and would only produce false gaps.
+readiness:
+  docs: https://code.claude.com/docs/en/best-practices
+  checks:
+    - id: subagents
+      label: "Subagents folder (.claude/agents) for delegated, isolated tasks"
+      kind: dir-exists
+      path: .claude/agents
+      fix: "sloop init --scaffold"
+      optional: true
 # No `heuristics:` block: Claude's prompts use the cross-tool defaults (see
 # defaultWaitingMarkers/defaultWorkingMarkers in internal/tmux/status.go).
 # Precise status comes from the hooks above; heuristics are only the fallback.

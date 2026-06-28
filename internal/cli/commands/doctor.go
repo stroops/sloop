@@ -9,38 +9,47 @@ import (
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/detect"
+	"github.com/stroops/sloop/internal/tui"
 )
 
 func RunDoctor(w io.Writer) error {
-	_, _ = fmt.Fprintln(w, "Tools:")
 	manifests, err := adapter.Load()
 	if err != nil {
 		return err
 	}
+
+	// AI provider CLIs (the tools sloop launches). A missing one isn't an error —
+	// you only use some — so it's marked in grey, not alarming red.
+	_, _ = fmt.Fprintln(w, "AI provider CLIs:")
 	for _, s := range detect.Tools(manifests) {
-		mark := "✗"
-		extra := ""
 		if s.Installed {
-			mark = "✓"
+			ver := ""
 			if s.Version != "" {
-				extra = " " + s.Version
+				ver = "  " + tui.Grey(s.Version)
 			}
+			_, _ = fmt.Fprintf(w, "  %s %s%s\n", tui.Green("✓"), s.Key, ver)
+		} else {
+			_, _ = fmt.Fprintf(w, "  %s %s %s\n", tui.Grey("✗"), s.Key, tui.Grey("(not installed)"))
 		}
-		_, _ = fmt.Fprintf(w, "  %s %s%s\n", mark, s.Key, extra)
 	}
 
-	tmux := detect.Tmux()
-	mark := "✗ (optional — exec fallback in use)"
-	if tmux.Installed {
-		mark = "✓ " + tmux.Version
+	// Multiplexer is its own group: it powers ps/run/attach, but is optional.
+	_, _ = fmt.Fprintln(w, "\nMultiplexer (powers ps / run / attach):")
+	if tmux := detect.Tmux(); tmux.Installed {
+		_, _ = fmt.Fprintf(w, "  %s tmux %s\n", tui.Green("✓"), tui.Grey(tmux.Version))
+	} else {
+		_, _ = fmt.Fprintf(w, "  %s %s\n", tui.Grey("✗"), tui.Grey("tmux not found — optional; sloop falls back to plain exec"))
 	}
-	_, _ = fmt.Fprintf(w, "tmux: %s\n", mark)
 
 	g, err := config.LoadGlobal()
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(w, "mode: %s\n", g.Mode)
+	desc := "asks before actions"
+	if g.Mode == config.ModeAuto {
+		desc = "runs without prompts (assume yes)"
+	}
+	_, _ = fmt.Fprintf(w, "\nMode: %s %s\n", g.Mode, tui.Grey("— "+desc))
 	return nil
 }
 

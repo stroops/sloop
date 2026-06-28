@@ -28,7 +28,11 @@ func ReadLine(prompt string) (string, bool) {
 	var buf []byte
 	in := make([]byte, 16)
 	for {
-		n, _ := os.Stdin.Read(in)
+		n, err := os.Stdin.Read(in)
+		if err != nil {
+			fmt.Print("\r\n")
+			return "", false // stdin closed / hard error → cancel, like Esc (never spin)
+		}
 		if n == 0 {
 			continue
 		}
@@ -74,7 +78,10 @@ func Confirm(prompt string) bool {
 	fmt.Print(prompt)
 	in := make([]byte, 1)
 	for {
-		n, _ := os.Stdin.Read(in)
+		n, err := os.Stdin.Read(in)
+		if err != nil {
+			return false // stdin closed / hard error → treat as "no" (never spin)
+		}
 		if n == 0 {
 			continue
 		}
