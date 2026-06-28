@@ -99,7 +99,7 @@ func launchWorkspaceDefault(startDir string) error {
 	if err != nil {
 		return err
 	}
-	return RunRun(startDir, "", "", "", "", "", nil, selectRunner(ws.Name, plan.toolKey))
+	return RunRun(startDir, "", "", "", "", "", nil, nil, "", selectRunner(ws.Name, plan.toolKey))
 }
 
 func RunLs(w io.Writer) error {

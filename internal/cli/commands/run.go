@@ -157,8 +157,10 @@ func buildRunArgs(m adapter.Manifest, model, effort, task string, passthrough []
 }
 
 // RunRun resolves the target + model/effort/task flags, syncs context, then
-// launches the CLI with the right flags in a managed session.
-func RunRun(startDir, target, provider, model, effort, task string, passthrough []string, r runner.Runner) error {
+// launches the CLI with the right flags in a managed session. env is injected
+// into the launched process (e.g. a second account's CLAUDE_CONFIG_DIR), and
+// instance records which named instance this session is.
+func RunRun(startDir, target, provider, model, effort, task string, passthrough []string, env map[string]string, instance string, r runner.Runner) error {
 	ws, err := workspace.Resolve(startDir)
 	if err != nil {
 		return err
@@ -187,12 +189,12 @@ func RunRun(startDir, target, provider, model, effort, task string, passthrough 
 	}
 
 	// Record session (best-effort: never block the launch).
-	sessID, store := recordSessionBestEffort(ws, plan.toolKey, target)
+	sessID, store := recordSessionBestEffort(ws, plan.toolKey, instance)
 	if store != nil {
 		defer func() { _ = store.Close() }()
 	}
 
-	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch, Args: args})
+	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch, Args: args, Env: env})
 
 	if store != nil && sessID > 0 {
 		_ = store.EndSession(sessID, time.Now())
@@ -287,12 +289,27 @@ var (
 	runModel     string
 	runEffort    string
 	runTask      string
+	runName      string
+	runEnv       []string
+	runNew       bool
 )
 
 var runCmd = &cobra.Command{
-	Use:     "run [tool|profile ...] [-- <args>]",
+	Use:     "run [tool | @profile | tool@instance] [-- <args>]",
 	Aliases: []string{"r"},
 	Short:   "Sync context and launch an AI tool in the workspace (--split for side-by-side panes)",
+	Long: `Sync context and launch an AI tool in the workspace.
+
+Run a second agent of the same provider with a named instance, or a different
+account with a saved profile:
+
+  sloop run claude            # the workspace's claude (re-attaches if running)
+  sloop run claude --new      # a fresh claude instance (claude·2, claude·3, …)
+  sloop run claude@review     # an ad-hoc instance named "review"
+  sloop run @sec              # the "sec" profile (e.g. a second account)
+
+Profiles live in ~/.sloop/config.yaml; manage them with ` + "`sloop profile`" + `.
+Use --env KEY=VAL for a one-off account/env without saving a profile.`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		n := len(args)
 		if d := cmd.ArgsLenAtDash(); d >= 0 {
@@ -347,11 +364,27 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		plan, err := planLaunch(target, runProvider, runModel, runEffort, proj.DefaultTool, manifests)
+		// Interpret @profile / tool@instance and fold in --name/--env, then plan
+		// against the resolved tool token.
+		glob, err := config.LoadGlobal()
 		if err != nil {
 			return err
 		}
-		if err := RunRun(startDir, target, runProvider, runModel, runEffort, runTask, passthrough, selectRunner(ws.Name, plan.toolKey)); err != nil {
+		res, err := resolveInstance(target, runName, runEnv, glob.Profiles, manifests)
+		if err != nil {
+			return err
+		}
+		plan, err := planLaunch(res.target, runProvider, runModel, runEffort, proj.DefaultTool, manifests)
+		if err != nil {
+			return err
+		}
+		// --new spins a fresh instance (next free slot) instead of re-attaching;
+		// it's a no-op once a name/instance already makes the session distinct.
+		if runNew && res.instance == "" {
+			res.instance = nextFreeInstance(ws.Name, plan.toolKey, tmux.ParseSessions(tmuxList()))
+		}
+		r := selectRunnerInstance(ws.Name, plan.toolKey, res.instance)
+		if err := RunRun(startDir, res.target, runProvider, runModel, runEffort, runTask, passthrough, res.env, res.instance, r); err != nil {
 			return err
 		}
 		hints.Show(cmd.OutOrStdout(), "run")
@@ -366,6 +399,9 @@ func RegisterRun(cmd *cobra.Command) {
 	runCmd.Flags().StringVarP(&runModel, "model", "m", "", "model to pass to the CLI (forwarded as-is, not validated)")
 	runCmd.Flags().StringVarP(&runEffort, "effort", "e", "", "reasoning effort: low|medium|high (if the CLI supports it)")
 	runCmd.Flags().StringVarP(&runTask, "task", "t", "", "hand the agent an initial task — launches an interactive session already working on it")
+	runCmd.Flags().StringVarP(&runName, "name", "n", "", "name this instance so a second agent of the same tool gets its own session")
+	runCmd.Flags().StringArrayVar(&runEnv, "env", nil, "extra env for the launched tool, KEY=VAL (e.g. a second account's CLAUDE_CONFIG_DIR); repeatable")
+	runCmd.Flags().BoolVarP(&runNew, "new", "N", false, "start a fresh instance (next free slot) instead of re-attaching the existing session")
 	runCmd.ValidArgsFunction = completeTools
 	_ = runCmd.RegisterFlagCompletionFunc("workspace", completeWorkspaces)
 	_ = runCmd.RegisterFlagCompletionFunc("provider", completeTools)
