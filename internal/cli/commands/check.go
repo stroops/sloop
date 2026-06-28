@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -14,6 +16,33 @@ import (
 	"github.com/stroops/sloop/internal/tui"
 	"github.com/stroops/sloop/internal/workspace"
 )
+
+// git helpers are seams (overridable in tests) so the checklist can verify a
+// file is committed without a real repo in the test.
+var (
+	inGitRepo = func(root string) bool {
+		return exec.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree").Run() == nil
+	}
+	gitTracked = func(root, path string) bool {
+		return exec.Command("git", "-C", root, "ls-files", "--error-unmatch", "--", path).Run() == nil
+	}
+)
+
+// evalReadiness evaluates one declarative manifest check against the filesystem.
+func evalReadiness(root string, c adapter.ReadinessCheck) bool {
+	p := filepath.Join(root, c.Path)
+	switch c.Kind {
+	case "file-exists":
+		fi, err := os.Stat(p)
+		return err == nil && !fi.IsDir()
+	case "dir-exists":
+		fi, err := os.Stat(p)
+		return err == nil && fi.IsDir()
+	case "git-tracked":
+		return inGitRepo(root) && gitTracked(root, c.Path)
+	}
+	return false
+}
 
 // checkItem is one readiness line: whether it passed, a label, and the command
 // that fixes it when it hasn't. Info items are advisory (not counted as a gap).
@@ -34,11 +63,21 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 	var items []checkItem
 
 	// Workspace-level basics.
+	agentsOK := syncpkg.AgentsState(root) == "ok"
 	items = append(items, checkItem{
-		OK:    syncpkg.AgentsState(root) == "ok",
+		OK:    agentsOK,
 		Label: "AGENTS.md present (canonical context)",
 		Fix:   "sloop init",
 	})
+	// Canonical context should be committed so the team shares it (a best practice
+	// every provider echoes). Only meaningful once it exists and we're in a repo.
+	if agentsOK && inGitRepo(root) {
+		items = append(items, checkItem{
+			OK:    gitTracked(root, "AGENTS.md"),
+			Label: "AGENTS.md committed to git (shared with your team)",
+			Fix:   "git add AGENTS.md && git commit",
+		})
+	}
 	_, hasDefault := manifests[proj.DefaultTool]
 	items = append(items, checkItem{
 		OK:    proj.DefaultTool != "" && hasDefault,
@@ -79,6 +118,19 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 				items = append(items, checkItem{OK: true, Label: m.Name + ": status hooks installed"})
 			} else {
 				items = append(items, checkItem{Label: m.Name + ": status hooks not installed", Fix: "sloop hooks install " + t})
+			}
+		}
+
+		// Extra best practices declared in the manifest (sourced from the provider's
+		// own docs). Optional ones are advisory so power-user features don't nag.
+		for _, rc := range m.Readiness.Checks {
+			switch {
+			case evalReadiness(root, rc):
+				items = append(items, checkItem{OK: true, Label: m.Name + ": " + rc.Label})
+			case rc.Optional:
+				items = append(items, checkItem{Info: true, Label: m.Name + ": " + rc.Label + " (optional)"})
+			default:
+				items = append(items, checkItem{Label: m.Name + ": " + rc.Label, Fix: rc.Fix})
 			}
 		}
 	}
@@ -129,6 +181,17 @@ func RunCheck(startDir string, w io.Writer) error {
 		return err
 	}
 	renderChecklist(w, ws.Name, readinessChecklist(ws.Root, ws.SloopDir(), proj, manifests))
+
+	// Cite the source of each provider's extra criteria, so the checklist reads as
+	// "X's own best practices", not sloop's opinion.
+	seen := map[string]bool{}
+	for _, t := range proj.Tools {
+		m := manifests[t]
+		if m.Readiness.Docs != "" && !seen[m.Readiness.Docs] {
+			seen[m.Readiness.Docs] = true
+			_, _ = fmt.Fprintf(w, "%s %s — %s\n", tui.Grey("  learn more:"), m.Name, tui.Grey(m.Readiness.Docs))
+		}
+	}
 	return nil
 }
 
