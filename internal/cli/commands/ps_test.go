@@ -32,9 +32,9 @@ func TestFleetRowsFiltersAndSplits(t *testing.T) {
 func TestSplitSession(t *testing.T) {
 	m := map[string]adapter.Manifest{"claude": {}, "cursor": {}}
 	cases := []struct {
-		name                   string
-		in                     string
-		manifests              map[string]adapter.Manifest
+		name                    string
+		in                      string
+		manifests               map[string]adapter.Manifest
 		wantWs, wantTool, wInst string
 	}{
 		{"legacy two-segment", "repo__claude", m, "repo", "claude", ""},
