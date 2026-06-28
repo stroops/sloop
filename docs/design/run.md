@@ -90,7 +90,8 @@ run:
     low: ""
     medium: ""
     high: ""
-  models: [opus, sonnet, haiku]   # model aliases this CLI serves (Phase 2 bare-model resolution)
+  models: [opus, sonnet, haiku, fable]   # model aliases this CLI serves (for completion + Phase 2;
+                                         # full API strings like claude-opus-4-8 still work via forward)
 ```
 
 **No separate model catalog file.** Model aliases live in the manifest's `run.models`, so the
@@ -100,8 +101,17 @@ binary and overridable the same way as any manifest (`~/.sloop/adapters/<tool>.y
 The alias's vendor is implied by its home CLI's `run.vendor` — no global `models.yaml` to maintain.
 
 **What sloop deliberately does *not* do:** keep a full, churning model catalog (ids, pricing, context
-windows), nor **validate** the model. It learns just enough to pick the CLI, then **forwards the model
-string to the CLI**, letting the CLI accept or reject it. Light, and resilient to new models.
+windows), nor **validate** the model — model selection is the CLI's own step; sloop only offers a
+nice-to-have shortcut. It learns just enough (a small curated alias list) to pick the CLI and power
+completion, then **forwards the model string to the CLI** (alias *or* full API id), letting the CLI
+accept or reject it. Light, and resilient to new models.
+
+**Why not persist models in SQLite?** The alias set is small, shared, and ships with the binary — it's
+*reference* data (manifest), not *runtime* state. SQLite holds accumulated per-machine data (sessions,
+fleet), not a model list that would need seeding/migrating per release. Dynamically discovering a
+tool's models — via the tool's *own* `list`-style command (provider-respecting, never the vendor API),
+cached with a TTL — is a possible later nicety for CLIs with large/volatile model sets. It's **opt-in
+and parked**; curated aliases cover the common case at zero runtime cost.
 
 > **User preference vs. reference knowledge.** The `run.*`/`models` above is *provider reference
 > knowledge* (manifest). A user's own default — "this repo defaults to sonnet at high effort" — is
