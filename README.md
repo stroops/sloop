@@ -160,6 +160,7 @@ agents — to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` t
 | `hooks install\|list\|print [tool]` | — | — | Wire a tool's own hooks so `ps` status is authoritative. |
 | `tools` | — | — | Capability matrix (context / skills / hooks per tool). |
 | `status` | `st` | — | One-screen workspace summary. |
+| `check` | — | — | AI-readiness checklist for the workspace (AGENTS.md, context, skills, hooks) with a fix command per gap. |
 | `ls` | — | — | Registered workspaces + recent sessions. |
 | `doctor` | — | — | Environment health (tools, multiplexer, mode). |
 | `hints [list\|on\|off]` | — | — | Contextual education tips (en/vi). |
