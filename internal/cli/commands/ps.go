@@ -387,23 +387,17 @@ var psCmd = &cobra.Command{
 			return runPsAll(cmd.OutOrStdout(), rows, paths, ext)
 		}
 
-		if len(rows) == 0 {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces).")
-			externalNudge(cmd.OutOrStdout(), ext)
-			return nil
-		}
-
-		if psWaiting {
-			rows = filterWaiting(rows)
+		// Non-interactive (piped, CI): print the plain listing instead of the
+		// raw-mode control center, which can't run without a tty.
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			if psWaiting {
+				rows = filterWaiting(rows)
+			}
 			if len(rows) == 0 {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "⚓ No agents waiting on you.")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), emptyFleetMessage(psWaiting))
+				externalNudge(cmd.OutOrStdout(), ext)
 				return nil
 			}
-		}
-
-		// Non-interactive (piped, CI): print the plain listing instead of the
-		// raw-mode menu, which can't run without a tty.
-		if !term.IsTerminal(int(os.Stdin.Fd())) {
 			if err := RunPs(cmd.OutOrStdout(), rows); err != nil {
 				return err
 			}
@@ -412,40 +406,75 @@ var psCmd = &cobra.Command{
 			return nil
 		}
 
-		wsW, toolW, waiting := columnWidths(rows)
-
-		var options []string
-		for _, r := range rows {
-			dot, label := statusDot(r)
-			line := fmt.Sprintf("%s %-*s %-*s %-16s %s",
-				dot, wsW, r.Workspace, toolW, r.Tool, label, shortSince(r.Activity))
-			if b := bottomLine(r); b != "" {
-				line += "\r\n└ " + tui.Grey(b)
+		// Interactive control center: loop so an action (send/answer/kill) or
+		// cancelling returns to the fleet instead of dropping to the shell. The
+		// fleet is re-read each pass, so kills and new sessions show immediately.
+		for {
+			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+			sortNeedsAttention(rows)
+			annotatePaths(rows, registryPaths())
+			if psWaiting {
+				rows = filterWaiting(rows)
 			}
-			options = append(options, line)
-		}
+			if len(rows) == 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), emptyFleetMessage(psWaiting))
+				break
+			}
 
-		header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
-		if waiting > 0 {
-			header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
-		}
-		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q quit")
+			wsW, _, waiting := columnWidths(rows)
+			toolNames := make([]string, len(rows))
+			toolW := 0
+			for i, r := range rows {
+				toolNames[i] = displayTool(r.Tool, manifests)
+				if len(toolNames[i]) > toolW {
+					toolW = len(toolNames[i])
+				}
+			}
+			var options []string
+			for i, r := range rows {
+				dot, label := statusDot(r)
+				line := fmt.Sprintf("%s %-*s %-*s %-16s %s",
+					dot, wsW, r.Workspace, toolW, toolNames[i], label, shortSince(r.Activity))
+				if b := bottomLine(r); b != "" {
+					line += "\r\n└ " + tui.Grey(b)
+				}
+				options = append(options, line)
+			}
 
-		actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-		idx, key, err := tui.SelectAction(prompt, options, actionKeys)
-		if err != nil {
-			return err
-		}
-		switch key {
-		case 13: // Enter → jump
-			return jumpToFleet(rows, idx+1)
-		case 's': // send a quick prompt to the highlighted session
-			return promptAndSend(cmd, rows[idx])
-		case 'x': // kill the highlighted session (with confirm)
-			return confirmAndKill(cmd, rows[idx])
-		default:
-			if a, ok := matchAnswer(rows[idx], key); ok { // one-key answer
-				return sendAnswer(cmd, rows[idx], a)
+			header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
+			if waiting > 0 {
+				header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
+			}
+			legend := tui.Grey("  ● working/waiting · ○ idle · trailing age = since last activity")
+			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q quit")
+			prompt := header + "\r\n" + legend + "\r\n" + keys
+
+			actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
+			idx, key, err := tui.SelectAction(prompt, options, actionKeys)
+			if err != nil {
+				return err
+			}
+			switch key {
+			case 0: // q / Esc / Ctrl-C → leave the control center
+				externalNudge(cmd.OutOrStdout(), ext)
+				hints.Show(cmd.OutOrStdout(), "ps")
+				return nil
+			case 13: // Enter → attach (replaces this process)
+				return jumpToFleet(rows, idx+1)
+			case 's': // send a quick prompt; empty cancels back to the fleet
+				if err := promptAndSend(cmd, rows[idx]); err != nil {
+					return err
+				}
+			case 'x': // kill the highlighted session (with confirm)
+				if err := confirmAndKill(cmd, rows[idx]); err != nil {
+					return err
+				}
+			default:
+				if a, ok := matchAnswer(rows[idx], key); ok { // one-key answer
+					if err := sendAnswer(cmd, rows[idx], a); err != nil {
+						return err
+					}
+				}
 			}
 		}
 		externalNudge(cmd.OutOrStdout(), ext)
@@ -507,7 +536,7 @@ func sendAnswer(cmd *cobra.Command, row FleetRow, a tmux.Answer) error {
 
 // promptAndSend asks for a line and sends it to the row (used by the ps `s` key).
 func promptAndSend(cmd *cobra.Command, row FleetRow) error {
-	msg := promptLine(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("send to %s: ", row.Name))
+	msg := promptLine(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("send to %s (empty to cancel): ", row.Name))
 	if strings.TrimSpace(msg) == "" {
 		return nil
 	}
@@ -528,6 +557,24 @@ func confirmAndKill(cmd *cobra.Command, row FleetRow) error {
 	}
 	cmd.Printf("killed %s\n", row.Name)
 	return nil
+}
+
+// displayTool returns a friendly name for a tool key (the manifest's display
+// name, e.g. "Google Antigravity" for "agy"), falling back to the key for
+// unknown/adopted tools.
+func displayTool(key string, manifests map[string]adapter.Manifest) string {
+	if m, ok := manifests[key]; ok && m.Name != "" {
+		return m.Name
+	}
+	return key
+}
+
+// emptyFleetMessage is the "nothing here" line for ps, tailored to --waiting.
+func emptyFleetMessage(waitingOnly bool) string {
+	if waitingOnly {
+		return "⚓ No agents waiting on you."
+	}
+	return "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces)."
 }
 
 // statusDot renders the agent status as a colored dot plus a label for the
