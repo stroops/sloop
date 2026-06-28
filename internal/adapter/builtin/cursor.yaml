@@ -18,3 +18,5 @@ hooks:
     working: beforeSubmitPrompt
     waiting: ""   # beforeShellExecution fires on every command, not only when blocked — would mislabel; heuristic handles cursor's approval prompts
     idle: stop
+run:
+  model_flag: "--model"   # e.g. agent --model gpt-5 (Cursor is multi-vendor; no bare-model home)
