@@ -166,6 +166,21 @@ func SessionPath(session string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// LaunchDetached creates a detached session running command+args in dir and
+// gives it sloop's per-session status bar, without attaching. Used by `sloop
+// restore` to bring several sessions back at once. No-op if it already exists.
+func LaunchDetached(session, dir, command string, args []string) error {
+	if hasSession(session) {
+		return nil
+	}
+	create := append([]string{"new-session", "-d", "-s", session, "-c", dir, command}, args...)
+	if err := Run(create...); err != nil {
+		return err
+	}
+	SetStatusLine(session)
+	return nil
+}
+
 type Runner struct {
 	Session string
 }

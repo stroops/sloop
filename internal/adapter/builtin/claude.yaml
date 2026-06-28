@@ -24,6 +24,7 @@ run:
   model_flag: "--model"   # accepts opus/sonnet/haiku/fable or a full id (claude-opus-4-8)
   models: [opus, sonnet, haiku, fable]
   prompt: positional      # `claude "task"` seeds an interactive session (claude -p exits)
+  resume_flag: "--continue"  # `claude --continue` resumes the repo's most recent conversation
 # No `heuristics:` block: Claude's prompts use the cross-tool defaults (see
 # defaultWaitingMarkers/defaultWorkingMarkers in internal/tmux/status.go).
 # Precise status comes from the hooks above; heuristics are only the fallback.

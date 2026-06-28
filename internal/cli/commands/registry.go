@@ -29,6 +29,7 @@ func init() {
 	add(RegisterKill)
 	add(RegisterApprove)
 	add(RegisterAdopt)
+	add(RegisterRestore)
 	add(RegisterPopup)
 	add(RegisterStatusline)
 	add(RegisterSkill)

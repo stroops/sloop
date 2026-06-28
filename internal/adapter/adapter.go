@@ -73,6 +73,9 @@ type RunSpec struct {
 	// "positional" appends it as a bare arg, a flag string passes `<flag> <task>`,
 	// "" = the CLI has no initial-task support via sloop.
 	Prompt string `yaml:"prompt"`
+	// ResumeFlag continues the most recent conversation (used by `sloop restore
+	// --resume`); "" = the CLI can't resume.
+	ResumeFlag string `yaml:"resume_flag"`
 }
 
 type Manifest struct {
