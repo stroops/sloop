@@ -196,6 +196,7 @@ hooks:                                          # status hooks for `sloop ps`
 - [docs/USAGE.md](docs/USAGE.md) — hands-on guide, every command with examples
 - [docs/CONFIG.md](docs/CONFIG.md) — the three config layers (local / global / built-in)
 - [docs/ADAPTERS.md](docs/ADAPTERS.md) — the provider-aware adapter contract
+- [docs/run.md](docs/run.md) — `sloop run` design: CLI · model · effort resolution
 - [docs/skills.md](docs/skills.md) — skills model, lockfile, registry roadmap
 - [docs/hooks.md](docs/hooks.md) — status hooks today, workflow-hook design for v0.2.0
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — packages, data flow, internals
