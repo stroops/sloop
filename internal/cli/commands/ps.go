@@ -279,20 +279,38 @@ func jumpToFleet(rows []FleetRow, n int) error {
 	return attachSession(rows[n-1].Name)
 }
 
-// pickFleetSession shows a simple menu of the live fleet and returns the chosen
-// session name ("" if cancelled). Backs the no-argument `sloop attach` so you
-// don't have to type a session name.
-func pickFleetSession(prompt string) (string, error) {
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+// pickFleetSession shows the live fleet and returns the chosen session name ("" if
+// cancelled). Backs the no-argument `sloop attach` so you don't have to type a
+// session name — using the same WORKSPACE/TOOL/STATUS columns, colors and
+// waiting-first order as `ps`, so the picker reads identically to the fleet view.
+func pickFleetSession(title string) (string, error) {
+	manifests, _ := adapter.Load()
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
 	if len(rows) == 0 {
 		return "", fmt.Errorf("no running AI sessions to attach to (start one with `sloop run <tool>`)")
 	}
-	manifests, _ := adapter.Load()
+	sortNeedsAttention(rows)
+
+	wsW, _, _ := columnWidths(rows)
+	if wsW < len("WORKSPACE") {
+		wsW = len("WORKSPACE")
+	}
+	toolW := len("TOOL")
+	for _, r := range rows {
+		if n := len(r.toolName()); n > toolW {
+			toolW = n
+		}
+	}
 	opts := make([]string, len(rows))
 	for i, r := range rows {
-		opts[i] = fmt.Sprintf("%-16s %s", r.Workspace, displayTool(r.Tool, manifests))
+		opts[i] = fmt.Sprintf("%-*s %-*s %s", wsW, r.Workspace, toolW, r.toolName(), statusText(r))
 	}
-	idx, err := tui.SelectMenu(prompt, opts)
+
+	legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
+		tui.Blue("attached") + " · " + tui.Green("idle")
+	cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS"))
+	tui.Clear()
+	idx, err := tui.SelectMenu(title+"\r\n"+legend+"\r\n\r\n"+cols, opts)
 	if err != nil || idx < 0 {
 		return "", err
 	}
