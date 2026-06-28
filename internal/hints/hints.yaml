@@ -128,6 +128,12 @@ hints:
       en: "Inside a session, detach with your tmux prefix then d — the agent keeps working; reattach with `sloop ps`."
       vi: "Trong một session, detach bằng tmux prefix rồi d — agent vẫn làm việc; quay lại bằng `sloop ps`."
 
+  - id: check-readiness
+    context: check
+    text:
+      en: "`sloop check` is a best-practices checklist, not a score — each ✗ comes with the command that fixes it. Re-run after `sloop sync` or `hooks install`."
+      vi: "`sloop check` là checklist best-practice, không phải điểm số — mỗi ✗ kèm lệnh sửa. Chạy lại sau `sloop sync` hoặc `hooks install`."
+
   - id: lang-toggle
     context: general
     text:

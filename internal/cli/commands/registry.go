@@ -23,6 +23,7 @@ func init() {
 	add(RegisterTools)
 	add(RegisterDoctor)
 	add(RegisterStatus)
+	add(RegisterCheck)
 	add(RegisterLs)
 	add(RegisterPs)
 	add(RegisterSend)

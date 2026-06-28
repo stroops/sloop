@@ -204,6 +204,44 @@ func hookInstaller(strategy string) func(path string, events map[string]string) 
 	}
 }
 
+// hooksInstalledFor reports whether a tool's status hooks are already wired into
+// its config file (read-only; reuses the same idempotency check as install).
+// Only meaningful for auto-install strategies; false when the config is absent.
+func hooksInstalledFor(root string, m adapter.Manifest) bool {
+	events := eventCommands(m.Hooks)
+	if len(events) == 0 {
+		return false
+	}
+	path, err := resolveHookConfigPath(root, m.Hooks.Config)
+	if err != nil {
+		return false
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var doc map[string]any
+	if json.Unmarshal(b, &doc) != nil {
+		return false
+	}
+	hooks, _ := doc["hooks"].(map[string]any)
+	for ev, cmd := range events {
+		switch m.Hooks.Install {
+		case "settings-json":
+			if !hasCommandHook(hooks[ev], cmd) {
+				return false
+			}
+		case "cursor-json":
+			if !hasCursorCommand(hooks[ev], cmd) {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
 // expands to the home dir, absolute paths pass through, and a repo-relative path
 // is joined to the workspace root.
