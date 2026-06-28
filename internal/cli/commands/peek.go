@@ -34,7 +34,7 @@ func resolvePeekTarget(args []string) (string, error) {
 		return args[0], nil
 	}
 	manifests, _ := adapter.Load()
-	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
 	if len(rows) == 0 {
 		return "", fmt.Errorf("no running AI sessions to peek (start one with `sloop run <tool>`)")
 	}

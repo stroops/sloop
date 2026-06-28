@@ -38,15 +38,22 @@ type FleetRow struct {
 	Prompt    string           // the question the agent is blocked on (when waiting)
 	Answers   []tmux.Answer    // parsed choices the agent offers (answer in one key)
 	Display   string           // provider display name (e.g. "Google Antigravity" for "agy")
+	Instance  string           // named instance suffix (e.g. "sec" / "2"); "" = the default session
 }
 
 // toolName is the row's provider display name, falling back to the tool key when
 // the row hasn't been enriched (e.g. plain listings built straight from tmux).
+// A named instance is appended (`claude·sec`) so two agents of the same provider
+// in one workspace are distinguishable.
 func (r FleetRow) toolName() string {
+	name := r.Tool
 	if r.Display != "" {
-		return r.Display
+		name = r.Display
 	}
-	return r.Tool
+	if r.Instance != "" {
+		return name + "·" + r.Instance
+	}
+	return name
 }
 
 // registryPaths maps each registered workspace name to its repo path, so the
@@ -79,18 +86,51 @@ func annotatePaths(rows []FleetRow, paths map[string]string) {
 	}
 }
 
-// fleetRows keeps only sloop-named sessions (`<workspace>__<tool>`), splitting
-// on the last `__`, and sorts them by workspace then tool.
-func fleetRows(sessions []tmux.Session) []FleetRow {
+// splitSession parses a sloop session name into workspace, tool, and instance.
+// It is manifest-aware so the tool is found by key rather than by position,
+// which keeps `ws__tool__instance` unambiguous: the tool is the last `__`
+// segment that is a known tool (legacy `ws__tool` → instance ""), else the
+// second-to-last when that is a known tool (→ instance = the last segment).
+// With nil/empty manifests it falls back to the legacy last-`__` split, so
+// callers that only need the name behave exactly as before.
+func splitSession(name string, manifests map[string]adapter.Manifest) (ws, tool, instance string) {
+	parts := strings.Split(name, "__")
+	if len(parts) >= 2 {
+		last := parts[len(parts)-1]
+		if _, ok := manifests[last]; ok {
+			return strings.Join(parts[:len(parts)-1], "__"), last, ""
+		}
+		if len(parts) >= 3 {
+			if mid := parts[len(parts)-2]; hasKey(manifests, mid) {
+				return strings.Join(parts[:len(parts)-2], "__"), mid, last
+			}
+		}
+	}
+	i := strings.LastIndex(name, "__")
+	if i < 0 {
+		return name, "", "" // not a sloop session name
+	}
+	return name[:i], name[i+2:], ""
+}
+
+func hasKey(m map[string]adapter.Manifest, k string) bool {
+	_, ok := m[k]
+	return ok
+}
+
+// fleetRows keeps only sloop-named sessions (containing `__`), splitting each
+// into workspace/tool/instance, and sorts them by workspace, tool, instance.
+func fleetRows(sessions []tmux.Session, manifests map[string]adapter.Manifest) []FleetRow {
 	var rows []FleetRow
 	for _, s := range sessions {
-		i := strings.LastIndex(s.Name, "__")
-		if i < 0 {
+		if !strings.Contains(s.Name, "__") {
 			continue // not a sloop session
 		}
+		ws, tool, instance := splitSession(s.Name, manifests)
 		rows = append(rows, FleetRow{
-			Workspace: s.Name[:i],
-			Tool:      s.Name[i+2:],
+			Workspace: ws,
+			Tool:      tool,
+			Instance:  instance,
 			Name:      s.Name,
 			Attached:  s.Attached,
 			Windows:   s.Windows,
@@ -101,7 +141,10 @@ func fleetRows(sessions []tmux.Session) []FleetRow {
 		if rows[i].Workspace != rows[j].Workspace {
 			return rows[i].Workspace < rows[j].Workspace
 		}
-		return rows[i].Tool < rows[j].Tool
+		if rows[i].Tool != rows[j].Tool {
+			return rows[i].Tool < rows[j].Tool
+		}
+		return rows[i].Instance < rows[j].Instance
 	})
 	return rows
 }
@@ -285,7 +328,7 @@ func jumpToFleet(rows []FleetRow, n int) error {
 // waiting-first order as `ps`, so the picker reads identically to the fleet view.
 func pickFleetSession(title string) (string, error) {
 	manifests, _ := adapter.Load()
-	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
 	if len(rows) == 0 {
 		return "", fmt.Errorf("no running AI sessions to attach to (start one with `sloop run <tool>`)")
 	}
@@ -410,8 +453,9 @@ var psCmd = &cobra.Command{
 	Short: "List running AI sessions (the fleet); `sloop ps <#>` jumps to one",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		manifests, _ := adapter.Load()
 		parsed := tmux.ParseSessions(tmuxList())
-		rows := fleetRows(parsed)
+		rows := fleetRows(parsed, manifests)
 		if len(args) == 1 {
 			n, err := strconv.Atoi(args[0])
 			if err != nil {
@@ -424,7 +468,6 @@ var psCmd = &cobra.Command{
 			return runWatch(cmd.OutOrStdout(), psInterval, psWaiting, psNotify)
 		}
 
-		manifests, _ := adapter.Load()
 		rows = enrichGlances(rows, manifests)
 		sortNeedsAttention(rows)
 		paths := registryPaths()
@@ -464,7 +507,7 @@ var psCmd = &cobra.Command{
 		detach := tui.Grey("  ⏎ enters an agent — to come back, detach (keeps it running): " + tmux.PrefixRaw() + " d")
 		for {
 			tui.Clear()
-			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
 			sortNeedsAttention(rows)
 			annotatePaths(rows, registryPaths())
 			if psWaiting {
@@ -724,7 +767,7 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 	var prev []FleetRow
 	for {
 		manifests, _ := adapter.Load()
-		rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+		rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
 		sortNeedsAttention(rows)
 
 		shown := rows

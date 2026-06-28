@@ -74,8 +74,9 @@ func RunStatus(startDir string, w io.Writer) error {
 
 	// running sessions (best-effort; needs tmux).
 	if tmux.Available() {
+		manifests, _ := adapter.Load()
 		n := 0
-		for _, r := range fleetRows(tmux.ParseSessions(tmuxList())) {
+		for _, r := range fleetRows(tmux.ParseSessions(tmuxList()), manifests) {
 			if r.Workspace == ws.Name {
 				n++
 			}

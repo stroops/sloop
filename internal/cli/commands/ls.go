@@ -37,7 +37,7 @@ func openShellIn(dir string) error {
 // status dots as `ps` — the bridge between the two views.
 func enrichedByWorkspace(manifests map[string]adapter.Manifest) map[string][]FleetRow {
 	m := map[string][]FleetRow{}
-	for _, r := range enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests) {
+	for _, r := range enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests) {
 		m[r.Workspace] = append(m[r.Workspace], r)
 	}
 	return m
