@@ -248,10 +248,7 @@ func resolveStartDir(cwd, workspaceFlag string) (string, error) {
 
 // selectRunner returns a tmux-backed runner when tmux is available, else exec.
 func selectRunner(workspace, tool string) runner.Runner {
-	if tmux.Available() {
-		return tmux.Runner{Session: tmux.SessionName(workspace, tool)}
-	}
-	return runner.ExecRunner{}
+	return selectRunnerInstance(workspace, tool, "")
 }
 
 // RunSplit syncs each tool then launches them side-by-side as tmux panes in one
