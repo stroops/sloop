@@ -16,11 +16,20 @@ The initial public release: the local-first control layer for your AI coding CLI
   pre-fills `AGENTS.md` from the codebase (offline, no LLM); `--scaffold` creates each
   tool's standard folders.
 
+### Launch
+- `sloop run` syncs context, then launches in a managed session. The target can be a
+  tool (`claude`), its binary (`agent` → cursor), or a model alias (`opus` → its vendor's
+  home CLI). Flags: `-m/--model`, `-e/--effort` (low|medium|high), `-p/--provider`. The
+  model is forwarded to the CLI as-is, never validated. `--split` runs several tools side
+  by side; `-w` targets a registered workspace from anywhere.
+
 ### Cross-repo fleet
 - `sloop ps` — every running agent across all your repos; agents waiting on you float
   to the top. `--watch` live-monitors and alerts (terminal bell + desktop notify);
   `--waiting`, `--all`, and `ps <#>` to jump.
 - Interactive control center: jump, send a reply, or kill the highlighted session in place.
+- `sloop ls` — registered workspaces with live status; Enter attaches to a running session
+  or launches the workspace's default tool right there.
 - `sloop send` (`--waiting`/`--all` broadcast), `sloop kill`, `sloop attach`,
   `sloop run --split`.
 
@@ -28,9 +37,10 @@ The initial public release: the local-first control layer for your AI coding CLI
 - Tools are declarative adapter manifests (detect/launch/context/skills/hooks/scaffold);
   adding a CLI is adding a file. Built-ins: Claude, Cursor, Codex, Copilot, Gemini,
   Antigravity. `sloop tools` shows the capability matrix.
-- `sloop hooks` wires each tool's own hooks for authoritative status (Claude & Gemini
-  auto-install; others print-and-paste).
-- `sloop skills new` / `add` — reusable skills shared across every tool.
+- `sloop hooks` wires each tool's own hooks for authoritative status (Claude, Gemini &
+  Cursor auto-install; others print-and-paste).
+- `sloop skills new` / `add` — reusable skills shared across every tool. `.sloop/skills.lock`
+  records imported skills + source so `sloop skills update` re-fetches reproducibly.
 
 ### Cross-platform & DX
 - Multiplexer-agnostic: tmux on macOS/Linux, **psmux** on native Windows (`SLOOP_MUX`

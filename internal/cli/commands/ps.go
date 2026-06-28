@@ -265,10 +265,15 @@ func jumpToFleet(rows []FleetRow, n int) error {
 	if n < 1 || n > len(rows) {
 		return fmt.Errorf("no session #%d (have %d)", n, len(rows))
 	}
+	return attachSession(rows[n-1].Name)
+}
+
+// attachSession attaches to a session by name (switches client if already inside
+// tmux), replacing this process's foreground with tmux. Shared by `ps` and `ls`.
+func attachSession(name string) error {
 	if !tmux.Available() {
 		return fmt.Errorf("tmux is not installed")
 	}
-	name := rows[n-1].Name
 	args := tmux.BuildAttachArgs(name)
 	if os.Getenv("TMUX") != "" {
 		args = tmux.BuildSwitchArgs(name)
