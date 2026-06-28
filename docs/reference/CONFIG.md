@@ -1,7 +1,7 @@
 # Config — the three layers
 
 Sloop keeps a clear split: **user config is unified** (one local + one global file), and only the
-*provider knowledge* (adapter manifests, see `docs/ADAPTERS.md`) is per-provider. This matches how
+*provider knowledge* (adapter manifests, see `docs/reference/ADAPTERS.md`) is per-provider. This matches how
 peers do it — aider has a single `.aider.conf.yml`; Claude Squad a single `~/.claude-squad/config.json`
 with programs listed inside — while sloop's extra global/local split fits its cross-repo + per-project
 nature.
@@ -45,7 +45,7 @@ Plus, at the repo root: `AGENTS.md` (canonical context, hand-authored, committed
 ## 3. Built-in — adapter manifests
 
 Provider knowledge (`detect/launch/context/skills/hooks`), embedded in the binary, overridable in
-`~/.sloop/adapters/`. See `docs/ADAPTERS.md`. **Not** user config.
+`~/.sloop/adapters/`. See `docs/reference/ADAPTERS.md`. **Not** user config.
 
 ## `version` and forward-compat
 

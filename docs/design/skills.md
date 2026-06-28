@@ -4,14 +4,14 @@ A **skill** is a reusable prompt/workflow (a markdown file) that sloop delivers 
 tool from one source. Author or import once; Claude, Cursor, Codex, … all see the same set. This is
 context portability across **tools** *and* **sources** — something single-tool orchestrators don't do.
 
-> Hands-on command reference lives in [USAGE.md §5](USAGE.md). This doc is the model + the roadmap so
+> Hands-on command reference lives in [USAGE.md §5](../guide/USAGE.md). This doc is the model + the roadmap so
 > contributions and integrations start from a clear contract.
 
 ## Model
 
 - Skills live in **`.sloop/skills/*.md`** (one workspace, one set).
 - They are **symlinked** into each tool's skills dir (e.g. `.claude/skills`), resolved from the
-  manifest's `skills.target` ([ADAPTERS.md](ADAPTERS.md)). A directory symlink means every skill is
+  manifest's `skills.target` ([ADAPTERS.md](../reference/ADAPTERS.md)). A directory symlink means every skill is
   shared at once; it self-heals and falls back to copy when symlinks aren't available.
 - `sloop sync` (and `skills new`/`add`) keep the links in place.
 

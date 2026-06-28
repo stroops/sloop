@@ -3,7 +3,7 @@
 > **The local-first control layer for your AI coding CLIs.**
 > One canonical context for every tool, and one cross-repo view of every agent you're running.
 
-[Documentation](docs/USAGE.md) 
+[Documentation](docs/guide/USAGE.md) 
 
 Sloop is a single, lightweight Go binary that sits **above** your AI coding tools — Claude Code,
 Cursor CLI, Codex CLI, GitHub Copilot CLI, Gemini CLI, Google Antigravity, and future agents. It
@@ -123,7 +123,7 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 **Global flags** (any command): `-y/--auto` (assume yes), `--no-color`, `--no-input`, `--config <file>`,
 `--debug` (log diagnostics to stderr; or set `SLOOP_DEBUG=1` — shows every multiplexer call sloop makes).
 
-Full, example-driven walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
+Full, example-driven walkthrough: **[docs/guide/USAGE.md](docs/guide/USAGE.md)**.
 
 ---
 
@@ -137,7 +137,7 @@ skills dir. Delivery is **create-if-missing** — sloop never overwrites a file 
 Launch happens in a tmux/psmux session named `<workspace>__<tool>`, which is what makes the fleet
 view, `send`, and `attach` possible.
 
-Architecture & internals: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+Architecture & internals: **[docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md)**.
 
 ---
 
@@ -157,7 +157,7 @@ Architecture & internals: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 Machine-local state lives under `~/.sloop/`: the workspaces registry + session history (`sloop.db`,
 SQLite with WAL), hook status markers (`state/`), and any user adapter manifests (`adapters/*.yaml`).
-Config layering is documented in **[docs/CONFIG.md](docs/CONFIG.md)**.
+Config layering is documented in **[docs/reference/CONFIG.md](docs/reference/CONFIG.md)**.
 
 ---
 
@@ -165,7 +165,7 @@ Config layering is documented in **[docs/CONFIG.md](docs/CONFIG.md)**.
 
 Every tool is a declarative YAML manifest — adding a CLI is adding a file, never editing Go. Built-ins
 are embedded; user adapters/overrides live in `~/.sloop/adapters/*.yaml`. `sloop tools` shows the
-capability matrix. See **[docs/ADAPTERS.md](docs/ADAPTERS.md)** for the contract.
+capability matrix. See **[docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md)** for the contract.
 
 ```yaml
 name: Claude Code
@@ -193,13 +193,13 @@ hooks:                                          # status hooks for `sloop ps`
 ## Docs
 
 - [ROADMAP.md](ROADMAP.md) — pillars, what's next (v0.2.0 workflow hooks), how to contribute
-- [docs/USAGE.md](docs/USAGE.md) — hands-on guide, every command with examples
-- [docs/CONFIG.md](docs/CONFIG.md) — the three config layers (local / global / built-in)
-- [docs/ADAPTERS.md](docs/ADAPTERS.md) — the provider-aware adapter contract
-- [docs/run.md](docs/run.md) — `sloop run` design: CLI · model · effort resolution
-- [docs/skills.md](docs/skills.md) — skills model, lockfile, registry roadmap
-- [docs/hooks.md](docs/hooks.md) — status hooks today, workflow-hook design for v0.2.0
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — packages, data flow, internals
+- [docs/guide/USAGE.md](docs/guide/USAGE.md) — hands-on guide, every command with examples
+- [docs/reference/CONFIG.md](docs/reference/CONFIG.md) — the three config layers (local / global / built-in)
+- [docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md) — the provider-aware adapter contract
+- [docs/design/run.md](docs/design/run.md) — `sloop run` design: CLI · model · effort resolution
+- [docs/design/skills.md](docs/design/skills.md) — skills model, lockfile, registry roadmap
+- [docs/design/hooks.md](docs/design/hooks.md) — status hooks today, workflow-hook design for v0.2.0
+- [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) — packages, data flow, internals
 
 ## License
 

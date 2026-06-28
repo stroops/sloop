@@ -13,7 +13,7 @@ contribution starts from a clear contract. For the shipped detail of each releas
 - **Provider-respecting.** Never intercept or inject into an AI tool. Use the tool's *own* hook
   mechanism or non-invasive local signals only.
 - **Provider-aware by construction.** All per-provider knowledge lives in one adapter manifest; no
-  feature hardcodes a tool name. See [docs/ADAPTERS.md](docs/ADAPTERS.md).
+  feature hardcodes a tool name. See [docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md).
 - **One lightweight binary.** CGO-free Go, no daemon, no bundled LLM. Add capability when the first
   real feature needs it — never a standalone "foundation" ahead of a consumer.
 - **Local-first & portable.** Author context/skills once; every tool and every repo sees them.
@@ -22,11 +22,11 @@ contribution starts from a clear contract. For the shipped detail of each releas
 
 | Pillar | What it is | Design doc | Status |
 |---|---|---|---|
-| **Launch (`run`)** | one friendly target → the right CLI, model and effort, in a managed session | [docs/run.md](docs/run.md) | tool launch shipped; model/effort → next |
-| **Portable context** | `AGENTS.md` canonical; pointer files + skills delivered to every tool | [docs/ADAPTERS.md](docs/ADAPTERS.md) | shipped (v0.1.0) |
-| **Skills** | reusable prompts/workflows shared across tools *and* sources | [docs/skills.md](docs/skills.md) | shipping incrementally |
-| **Cross-repo fleet** | every running agent across all repos; triage who needs you | [docs/USAGE.md](docs/USAGE.md) | shipped (v0.1.0) |
-| **Hooks** | precise agent status today; a portable workflow-hook library next | [docs/hooks.md](docs/hooks.md) | status hooks shipped; workflow hooks → v0.2.0 |
+| **Launch (`run`)** | one friendly target → the right CLI, model and effort, in a managed session | [docs/design/run.md](docs/design/run.md) | tool launch shipped; model/effort → next |
+| **Portable context** | `AGENTS.md` canonical; pointer files + skills delivered to every tool | [docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md) | shipped (v0.1.0) |
+| **Skills** | reusable prompts/workflows shared across tools *and* sources | [docs/design/skills.md](docs/design/skills.md) | shipping incrementally |
+| **Cross-repo fleet** | every running agent across all repos; triage who needs you | [docs/guide/USAGE.md](docs/guide/USAGE.md) | shipped (v0.1.0) |
+| **Hooks** | precise agent status today; a portable workflow-hook library next | [docs/design/hooks.md](docs/design/hooks.md) | status hooks shipped; workflow hooks → v0.2.0 |
 
 ## Now (v0.1.x — validating the wedge)
 
@@ -43,7 +43,7 @@ workflow-automation library**: pick a hook (format-on-edit, commit-policy, shell
 and sloop installs it into the right tool's own hook config — author once, run across tools and repos.
 This is a large, security-sensitive surface, so it is **designed before it is built**. Full proposal,
 categories, project/user levels, cross-tool mapping, and the trust model are in
-**[docs/hooks.md](docs/hooks.md)**.
+**[docs/design/hooks.md](docs/design/hooks.md)**.
 
 ## Later / parked
 
@@ -56,7 +56,7 @@ categories, project/user levels, cross-tool mapping, and the trust model are in
 The lowest-barrier, highest-leverage contributions are **data, not code**:
 
 - **Add an AI tool:** drop one `internal/adapter/builtin/<tool>.yaml` — see
-  [docs/ADAPTERS.md](docs/ADAPTERS.md). No Go changes unless the tool needs a brand-new mechanism.
-- **Share a skill:** see [docs/skills.md](docs/skills.md).
-- **Propose a workflow hook:** see the open questions in [docs/hooks.md](docs/hooks.md) — feedback on
+  [docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md). No Go changes unless the tool needs a brand-new mechanism.
+- **Share a skill:** see [docs/design/skills.md](docs/design/skills.md).
+- **Propose a workflow hook:** see the open questions in [docs/design/hooks.md](docs/design/hooks.md) — feedback on
   the model is wanted *before* the v0.2.0 build.

@@ -193,7 +193,7 @@ copilot   print+paste   ~/.copilot/hooks/notification-hooks.json
 codex     print+paste   ~/.codex/config.toml  (notify = [...])
 ```
 
-Hook knowledge lives in each tool's adapter manifest (see `docs/ADAPTERS.md`), so adding a provider
+Hook knowledge lives in each tool's adapter manifest (see `docs/reference/ADAPTERS.md`), so adding a provider
 is "drop one yaml". `sloop tools` shows the full capability matrix (context / skills / hooks).
 
 ### Whole cross-repo board (`ps --all`)

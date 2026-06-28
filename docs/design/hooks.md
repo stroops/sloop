@@ -5,8 +5,8 @@ tool-call) where a command can observe, react, or block. Sloop uses hooks two wa
 two cleanly separated is the whole design.
 
 > **Status hooks** ship today. **Workflow hooks** are a v0.2.0 proposal — this doc is the contract to
-> review *before* it's built. Command reference for status hooks: [USAGE.md](USAGE.md); the install
-> mechanism: [ADAPTERS.md §Hook install strategies](ADAPTERS.md).
+> review *before* it's built. Command reference for status hooks: [USAGE.md](../guide/USAGE.md); the install
+> mechanism: [ADAPTERS.md §Hook install strategies](../reference/ADAPTERS.md).
 
 ## Two kinds of hook (don't conflate them)
 
@@ -39,7 +39,7 @@ A provider calls `sloop hooks emit <waiting|working|idle>` from its own lifecycl
 writes a short-lived marker under `~/.sloop/state` that `sloop ps` prefers over the screen heuristic
 (15-min TTL, so it never goes stale). Per-provider event→state mapping and the install strategy live
 in the adapter manifest. Auto-install today: **claude, gemini, cursor**; **copilot, codex** are
-`print+paste` pending a matcher-aware model (below). See [ADAPTERS.md](ADAPTERS.md).
+`print+paste` pending a matcher-aware model (below). See [ADAPTERS.md](../reference/ADAPTERS.md).
 
 ## Workflow hooks (v0.2.0 proposal)
 
@@ -105,6 +105,6 @@ runs on a teammate's machine. So, unlike skills, the library needs:
 
 ## Contributing
 
-- **Status hooks:** add/correct a tool's `hooks.*` in its adapter manifest — [ADAPTERS.md](ADAPTERS.md).
+- **Status hooks:** add/correct a tool's `hooks.*` in its adapter manifest — [ADAPTERS.md](../reference/ADAPTERS.md).
 - **Workflow hooks (v0.2.0):** comment on the open questions above. The model is intentionally being
   settled in public *before* implementation — input now shapes the schema.

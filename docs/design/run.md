@@ -5,7 +5,7 @@ with the right model and reasoning effort, in a managed session. This doc is the
 the model, the resolution rules, the manifest schema, and the staged plan — so the upgrade is settled
 before it's built.
 
-> Command reference (today's behaviour): [USAGE.md](USAGE.md). Provider contract: [ADAPTERS.md](ADAPTERS.md).
+> Command reference (today's behaviour): [USAGE.md](../guide/USAGE.md). Provider contract: [ADAPTERS.md](../reference/ADAPTERS.md).
 
 ## Two jobs, one clean seam
 
@@ -134,5 +134,5 @@ string to the CLI**, letting the CLI validate it. Light, and resilient to new mo
 ## Contributing
 
 Teaching sloop to launch a tool with a model/effort is **manifest-only**: add a `run:` block to the
-tool's adapter (see [ADAPTERS.md](ADAPTERS.md)) — `model_flag`, `effort_flag`/`effort_values`,
+tool's adapter (see [ADAPTERS.md](../reference/ADAPTERS.md)) — `model_flag`, `effort_flag`/`effort_values`,
 `vendor`, `default_for`. No Go changes unless the CLI needs a brand-new launch mechanism.

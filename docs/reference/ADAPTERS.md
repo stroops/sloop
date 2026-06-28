@@ -13,7 +13,7 @@ Every provider-aware feature reads it; no feature hardcodes a tool name.
   (`internal/adapter/adapter.go`).
 
 Manifests are sloop's *provider knowledge / plugin layer* — **not** user config. Users normally
-never touch them (enabled tools are chosen in `.sloop/config.yaml`; see `docs/CONFIG.md`).
+never touch them (enabled tools are chosen in `.sloop/config.yaml`; see `docs/reference/CONFIG.md`).
 
 ## Manifest schema
 
@@ -29,7 +29,7 @@ context:                       # how AGENTS.md context reaches the tool
 skills:                        # how .sloop/skills is delivered
   target: .claude/skills       #   dir to symlink skills into; "" = tool has no skills dir
 
-hooks:                         # status hooks for `sloop ps` (see docs/USAGE.md)
+hooks:                         # status hooks for `sloop ps` (see docs/guide/USAGE.md)
   config: .claude/settings.local.json   # where the tool configures hooks (repo-relative or ~/…)
   install: settings-json                # installer strategy: "settings-json" | "" (manual)
   docs: https://…                       # link to the tool's hook docs
