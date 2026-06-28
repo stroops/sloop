@@ -134,16 +134,10 @@ var (
 )
 
 // resolveInitTools decides which tools `init` enables: the explicit --tools list
-// if given, else an interactive per-tool prompt (primary on, others opt-in), else
-// a minimal single-tool default. Keeps a fresh workspace from turning on every CLI
-// installed on the machine.
-func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest) []string {
-	detected := detect.InstalledKeys(manifests)
-	if len(detected) == 0 {
-		detected = []string{fallbackTool}
-	}
-	primary := defaultPrimary(manifests)
-
+// if given, else an interactive per-tool prompt (every detected tool is asked, the
+// primary defaulted on), else a minimal single-tool default. r==nil means
+// non-interactive. Keeps a fresh workspace from turning on every CLI installed.
+func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest, r *bufio.Reader, ix Interaction) []string {
 	if initTools != "" {
 		var out []string
 		for _, t := range strings.Split(initTools, ",") {
@@ -164,22 +158,54 @@ func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest)
 		}
 	}
 
-	if interactiveInit(cmd) {
-		r := bufio.NewReader(os.Stdin)
-		ix := initInteraction(cmd)
-		cmd.Printf("Detected tools: %s\n", strings.Join(detected, ", "))
-		selected := []string{primary}
-		for _, t := range detected {
-			if t == primary {
-				continue
-			}
-			if ix.Ask("Also set up "+displayTool(t, manifests)+" in this workspace?", false, r, cmd.OutOrStdout()) {
-				selected = append(selected, t)
+	detected := detect.InstalledKeys(manifests)
+	if len(detected) == 0 {
+		detected = []string{fallbackTool}
+	}
+	primary := defaultPrimary(manifests)
+
+	if r == nil {
+		return []string{primary} // minimal default
+	}
+
+	// Ask about every detected tool (including the primary — it isn't always
+	// Claude), defaulting the primary on so a quick Enter keeps it simple.
+	cmd.Printf("Detected tools: %s\n", strings.Join(detected, ", "))
+	var selected []string
+	for _, t := range detected {
+		if ix.Ask("Use "+displayTool(t, manifests)+" in this workspace?", t == primary, r, cmd.OutOrStdout()) {
+			selected = append(selected, t)
+		}
+	}
+	if len(selected) == 0 {
+		cmd.Println(tui.Grey("none selected — enabling " + displayTool(primary, manifests)))
+		selected = []string{primary}
+	}
+	return selected
+}
+
+// scaffoldNeeded reports whether any enabled tool has a standard folder that
+// doesn't exist yet, so init only offers scaffolding when there's work to do.
+func scaffoldNeeded(root string, tools []string, manifests map[string]adapter.Manifest) bool {
+	for _, t := range tools {
+		for _, d := range manifests[t].Scaffold {
+			if _, err := os.Stat(filepath.Join(root, d)); os.IsNotExist(err) {
+				return true
 			}
 		}
-		return selected
 	}
-	return []string{primary} // minimal default
+	return false
+}
+
+// hooksNeeded reports whether any enabled tool's status hooks aren't installed.
+func hooksNeeded(root string, tools []string, manifests map[string]adapter.Manifest) bool {
+	for _, t := range tools {
+		m := manifests[t]
+		if hookInstaller(m.Hooks.Install) != nil && !hooksInstalledFor(root, m) {
+			return true
+		}
+	}
+	return false
 }
 
 var initCmd = &cobra.Command{
@@ -191,20 +217,30 @@ var initCmd = &cobra.Command{
 			return err
 		}
 		manifests, _ := adapter.Load()
-		tools := resolveInitTools(cmd, manifests)
+
+		// One reader for the whole interactive flow (two readers on stdin would
+		// race over buffered input).
+		var r *bufio.Reader
+		var ix Interaction
+		if interactiveInit(cmd) {
+			r = bufio.NewReader(os.Stdin)
+			ix = initInteraction(cmd)
+		}
+		tools := resolveInitTools(cmd, manifests, r, ix)
 		canonical := needsCanonical(tools, manifests)
 
-		// Interactive onboarding: ask the remaining setup choices (only those that
-		// apply). Scriptable runs keep flag-only behavior.
+		// Only ask about work that isn't already done.
 		wantHooks := false
-		if interactiveInit(cmd) {
-			r := bufio.NewReader(os.Stdin)
-			ix := initInteraction(cmd)
-			if canonical {
+		if r != nil {
+			if canonical && syncpkg.AgentsState(cwd) != "ok" {
 				initScan = ix.Ask("Pre-fill AGENTS.md from your codebase?", true, r, cmd.OutOrStdout())
 			}
-			initScaffold = ix.Ask("Create each tool's standard folders?", false, r, cmd.OutOrStdout())
-			wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())
+			if scaffoldNeeded(cwd, tools, manifests) {
+				initScaffold = ix.Ask("Create each tool's standard folders?", false, r, cmd.OutOrStdout())
+			}
+			if hooksNeeded(cwd, tools, manifests) {
+				wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())
+			}
 		}
 
 		summary, err := RunInit(cwd, tools, initScan)

@@ -6,8 +6,56 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
 )
+
+func TestResolveInitToolsFlag(t *testing.T) {
+	manifests := map[string]adapter.Manifest{
+		"claude": {Name: "Claude Code"},
+		"cursor": {Name: "Cursor CLI"},
+	}
+	defer func(v string) { initTools = v }(initTools)
+	initTools = "claude, bogus, cursor, claude" // unknown dropped, dupes deduped
+
+	got := resolveInitTools(&cobra.Command{}, manifests, nil, Interaction{})
+	if len(got) != 2 || got[0] != "claude" || got[1] != "cursor" {
+		t.Fatalf("resolveInitTools = %v, want [claude cursor]", got)
+	}
+}
+
+func TestScaffoldNeeded(t *testing.T) {
+	root := t.TempDir()
+	manifests := map[string]adapter.Manifest{
+		"claude": {Scaffold: []string{".claude/skills", ".claude/agents"}},
+	}
+	tools := []string{"claude"}
+	if !scaffoldNeeded(root, tools, manifests) {
+		t.Fatal("nothing scaffolded yet → should be needed")
+	}
+	for _, d := range manifests["claude"].Scaffold {
+		_ = os.MkdirAll(filepath.Join(root, d), 0o755)
+	}
+	if scaffoldNeeded(root, tools, manifests) {
+		t.Fatal("all folders exist → should NOT be needed")
+	}
+}
+
+func TestHooksNeeded(t *testing.T) {
+	root := t.TempDir()
+	manifests := map[string]adapter.Manifest{
+		"claude": {Hooks: adapter.HooksSpec{Install: "settings-json", Config: ".claude/settings.local.json", Events: adapter.HookEvents{Idle: "Stop"}}},
+		"codex":  {Hooks: adapter.HooksSpec{Install: ""}}, // manual install → never "needed"
+	}
+	if !hooksNeeded(root, []string{"claude"}, manifests) {
+		t.Fatal("claude hooks not installed → needed")
+	}
+	if hooksNeeded(root, []string{"codex"}, manifests) {
+		t.Fatal("manual-install tool → not auto-needed")
+	}
+}
 
 func TestRunInitScaffolds(t *testing.T) {
 	dir := t.TempDir()
