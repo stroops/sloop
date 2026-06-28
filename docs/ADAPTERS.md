@@ -62,11 +62,20 @@ The runtime view of all of this is **`sloop tools`** (capability matrix:
 ## Hook install strategies
 
 - `settings-json` — merge `events → "sloop hook <state>"` into a JSON settings file
-  (`mergeSettingsHooks`/`installSettingsHooks`). Used by **claude** and **gemini** (identical shape).
-  `sloop hooks install <tool>` writes it idempotently, never clobbering existing keys.
+  (`mergeSettingsHooks`/`installSettingsHooks`). Used by **claude** and **gemini** (identical nested
+  `hooks[event] = [{hooks:[{type,command}]}]` shape). Written idempotently, never clobbering keys.
+- `cursor-json` — merge into `.cursor/hooks.json`, Cursor's flatter shape
+  (`{version, hooks[event]=[{command}]}`; `mergeCursorHooks`/`installCursorHooks`). Used by **cursor**.
+  Note: Cursor has no clean "blocked on user" event (`beforeShellExecution` fires on every command),
+  so its manifest leaves `waiting: ""` and the pane heuristic covers waiting.
 - `""` (manual) — no safe auto-writer yet; `sloop hooks print <tool>` shows the exact
-  event→command wiring and `sloop hooks list` marks it `print+paste`. Cursor/Copilot/Codex are here
-  (different config formats; Codex needs a `notify`-payload mode and is TOML, which we don't parse).
+  event→command wiring and `sloop hooks list` marks it `print+paste`. **Copilot/Codex** are here:
+  Copilot uses a single `notification` event with matchers (`permission_prompt`/`agent_idle`/…) plus
+  per-OS `bash`/`powershell` keys; Codex is TOML with one `notify` program for all events (would need
+  payload routing). Both need a matcher-aware model before auto-install.
+
+Strategies dispatch through `hookInstaller(strategy)` — add a `case` there + an `install…Hooks`
+writer to teach a new config format.
 
 ## Status heuristics (fallback only)
 

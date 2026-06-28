@@ -11,10 +11,10 @@ scaffold:
   - .cursor/rules
 hooks:
   config: .cursor/hooks.json
-  install: ""
+  install: cursor-json
   docs: https://cursor.com/docs/hooks
-  notes: CLI hooks since v1.7 (sessionStart/stop/prompt)
+  notes: hooks.json {version,hooks}; no clean "blocked on user" event, so waiting is left to the pane heuristic
   events:
     working: beforeSubmitPrompt
-    waiting: beforeShellExecution
+    waiting: ""   # beforeShellExecution fires on every command, not only when blocked — would mislabel; heuristic handles cursor's approval prompts
     idle: stop

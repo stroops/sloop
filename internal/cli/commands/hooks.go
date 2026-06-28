@@ -118,6 +118,90 @@ func installSettingsHooks(path string, events map[string]string) (bool, error) {
 	return true, os.WriteFile(path, append(out, '\n'), 0o644)
 }
 
+// mergeCursorHooks adds event→command hooks to a .cursor/hooks.json document.
+// Cursor's shape is flatter than settings.json: hooks[event] is an array of
+// {command} objects. Existing hooks are preserved and the merge is idempotent.
+func mergeCursorHooks(root map[string]any, events map[string]string) (map[string]any, bool) {
+	if root == nil {
+		root = map[string]any{}
+	}
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+	}
+	changed := false
+	for event, cmd := range events {
+		if hasCursorCommand(hooks[event], cmd) {
+			continue
+		}
+		arr, _ := hooks[event].([]any)
+		hooks[event] = append(arr, map[string]any{"command": cmd})
+		changed = true
+	}
+	if changed {
+		root["hooks"] = hooks
+		if _, ok := root["version"]; !ok {
+			root["version"] = 1
+		}
+	}
+	return root, changed
+}
+
+// hasCursorCommand reports whether an event's hook array already contains the
+// given command (so install is idempotent).
+func hasCursorCommand(eventVal any, cmd string) bool {
+	arr, ok := eventVal.([]any)
+	if !ok {
+		return false
+	}
+	for _, h := range arr {
+		hm, ok := h.(map[string]any)
+		if !ok {
+			continue
+		}
+		if c, _ := hm["command"].(string); c == cmd {
+			return true
+		}
+	}
+	return false
+}
+
+// installCursorHooks merges events into the .cursor/hooks.json file at path,
+// creating it if needed. Returns whether the file changed.
+func installCursorHooks(path string, events map[string]string) (bool, error) {
+	doc := map[string]any{}
+	if b, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(b, &doc); err != nil {
+			return false, fmt.Errorf("%s is not valid JSON: %w", path, err)
+		}
+	}
+	merged, changed := mergeCursorHooks(doc, events)
+	if !changed {
+		return false, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, err
+	}
+	out, err := json.MarshalIndent(merged, "", "  ")
+	if err != nil {
+		return false, err
+	}
+	return true, os.WriteFile(path, append(out, '\n'), 0o644)
+}
+
+// hookInstaller returns the writer for a manifest's install strategy, or nil if
+// the strategy has no safe auto-writer yet (then `hooks print` shows the wiring).
+func hookInstaller(strategy string) func(path string, events map[string]string) (bool, error) {
+	switch strategy {
+	case "settings-json":
+		return installSettingsHooks
+	case "cursor-json":
+		return installCursorHooks
+	default:
+		return nil
+	}
+}
+
 // resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
 // expands to the home dir, absolute paths pass through, and a repo-relative path
 // is joined to the workspace root.
@@ -186,7 +270,8 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if m.Hooks.Install != "settings-json" {
+		install := hookInstaller(m.Hooks.Install)
+		if install == nil {
 			cmd.Printf("auto-install isn't available for %s yet.\n", tool)
 			cmd.Printf("Run `sloop hooks print %s` for the exact events to wire in %s.\n", tool, m.Hooks.Config)
 			return nil
@@ -203,7 +288,7 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		changed, err := installSettingsHooks(path, eventCommands(m.Hooks))
+		changed, err := install(path, eventCommands(m.Hooks))
 		if err != nil {
 			return err
 		}
@@ -231,8 +316,14 @@ var hooksPrintCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if m.Hooks.Install == "settings-json" {
+		switch m.Hooks.Install {
+		case "settings-json":
 			doc, _ := mergeSettingsHooks(nil, eventCommands(m.Hooks))
+			out, _ := json.MarshalIndent(doc, "", "  ")
+			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
+			return nil
+		case "cursor-json":
+			doc, _ := mergeCursorHooks(nil, eventCommands(m.Hooks))
 			out, _ := json.MarshalIndent(doc, "", "  ")
 			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
 			return nil
@@ -264,7 +355,7 @@ var hooksListCmd = &cobra.Command{
 		for _, tool := range hookTools() {
 			m := manifests[tool]
 			auto := "print+paste"
-			if m.Hooks.Install == "settings-json" {
+			if hookInstaller(m.Hooks.Install) != nil {
 				auto = "yes"
 			}
 			cmd.Printf("%-9s %-12s %s\n", tool, auto, m.Hooks.Config)
