@@ -99,6 +99,9 @@ func RunInit(dir string, tools []string, scan bool) ([]string, error) {
 		if initScaffold {
 			for _, d := range m.Scaffold {
 				target := filepath.Join(dir, d)
+				if _, err := os.Stat(target); err == nil {
+					continue // already there — don't claim to have scaffolded it
+				}
 				if err := os.MkdirAll(target, 0o755); err != nil {
 					return nil, err
 				}
@@ -169,10 +172,10 @@ func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest,
 	}
 
 	// Ask about every detected tool (including the primary — it isn't always
-	// Claude), defaulting the primary on so a quick Enter keeps it simple.
+	// Claude), primary first and defaulted on so a quick Enter keeps it simple.
 	cmd.Printf("Detected tools: %s\n", strings.Join(detected, ", "))
 	var selected []string
-	for _, t := range detected {
+	for _, t := range primaryFirst(detected, primary) {
 		if ix.Ask("Use "+displayTool(t, manifests)+" in this workspace?", t == primary, r, cmd.OutOrStdout()) {
 			selected = append(selected, t)
 		}
@@ -184,17 +187,34 @@ func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest,
 	return selected
 }
 
-// scaffoldNeeded reports whether any enabled tool has a standard folder that
-// doesn't exist yet, so init only offers scaffolding when there's work to do.
-func scaffoldNeeded(root string, tools []string, manifests map[string]adapter.Manifest) bool {
+// primaryFirst returns detected tools with the primary moved to the front, so the
+// most-likely tool (e.g. Claude) is the first one init asks about.
+func primaryFirst(detected []string, primary string) []string {
+	out := make([]string, 0, len(detected))
+	if contains(detected, primary) {
+		out = append(out, primary)
+	}
+	for _, t := range detected {
+		if t != primary {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// missingScaffold lists the enabled tools' standard folders that don't exist yet
+// (deduped, ordered). init only offers scaffolding for these — and only creates
+// these — so it never claims to make a folder you already have.
+func missingScaffold(root string, tools []string, manifests map[string]adapter.Manifest) []string {
+	var out []string
 	for _, t := range tools {
 		for _, d := range manifests[t].Scaffold {
-			if _, err := os.Stat(filepath.Join(root, d)); os.IsNotExist(err) {
-				return true
+			if _, err := os.Stat(filepath.Join(root, d)); os.IsNotExist(err) && !contains(out, d) {
+				out = append(out, d)
 			}
 		}
 	}
-	return false
+	return out
 }
 
 // hooksNeeded reports whether any enabled tool's status hooks aren't installed.
@@ -235,8 +255,8 @@ var initCmd = &cobra.Command{
 			if canonical && syncpkg.AgentsState(cwd) != "ok" {
 				initScan = ix.Ask("Pre-fill AGENTS.md from your codebase?", true, r, cmd.OutOrStdout())
 			}
-			if scaffoldNeeded(cwd, tools, manifests) {
-				initScaffold = ix.Ask("Create each tool's standard folders?", false, r, cmd.OutOrStdout())
+			if missing := missingScaffold(cwd, tools, manifests); len(missing) > 0 {
+				initScaffold = ix.Ask("Create standard folders ("+strings.Join(missing, ", ")+")?", false, r, cmd.OutOrStdout())
 			}
 			if hooksNeeded(cwd, tools, manifests) {
 				wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())

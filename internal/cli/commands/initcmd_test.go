@@ -26,20 +26,34 @@ func TestResolveInitToolsFlag(t *testing.T) {
 	}
 }
 
-func TestScaffoldNeeded(t *testing.T) {
+func TestMissingScaffold(t *testing.T) {
 	root := t.TempDir()
 	manifests := map[string]adapter.Manifest{
 		"claude": {Scaffold: []string{".claude/skills", ".claude/agents"}},
 	}
 	tools := []string{"claude"}
-	if !scaffoldNeeded(root, tools, manifests) {
-		t.Fatal("nothing scaffolded yet → should be needed")
+
+	// Pre-create one of the two → only the other should be reported missing.
+	_ = os.MkdirAll(filepath.Join(root, ".claude/skills"), 0o755)
+	got := missingScaffold(root, tools, manifests)
+	if len(got) != 1 || got[0] != ".claude/agents" {
+		t.Fatalf("missingScaffold = %v, want [.claude/agents]", got)
 	}
-	for _, d := range manifests["claude"].Scaffold {
-		_ = os.MkdirAll(filepath.Join(root, d), 0o755)
+
+	_ = os.MkdirAll(filepath.Join(root, ".claude/agents"), 0o755)
+	if got := missingScaffold(root, tools, manifests); len(got) != 0 {
+		t.Fatalf("all folders exist → want none, got %v", got)
 	}
-	if scaffoldNeeded(root, tools, manifests) {
-		t.Fatal("all folders exist → should NOT be needed")
+}
+
+func TestPrimaryFirst(t *testing.T) {
+	got := primaryFirst([]string{"agy", "claude", "cursor"}, "claude")
+	if len(got) != 3 || got[0] != "claude" {
+		t.Fatalf("primaryFirst = %v, want claude first", got)
+	}
+	// Primary not in the list → order unchanged.
+	if got := primaryFirst([]string{"cursor", "gemini"}, "claude"); got[0] != "cursor" {
+		t.Fatalf("primaryFirst absent = %v", got)
 	}
 }
 
