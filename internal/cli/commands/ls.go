@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -31,14 +32,52 @@ func openShellIn(dir string) error {
 	return c.Run()
 }
 
-// liveByWorkspace groups live tmux fleet sessions by workspace name, so `ls` can
-// show which registered workspaces currently have an agent running.
-func liveByWorkspace() map[string][]FleetRow {
+// enrichedByWorkspace groups the live fleet by workspace name, classified
+// (waiting/working/idle) so `ls` can show each workspace's agents with the same
+// status dots as `ps` — the bridge between the two views.
+func enrichedByWorkspace(manifests map[string]adapter.Manifest) map[string][]FleetRow {
 	m := map[string][]FleetRow{}
-	for _, r := range fleetRows(tmux.ParseSessions(tmuxList())) {
+	for _, r := range enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests) {
 		m[r.Workspace] = append(m[r.Workspace], r)
 	}
 	return m
+}
+
+// workspaceDefault returns a workspace's default tool key (what `r`/launch runs),
+// or "—" when it can't be read.
+func workspaceDefault(path string) string {
+	proj, err := config.LoadProject(workspace.Workspace{Root: path}.SloopDir())
+	if err != nil || proj.DefaultTool == "" {
+		return "—"
+	}
+	return proj.DefaultTool
+}
+
+// agentsInline renders a workspace's live agents as "● Claude  ▸ Cursor" using
+// the same status dots as `ps`; "—" when nothing is running.
+func agentsInline(rows []FleetRow) string {
+	if len(rows) == 0 {
+		return tui.Grey("—")
+	}
+	parts := make([]string, 0, len(rows))
+	for _, r := range rows {
+		dot, _ := statusDot(r)
+		parts = append(parts, dot+" "+r.toolName())
+	}
+	return strings.Join(parts, "  ")
+}
+
+// abbrevHome shortens a path under $HOME to a leading ~ for compact display.
+func abbrevHome(path string) string {
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		if path == home {
+			return "~"
+		}
+		if strings.HasPrefix(path, home+"/") {
+			return "~" + path[len(home):]
+		}
+	}
+	return path
 }
 
 // launchWorkspaceDefault launches a workspace's default tool in its own dir — the
@@ -119,10 +158,29 @@ var lsCmd = &cobra.Command{
 			return nil
 		}
 
-		nameW := 0
+		manifests, _ := adapter.Load()
+
+		// Per-workspace columns. Defaults and abbreviated paths don't change between
+		// keystrokes, so compute them once; live agents are re-read each pass.
+		defaults := make(map[string]string, len(workspaces))
+		paths := make(map[string]string, len(workspaces))
+		nameW, defW := len("WORKSPACE"), len("DEFAULT")
+		pathW := len("PATH")
 		for _, ws := range workspaces {
+			defaults[ws.Name] = workspaceDefault(ws.Path)
+			p := abbrevHome(ws.Path)
+			if len(p) > 40 {
+				p = truncate(p, 40)
+			}
+			paths[ws.Name] = p
 			if len(ws.Name) > nameW {
 				nameW = len(ws.Name)
+			}
+			if len(defaults[ws.Name]) > defW {
+				defW = len(defaults[ws.Name])
+			}
+			if len(p) > pathW {
+				pathW = len(p)
 			}
 		}
 
@@ -131,18 +189,30 @@ var lsCmd = &cobra.Command{
 		// safe (attach a live session, else show the path); launching a tool is the
 		// explicit `r` key, so the list never spawns an agent by surprise.
 		for {
-			live := liveByWorkspace()
+			live := enrichedByWorkspace(manifests)
+			running := 0
 			var options []string
 			for _, ws := range workspaces {
-				status := tui.Grey("idle")
-				if n := len(live[ws.Name]); n > 0 {
-					status = tui.Green(fmt.Sprintf("● %d live", n))
+				agents := live[ws.Name]
+				if len(agents) > 0 {
+					running++
 				}
-				options = append(options, fmt.Sprintf("%-*s  %s  %s", nameW, ws.Name, status, tui.Grey(ws.Path)))
+				// No leading status glyph (ambiguous-width breaks alignment); the
+				// AGENTS column carries liveness — colored dots when running, "—" idle.
+				line := fmt.Sprintf("%-*s %-*s %-*s %s",
+					nameW, ws.Name, defW, defaults[ws.Name], pathW, paths[ws.Name], agentsInline(agents))
+				options = append(options, line)
 			}
 
-			prompt := fmt.Sprintf("⚓ Sloop workspaces · %d", len(workspaces)) +
-				"\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach/show path · r launch · s shell · c cd · q quit")
+			header := fmt.Sprintf("⚓ Workspaces · %d registered", len(workspaces))
+			if running > 0 {
+				header += " · " + tui.Green(fmt.Sprintf("%d running", running))
+			}
+			legend := tui.Grey("  AGENTS = live agents, colored by status (→ sloop ps) · — = idle")
+			keys := tui.Grey("  ↑/↓ move · ⏎ open · r launch · s shell · c cd · q quit")
+			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-*s %s", nameW, "WORKSPACE", defW, "DEFAULT", pathW, "PATH", "AGENTS"))
+			prompt := header + "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
+
 			selected, key, err := tui.SelectAction(prompt, options, []byte{'r', 's', 'c'})
 			if err != nil {
 				return err

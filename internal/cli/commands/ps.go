@@ -444,9 +444,10 @@ var psCmd = &cobra.Command{
 			}
 			var options []string
 			for _, r := range rows {
-				dot, label := statusDot(r)
-				line := fmt.Sprintf("%s %-*s %-*s %-16s %s",
-					dot, wsW, r.Workspace, toolW, r.toolName(), label, shortSince(r.Activity))
+				// No leading status glyph: ●/○ are ambiguous-width and break column
+				// alignment. Status is the colored STATUS column instead.
+				line := fmt.Sprintf("%-*s %-*s %s %s",
+					wsW, r.Workspace, toolW, r.toolName(), statusText(r), shortSince(r.Activity))
 				if b := bottomLine(r); b != "" {
 					line += "\r\n└ " + tui.Grey(b)
 				}
@@ -457,9 +458,9 @@ var psCmd = &cobra.Command{
 			if waiting > 0 {
 				header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
 			}
-			legend := tui.Grey("  ● working/waiting · ○ idle · AGE = since last activity")
+			legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
+				tui.Blue("attached") + " · " + tui.Green("idle") + tui.Grey(" · AGE = since last activity")
 			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q quit")
-			// Column header aligned under the rows (2 cols for the status dot + space).
 			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-16s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS", "AGE"))
 			prompt := header + "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
 
@@ -607,6 +608,23 @@ func statusDot(r FleetRow) (dot, label string) {
 		return tui.Blue("●"), "attached"
 	}
 	return tui.Green("○"), "idle"
+}
+
+// statusText is the colored, fixed-width STATUS column for the ps control
+// center: the status as legible text (no ambiguous-width glyph), padded to 16
+// before coloring so the trailing AGE column stays aligned.
+func statusText(r FleetRow) string {
+	pad := func(s string) string { return fmt.Sprintf("%-16s", s) }
+	switch r.Status {
+	case tmux.StatusWaiting:
+		return tui.Yellow(pad("waiting on you"))
+	case tmux.StatusWorking:
+		return tui.Cyan(pad("working"))
+	}
+	if r.Attached {
+		return tui.Blue(pad("attached"))
+	}
+	return tui.Green(pad("idle"))
 }
 
 // shortSince is a compact relative time ("now", "3m", "2h", "5d").
