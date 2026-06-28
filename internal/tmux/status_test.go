@@ -1,6 +1,11 @@
 package tmux
 
-import "testing"
+import (
+	"sync"
+	"testing"
+
+	"github.com/stroops/sloop/internal/adapter"
+)
 
 func TestClassifyStatus(t *testing.T) {
 	cases := []struct {
@@ -23,11 +28,45 @@ func TestClassifyStatus(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := ClassifyStatus(c.pane); got != c.want {
+			if got := ClassifyStatus(c.pane, adapter.Manifest{}); got != c.want {
 				t.Fatalf("ClassifyStatus(%q) = %v, want %v", c.pane, got, c.want)
 			}
 		})
 	}
+}
+
+// TestClassifyStatusManifestMarkers covers the per-tool heuristics path: a phrase
+// no built-in marker recognizes is classified via the manifest's own markers.
+func TestClassifyStatusManifestMarkers(t *testing.T) {
+	m := adapter.Manifest{Heuristics: adapter.HeuristicsSpec{
+		Waiting: []string{"Shall I apply this fix"},
+		Working: []string{"Crunching the repo"},
+	}}
+	if got := ClassifyStatus("Shall I apply this fix?", m); got != StatusWaiting {
+		t.Fatalf("manifest waiting marker = %v, want waiting", got)
+	}
+	if got := ClassifyStatus("Crunching the repo index", m); got != StatusWorking {
+		t.Fatalf("manifest working marker = %v, want working", got)
+	}
+	// Built-in markers still apply alongside the manifest's.
+	if got := ClassifyStatus("Apply changes? (y/n)", m); got != StatusWaiting {
+		t.Fatalf("built-in marker with manifest set = %v, want waiting", got)
+	}
+}
+
+// TestClassifyStatusConcurrent guards against the append-onto-shared-slice race:
+// many goroutines classify with a manifest at once (run with -race).
+func TestClassifyStatusConcurrent(t *testing.T) {
+	m := adapter.Manifest{Heuristics: adapter.HeuristicsSpec{Waiting: []string{"custom prompt"}}}
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = ClassifyStatus("doing some work\ncustom prompt here", m)
+		}()
+	}
+	wg.Wait()
 }
 
 func TestAgentStatusString(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/tmux"
 )
 
@@ -20,13 +21,6 @@ func confirm(w io.Writer, in io.Reader, prompt string) bool {
 	line, _ := bufio.NewReader(in).ReadString('\n')
 	line = strings.ToLower(strings.TrimSpace(line))
 	return line == "y" || line == "yes"
-}
-
-// promptLine prints prompt and returns the entered line (trimmed).
-func promptLine(w io.Writer, in io.Reader, prompt string) string {
-	_, _ = fmt.Fprint(w, prompt)
-	line, _ := bufio.NewReader(in).ReadString('\n')
-	return strings.TrimSpace(line)
 }
 
 func rowNames(rows []FleetRow) []string {
@@ -73,9 +67,10 @@ func RunKill(w io.Writer, in io.Reader, targets []string, all, waiting, yes bool
 	if !tmux.Available() {
 		return nil, fmt.Errorf("tmux is not installed; `sloop kill` needs tmux")
 	}
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
-	if waiting {
-		rows = enrichGlances(rows) // need status to find who's waiting
+	manifests, _ := adapter.Load()
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	if len(rows) == 0 {
+		rows = enrichGlances(rows, manifests) // need status to find who's waiting
 	}
 	victims, err := selectSessions(rows, targets, all, waiting)
 	if err != nil {

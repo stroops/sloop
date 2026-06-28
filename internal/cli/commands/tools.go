@@ -62,7 +62,7 @@ func skillsLabel(m adapter.Manifest) string {
 }
 
 func hooksLabel(m adapter.Manifest) string {
-	if m.Hooks.Install == "settings-json" {
+	if hookInstaller(m.Hooks.Install) != nil {
 		return "auto"
 	}
 	if m.Hooks.Events.Working != "" || m.Hooks.Events.Waiting != "" || m.Hooks.Events.Idle != "" {

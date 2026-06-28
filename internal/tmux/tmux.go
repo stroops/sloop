@@ -113,6 +113,21 @@ func Prefix() string {
 	return "Ctrl+b"
 }
 
+// PrefixRaw returns the tmux prefix key in tmux's own notation (e.g. "C-a"), for
+// compact display in a status bar; falls back to "C-b". (Prefix returns the
+// human "Ctrl+a" form for prose; this is the terse form for the status line.)
+func PrefixRaw() string {
+	out, err := Output("show-options", "-g", "prefix")
+	if err != nil {
+		return "C-b"
+	}
+	parts := strings.Fields(strings.TrimSpace(string(out)))
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return "C-b"
+}
+
 func sanitize(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -164,6 +179,21 @@ func SessionPath(session string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// LaunchDetached creates a detached session running command+args in dir and
+// gives it sloop's per-session status bar, without attaching. Used by `sloop
+// restore` to bring several sessions back at once. No-op if it already exists.
+func LaunchDetached(session, dir, command string, args []string) error {
+	if hasSession(session) {
+		return nil
+	}
+	create := append([]string{"new-session", "-d", "-s", session, "-c", dir, command}, args...)
+	if err := Run(create...); err != nil {
+		return err
+	}
+	SetStatusLine(session)
+	return nil
 }
 
 type Runner struct {

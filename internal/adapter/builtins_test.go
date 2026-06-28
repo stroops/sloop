@@ -27,7 +27,7 @@ func TestBuiltinManifests(t *testing.T) {
 	}{
 		"claude":  {"claude", "pointer", ".claude/skills", "settings-json"},
 		"gemini":  {"gemini", "pointer", "", "settings-json"},
-		"cursor":  {"agent", "native", "", ""},
+		"cursor":  {"agent", "native", "", "cursor-json"},
 		"codex":   {"codex", "native", "", ""},
 		"copilot": {"copilot", "native", "", ""},
 		"agy":     {"agy", "native", "", ""},

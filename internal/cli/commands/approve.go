@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/tmux"
 )
 
@@ -18,7 +19,11 @@ func RunApprove(w io.Writer, in io.Reader, targets []string, all, waiting, yes b
 	if !tmux.Available() {
 		return nil, fmt.Errorf("tmux is not installed; `sloop approve` needs tmux")
 	}
-	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()))) // need prompts/answers
+	manifests, _ := adapter.Load()
+	// Enrich first so each row has a Status; selectSessions does its own
+	// filterWaiting for the --waiting case (mirrors kill). Pre-filtering here
+	// would run before Status is set and drop every row.
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
 	sel, err := selectSessions(rows, targets, all, waiting)
 	if err != nil {
 		return nil, err

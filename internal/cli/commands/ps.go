@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
 	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/hints"
@@ -36,6 +37,16 @@ type FleetRow struct {
 	Path      string           // repo path from the registry (cross-repo context)
 	Prompt    string           // the question the agent is blocked on (when waiting)
 	Answers   []tmux.Answer    // parsed choices the agent offers (answer in one key)
+	Display   string           // provider display name (e.g. "Google Antigravity" for "agy")
+}
+
+// toolName is the row's provider display name, falling back to the tool key when
+// the row hasn't been enriched (e.g. plain listings built straight from tmux).
+func (r FleetRow) toolName() string {
+	if r.Display != "" {
+		return r.Display
+	}
+	return r.Tool
 }
 
 // registryPaths maps each registered workspace name to its repo path, so the
@@ -115,7 +126,7 @@ const captureTimeout = 2 * time.Second
 // writes a distinct index, so no locking is needed, and each capture is bounded
 // by captureTimeout so a stuck pane can't block. When a fresh hook-written
 // marker exists for a session it overrides the pane heuristic (authoritative).
-func enrichGlances(rows []FleetRow) []FleetRow {
+func enrichGlances(rows []FleetRow, manifests map[string]adapter.Manifest) []FleetRow {
 	var wg sync.WaitGroup
 	for i := range rows {
 		wg.Add(1)
@@ -123,13 +134,14 @@ func enrichGlances(rows []FleetRow) []FleetRow {
 			defer wg.Done()
 
 			marker, hasMarker := fleetstate.Read(rows[i].Name)
+			rows[i].Display = displayTool(rows[i].Tool, manifests)
 
 			ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 			defer cancel()
 			out, err := tmux.OutputContext(ctx, tmux.BuildCaptureArgs(rows[i].Name)...)
 			if err == nil {
 				rows[i].Glance = truncate(tmux.LastNonEmptyLine(string(out)), 72)
-				rows[i].Status = tmux.ClassifyStatus(string(out))
+				rows[i].Status = tmux.ClassifyStatus(string(out), manifests[rows[i].Tool])
 			}
 			if hasMarker {
 				rows[i].Status = stateToStatus(marker.Status)
@@ -221,8 +233,8 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 	}
 	_, _ = fmt.Fprintf(w, "%s\n\n", header)
 	for i, r := range rows {
-		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-9s %s · %s\n",
-			i+1, r.Workspace, r.Tool, stateLabel(r), humanizeSince(r.Activity))
+		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-18s %s · %s\n",
+			i+1, r.Workspace, r.toolName(), stateLabel(r), humanizeSince(r.Activity))
 		if b := bottomLine(r); b != "" {
 			_, _ = fmt.Fprintf(w, "      └ %s\n", b)
 		}
@@ -264,10 +276,53 @@ func jumpToFleet(rows []FleetRow, n int) error {
 	if n < 1 || n > len(rows) {
 		return fmt.Errorf("no session #%d (have %d)", n, len(rows))
 	}
+	return attachSession(rows[n-1].Name)
+}
+
+// pickFleetSession shows the live fleet and returns the chosen session name ("" if
+// cancelled). Backs the no-argument `sloop attach` so you don't have to type a
+// session name — using the same WORKSPACE/TOOL/STATUS columns, colors and
+// waiting-first order as `ps`, so the picker reads identically to the fleet view.
+func pickFleetSession(title string) (string, error) {
+	manifests, _ := adapter.Load()
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+	if len(rows) == 0 {
+		return "", fmt.Errorf("no running AI sessions to attach to (start one with `sloop run <tool>`)")
+	}
+	sortNeedsAttention(rows)
+
+	wsW, _, _ := columnWidths(rows)
+	if wsW < len("WORKSPACE") {
+		wsW = len("WORKSPACE")
+	}
+	toolW := len("TOOL")
+	for _, r := range rows {
+		if n := len(r.toolName()); n > toolW {
+			toolW = n
+		}
+	}
+	opts := make([]string, len(rows))
+	for i, r := range rows {
+		opts[i] = fmt.Sprintf("%-*s %-*s %s", wsW, r.Workspace, toolW, r.toolName(), statusText(r))
+	}
+
+	legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
+		tui.Blue("attached") + " · " + tui.Green("idle")
+	cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS"))
+	tui.Clear()
+	idx, err := tui.SelectMenu(title+"\r\n"+legend+"\r\n\r\n"+cols, opts)
+	if err != nil || idx < 0 {
+		return "", err
+	}
+	return rows[idx].Name, nil
+}
+
+// attachSession attaches to a session by name (switches client if already inside
+// tmux), replacing this process's foreground with tmux. Shared by `ps` and `ls`.
+func attachSession(name string) error {
 	if !tmux.Available() {
 		return fmt.Errorf("tmux is not installed")
 	}
-	name := rows[n-1].Name
 	args := tmux.BuildAttachArgs(name)
 	if os.Getenv("TMUX") != "" {
 		args = tmux.BuildSwitchArgs(name)
@@ -369,7 +424,8 @@ var psCmd = &cobra.Command{
 			return runWatch(cmd.OutOrStdout(), psInterval, psWaiting, psNotify)
 		}
 
-		rows = enrichGlances(rows)
+		manifests, _ := adapter.Load()
+		rows = enrichGlances(rows, manifests)
 		sortNeedsAttention(rows)
 		paths := registryPaths()
 		annotatePaths(rows, paths)
@@ -380,23 +436,17 @@ var psCmd = &cobra.Command{
 			return runPsAll(cmd.OutOrStdout(), rows, paths, ext)
 		}
 
-		if len(rows) == 0 {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces).")
-			externalNudge(cmd.OutOrStdout(), ext)
-			return nil
-		}
-
-		if psWaiting {
-			rows = filterWaiting(rows)
+		// Non-interactive (piped, CI): print the plain listing instead of the
+		// raw-mode control center, which can't run without a tty.
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			if psWaiting {
+				rows = filterWaiting(rows)
+			}
 			if len(rows) == 0 {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "⚓ No agents waiting on you.")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), emptyFleetMessage(psWaiting))
+				externalNudge(cmd.OutOrStdout(), ext)
 				return nil
 			}
-		}
-
-		// Non-interactive (piped, CI): print the plain listing instead of the
-		// raw-mode menu, which can't run without a tty.
-		if !term.IsTerminal(int(os.Stdin.Fd())) {
 			if err := RunPs(cmd.OutOrStdout(), rows); err != nil {
 				return err
 			}
@@ -405,40 +455,95 @@ var psCmd = &cobra.Command{
 			return nil
 		}
 
-		wsW, toolW, waiting := columnWidths(rows)
-
-		var options []string
-		for _, r := range rows {
-			dot, label := statusDot(r)
-			line := fmt.Sprintf("%s %-*s %-*s %-16s %s",
-				dot, wsW, r.Workspace, toolW, r.Tool, label, shortSince(r.Activity))
-			if b := bottomLine(r); b != "" {
-				line += "\r\n└ " + tui.Grey(b)
+		// Interactive control center: loop so an action (send/answer/kill) or
+		// cancelling returns to the fleet instead of dropping to the shell. The
+		// screen is cleared each pass and feedback shows in `notice` under the
+		// header, so the fleet redraws in place; it's re-read every pass, so kills
+		// and new sessions show immediately.
+		var notice string
+		detach := tui.Grey("  ⏎ enters an agent — to come back, detach (keeps it running): " + tmux.PrefixRaw() + " d")
+		for {
+			tui.Clear()
+			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
+			sortNeedsAttention(rows)
+			annotatePaths(rows, registryPaths())
+			if psWaiting {
+				rows = filterWaiting(rows)
 			}
-			options = append(options, line)
-		}
+			if len(rows) == 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), emptyFleetMessage(psWaiting))
+				break
+			}
 
-		header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
-		if waiting > 0 {
-			header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
-		}
-		prompt := header + "\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q quit")
+			wsW, _, waiting := columnWidths(rows)
+			toolW := len("TOOL")
+			for _, r := range rows {
+				if n := len(r.toolName()); n > toolW {
+					toolW = n
+				}
+			}
+			if wsW < len("WORKSPACE") {
+				wsW = len("WORKSPACE")
+			}
+			var options []string
+			for _, r := range rows {
+				// No leading status glyph: ●/○ are ambiguous-width and break column
+				// alignment. Status is the colored STATUS column instead.
+				line := fmt.Sprintf("%-*s %-*s %s %s",
+					wsW, r.Workspace, toolW, r.toolName(), statusText(r), shortSince(r.Activity))
+				if b := bottomLine(r); b != "" {
+					line += "\r\n└ " + tui.Grey(b)
+				}
+				options = append(options, line)
+			}
 
-		actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-		idx, key, err := tui.SelectAction(prompt, options, actionKeys)
-		if err != nil {
-			return err
-		}
-		switch key {
-		case 13: // Enter → jump
-			return jumpToFleet(rows, idx+1)
-		case 's': // send a quick prompt to the highlighted session
-			return promptAndSend(cmd, rows[idx])
-		case 'x': // kill the highlighted session (with confirm)
-			return confirmAndKill(cmd, rows[idx])
-		default:
-			if a, ok := matchAnswer(rows[idx], key); ok { // one-key answer
-				return sendAnswer(cmd, rows[idx], a)
+			header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
+			if waiting > 0 {
+				header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
+			}
+			legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
+				tui.Blue("attached") + " · " + tui.Green("idle") + tui.Grey(" · AGE = since last activity")
+			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q/esc quit")
+			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-16s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS", "AGE"))
+			prompt := header
+			if notice != "" {
+				prompt += "\r\n" + notice
+			}
+			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n" + detach + "\r\n\r\n" + cols
+			notice = "" // consumed; the handler below sets a fresh one for next pass
+
+			actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
+			idx, key, err := tui.SelectAction(prompt, options, actionKeys)
+			if err != nil {
+				return err
+			}
+			switch key {
+			case 0: // q / Esc / Ctrl-C → leave the control center
+				externalNudge(cmd.OutOrStdout(), ext)
+				hints.Show(cmd.OutOrStdout(), "ps")
+				return nil
+			case 13: // Enter → attach (replaces this process)
+				return jumpToFleet(rows, idx+1)
+			case 's': // send a quick prompt; empty cancels back to the fleet
+				n, err := promptAndSend(cmd, rows[idx])
+				if err != nil {
+					return err
+				}
+				notice = n
+			case 'x': // kill the highlighted session (with confirm)
+				n, err := confirmAndKill(cmd, rows[idx])
+				if err != nil {
+					return err
+				}
+				notice = n
+			default:
+				if a, ok := matchAnswer(rows[idx], key); ok { // one-key answer
+					n, err := sendAnswer(cmd, rows[idx], a)
+					if err != nil {
+						return err
+					}
+					notice = n
+				}
 			}
 		}
 		externalNudge(cmd.OutOrStdout(), ext)
@@ -489,38 +594,58 @@ func matchAnswer(r FleetRow, key byte) (tmux.Answer, bool) {
 	return tmux.Answer{}, false
 }
 
-// sendAnswer types the chosen answer into the session.
-func sendAnswer(cmd *cobra.Command, row FleetRow, a tmux.Answer) error {
+// sendAnswer types the chosen answer into the session, returning a notice line
+// for the control center to show on its next redraw.
+func sendAnswer(_ *cobra.Command, row FleetRow, a tmux.Answer) (string, error) {
 	if err := tmux.LaunchSend(row.Name, a.Key); err != nil {
-		return err
+		return "", err
 	}
-	cmd.Printf("answered %s: %s\n", row.Name, a.Label)
-	return nil
+	return tui.Green(fmt.Sprintf("✓ answered %s: %s", row.Name, a.Label)), nil
 }
 
 // promptAndSend asks for a line and sends it to the row (used by the ps `s` key).
-func promptAndSend(cmd *cobra.Command, row FleetRow) error {
-	msg := promptLine(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("send to %s: ", row.Name))
-	if strings.TrimSpace(msg) == "" {
-		return nil
+// Reading in raw mode means Esc/Ctrl-C cancel back to the fleet instead of
+// killing `ps`, and an empty submit cancels too. Returns a notice line ("" when
+// cancelled) for the control center to show on its next redraw.
+func promptAndSend(_ *cobra.Command, row FleetRow) (string, error) {
+	msg, ok := tui.ReadLine(fmt.Sprintf("send to %s (Enter to send · Esc to cancel): ", row.Name))
+	if !ok || strings.TrimSpace(msg) == "" {
+		return "", nil
 	}
 	if err := tmux.LaunchSend(row.Name, msg); err != nil {
-		return err
+		return "", err
 	}
-	cmd.Printf("sent to %s\n", row.Name)
-	return nil
+	return tui.Green("✓ sent to " + row.Name), nil
 }
 
 // confirmAndKill ends the row's session after a y/N confirm (used by ps `x`).
-func confirmAndKill(cmd *cobra.Command, row FleetRow) error {
-	if !confirm(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("kill %s? [y/N] ", row.Name)) {
-		return nil
+// Returns a notice line ("" when declined) for the next redraw.
+func confirmAndKill(_ *cobra.Command, row FleetRow) (string, error) {
+	if !tui.Confirm(fmt.Sprintf("kill %s? [y/N] ", row.Name)) {
+		return "", nil
 	}
 	if err := killFunc(row.Name); err != nil {
-		return err
+		return "", err
 	}
-	cmd.Printf("killed %s\n", row.Name)
-	return nil
+	return tui.Yellow("✓ killed " + row.Name), nil
+}
+
+// displayTool returns a friendly name for a tool key (the manifest's display
+// name, e.g. "Google Antigravity" for "agy"), falling back to the key for
+// unknown/adopted tools.
+func displayTool(key string, manifests map[string]adapter.Manifest) string {
+	if m, ok := manifests[key]; ok && m.Name != "" {
+		return m.Name
+	}
+	return key
+}
+
+// emptyFleetMessage is the "nothing here" line for ps, tailored to --waiting.
+func emptyFleetMessage(waitingOnly bool) string {
+	if waitingOnly {
+		return "⚓ No agents waiting on you."
+	}
+	return "⚓ No running AI sessions. Start one with `sloop run <tool>` (or `sloop ps --all` to see known workspaces)."
 }
 
 // statusDot renders the agent status as a colored dot plus a label for the
@@ -537,6 +662,23 @@ func statusDot(r FleetRow) (dot, label string) {
 		return tui.Blue("●"), "attached"
 	}
 	return tui.Green("○"), "idle"
+}
+
+// statusText is the colored, fixed-width STATUS column for the ps control
+// center: the status as legible text (no ambiguous-width glyph), padded to 16
+// before coloring so the trailing AGE column stays aligned.
+func statusText(r FleetRow) string {
+	pad := func(s string) string { return fmt.Sprintf("%-16s", s) }
+	switch r.Status {
+	case tmux.StatusWaiting:
+		return tui.Yellow(pad("waiting on you"))
+	case tmux.StatusWorking:
+		return tui.Cyan(pad("working"))
+	}
+	if r.Attached {
+		return tui.Blue(pad("attached"))
+	}
+	return tui.Green(pad("idle"))
 }
 
 // shortSince is a compact relative time ("now", "3m", "2h", "5d").
@@ -581,7 +723,8 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 	}
 	var prev []FleetRow
 	for {
-		rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())))
+		manifests, _ := adapter.Load()
+		rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
 		sortNeedsAttention(rows)
 
 		shown := rows

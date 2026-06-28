@@ -13,11 +13,13 @@ import (
 const fleetPopupCmd = appName + " ps"
 
 var popupCmd = &cobra.Command{
-	Use:   "popup",
-	Short: "Open the cross-repo fleet (`ps`) as a floating tmux popup (HUD)",
+	Use:     "popup",
+	Aliases: []string{"hud"},
+	Short:   "Open the cross-repo fleet (`ps`) as a floating tmux popup / HUD",
 	Long: `Open ` + "`sloop ps`" + ` in a tmux popup over your current pane: glance at
 every agent, answer or jump with one key, then the popup closes back to your
-work. Bind it to a key with ` + "`sloop popup setup`" + `. Needs tmux ≥ 3.2.`,
+work — a heads-up display for the fleet. Aliased as ` + "`sloop hud`" + `. Bind it to
+a key with ` + "`sloop popup setup`" + ` (or ` + "`sloop hud setup`" + `). Needs tmux ≥ 3.2.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if os.Getenv("TMUX") == "" {

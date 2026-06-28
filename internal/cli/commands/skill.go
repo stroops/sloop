@@ -96,5 +96,6 @@ func RegisterSkill(cmd *cobra.Command) {
 	skillCmd.AddCommand(skillNewCmd)
 	skillAddCmd.Flags().StringVar(&skillAddName, "name", "", "name for the imported skill (default: derived from the URL)")
 	skillCmd.AddCommand(skillAddCmd)
+	skillCmd.AddCommand(skillUpdateCmd)
 	cmd.AddCommand(skillCmd)
 }

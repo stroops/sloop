@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/tmux"
 )
@@ -39,7 +40,8 @@ func renderStatusline(session string) string {
 	if m, ok := fleetstate.Read(session); ok {
 		st = stateToStatus(m.Status)
 	} else if out, err := tmux.Output(tmux.BuildCaptureArgs(session)...); err == nil {
-		st = tmux.ClassifyStatus(string(out))
+		manifests, _ := adapter.Load()
+		st = tmux.ClassifyStatus(string(out), manifests[tool])
 	}
 	return fmt.Sprintf("⚓ %s %s %s", ws, tool, tmuxStatusLabel(st))
 }
@@ -54,7 +56,9 @@ var statuslineCmd = &cobra.Command{
 		if len(args) == 1 {
 			session = args[0]
 		}
-		cmd.Print(renderStatusline(session))
+		// Must go to stdout: tmux's #() in the status bar captures stdout only.
+		// (cobra's cmd.Print writes to stderr, which the status bar never sees.)
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), renderStatusline(session))
 		return nil
 	},
 }

@@ -8,6 +8,15 @@ import (
 	"golang.org/x/term"
 )
 
+// Clear homes the cursor and clears the screen, but only on a real terminal, so
+// a control-center loop can redraw in place instead of stacking a fresh menu
+// under the previous one. A no-op when piped/redirected (no escape junk).
+func Clear() {
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Print("\033[H\033[2J")
+	}
+}
+
 // SelectMenu presents options and lets the user pick one with the arrow keys
 // (or j/k). It returns the selected index, or -1 if cancelled (Esc/Ctrl-C/q) or
 // run without a terminal. An option may contain "\r\n" to add indented

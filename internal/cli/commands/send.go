@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/tmux"
 )
 
@@ -74,9 +76,10 @@ func RunSendBroadcast(msg string, all, waiting bool) (int, error) {
 	if !tmux.Available() {
 		return 0, fmt.Errorf("tmux is not installed; `sloop send` needs tmux")
 	}
-	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+	manifests, _ := adapter.Load()
+	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
 	if waiting {
-		rows = filterWaiting(enrichGlances(rows))
+		rows = filterWaiting(rows)
 	}
 	if len(rows) == 0 {
 		return 0, fmt.Errorf("no matching sessions")

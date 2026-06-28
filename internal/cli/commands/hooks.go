@@ -18,11 +18,13 @@ import (
 // Hook installation is driven entirely by adapter manifests (the single
 // provider-aware source). A tool's manifest says where its hook config lives,
 // which install strategy applies, and which of its events map to sloop's
-// working/waiting/idle states. Each event calls `sloop hook <state>`, which
+// working/waiting/idle states. Each event calls `sloop hooks emit <state>`, which
 // records a marker `sloop ps` reads.
 
-// hookCommandFor is the shell command a tool runs for a sloop state.
-func hookCommandFor(state string) string { return appName + " hook " + state }
+// hookCommandFor is the shell command a tool runs for a sloop state. It is the
+// reserved `sloop hooks emit <state>` callback — its prefix is how sloop's own
+// status hooks stay identifiable and never collide with workflow hooks.
+func hookCommandFor(state string) string { return appName + " hooks emit " + state }
 
 // eventCommands turns a manifest's event→state mapping into the event→command
 // map the installers and printers use, skipping states the tool can't signal.
@@ -118,6 +120,90 @@ func installSettingsHooks(path string, events map[string]string) (bool, error) {
 	return true, os.WriteFile(path, append(out, '\n'), 0o644)
 }
 
+// mergeCursorHooks adds event→command hooks to a .cursor/hooks.json document.
+// Cursor's shape is flatter than settings.json: hooks[event] is an array of
+// {command} objects. Existing hooks are preserved and the merge is idempotent.
+func mergeCursorHooks(root map[string]any, events map[string]string) (map[string]any, bool) {
+	if root == nil {
+		root = map[string]any{}
+	}
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+	}
+	changed := false
+	for event, cmd := range events {
+		if hasCursorCommand(hooks[event], cmd) {
+			continue
+		}
+		arr, _ := hooks[event].([]any)
+		hooks[event] = append(arr, map[string]any{"command": cmd})
+		changed = true
+	}
+	if changed {
+		root["hooks"] = hooks
+		if _, ok := root["version"]; !ok {
+			root["version"] = 1
+		}
+	}
+	return root, changed
+}
+
+// hasCursorCommand reports whether an event's hook array already contains the
+// given command (so install is idempotent).
+func hasCursorCommand(eventVal any, cmd string) bool {
+	arr, ok := eventVal.([]any)
+	if !ok {
+		return false
+	}
+	for _, h := range arr {
+		hm, ok := h.(map[string]any)
+		if !ok {
+			continue
+		}
+		if c, _ := hm["command"].(string); c == cmd {
+			return true
+		}
+	}
+	return false
+}
+
+// installCursorHooks merges events into the .cursor/hooks.json file at path,
+// creating it if needed. Returns whether the file changed.
+func installCursorHooks(path string, events map[string]string) (bool, error) {
+	doc := map[string]any{}
+	if b, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(b, &doc); err != nil {
+			return false, fmt.Errorf("%s is not valid JSON: %w", path, err)
+		}
+	}
+	merged, changed := mergeCursorHooks(doc, events)
+	if !changed {
+		return false, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, err
+	}
+	out, err := json.MarshalIndent(merged, "", "  ")
+	if err != nil {
+		return false, err
+	}
+	return true, os.WriteFile(path, append(out, '\n'), 0o644)
+}
+
+// hookInstaller returns the writer for a manifest's install strategy, or nil if
+// the strategy has no safe auto-writer yet (then `hooks print` shows the wiring).
+func hookInstaller(strategy string) func(path string, events map[string]string) (bool, error) {
+	switch strategy {
+	case "settings-json":
+		return installSettingsHooks
+	case "cursor-json":
+		return installCursorHooks
+	default:
+		return nil
+	}
+}
+
 // resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
 // expands to the home dir, absolute paths pass through, and a repo-relative path
 // is joined to the workspace root.
@@ -169,8 +255,15 @@ func manifestForTool(tool string) (adapter.Manifest, error) {
 }
 
 var hooksCmd = &cobra.Command{
-	Use:   "hooks",
-	Short: "Install AI tool hooks so `sloop ps` knows agent status precisely",
+	Use:     "hooks",
+	Aliases: []string{"hk", "hook"},
+	Short:   "Wire a tool's status hooks so `sloop ps` knows agent state precisely",
+	Long: `Manage status hooks: each tool calls sloop from its own lifecycle events so
+sloop ps reports waiting/working/idle precisely (not just a screen guess).
+
+These are status hooks (for the fleet view). Portable workflow hooks —
+format/lint/policy automation installed into each tool — are a v0.2.0 proposal;
+see docs/design/hooks.md.`,
 }
 
 var hooksInstallCmd = &cobra.Command{
@@ -186,7 +279,8 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if m.Hooks.Install != "settings-json" {
+		install := hookInstaller(m.Hooks.Install)
+		if install == nil {
 			cmd.Printf("auto-install isn't available for %s yet.\n", tool)
 			cmd.Printf("Run `sloop hooks print %s` for the exact events to wire in %s.\n", tool, m.Hooks.Config)
 			return nil
@@ -203,7 +297,7 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		changed, err := installSettingsHooks(path, eventCommands(m.Hooks))
+		changed, err := install(path, eventCommands(m.Hooks))
 		if err != nil {
 			return err
 		}
@@ -231,8 +325,14 @@ var hooksPrintCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if m.Hooks.Install == "settings-json" {
+		switch m.Hooks.Install {
+		case "settings-json":
 			doc, _ := mergeSettingsHooks(nil, eventCommands(m.Hooks))
+			out, _ := json.MarshalIndent(doc, "", "  ")
+			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
+			return nil
+		case "cursor-json":
+			doc, _ := mergeCursorHooks(nil, eventCommands(m.Hooks))
 			out, _ := json.MarshalIndent(doc, "", "  ")
 			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
 			return nil
@@ -253,23 +353,25 @@ var hooksPrintCmd = &cobra.Command{
 
 var hooksListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "Show hook support and event mapping for every AI provider",
+	Short: "Show status-hook support and event mapping for every AI provider",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manifests, err := adapter.Load()
 		if err != nil {
 			return err
 		}
+		cmd.Println("Status hooks — report waiting/working/idle to `sloop ps`:")
 		cmd.Printf("%-9s %-12s %s\n", "TOOL", "AUTO-INSTALL", "CONFIG")
 		for _, tool := range hookTools() {
 			m := manifests[tool]
 			auto := "print+paste"
-			if m.Hooks.Install == "settings-json" {
+			if hookInstaller(m.Hooks.Install) != nil {
 				auto = "yes"
 			}
 			cmd.Printf("%-9s %-12s %s\n", tool, auto, m.Hooks.Config)
 		}
 		cmd.Println("\nDetails: sloop hooks print <tool>")
+		cmd.Println("(Workflow hooks — format/lint/policy — are v0.2.0; see docs/design/hooks.md.)")
 		hints.Show(cmd.OutOrStdout(), "hooks")
 		return nil
 	},
@@ -282,5 +384,6 @@ func RegisterHooks(cmd *cobra.Command) {
 	hooksCmd.AddCommand(hooksInstallCmd)
 	hooksCmd.AddCommand(hooksPrintCmd)
 	hooksCmd.AddCommand(hooksListCmd)
+	hooksCmd.AddCommand(hooksEmitCmd)
 	cmd.AddCommand(hooksCmd)
 }

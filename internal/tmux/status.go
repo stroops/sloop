@@ -3,6 +3,8 @@ package tmux
 import (
 	"regexp"
 	"strings"
+
+	"github.com/stroops/sloop/internal/adapter"
 )
 
 // AgentStatus is a best-effort classification of what an AI session is doing,
@@ -37,8 +39,12 @@ func (s AgentStatus) NeedsAttention() bool { return s == StatusWaiting }
 // spinner is almost always within the last handful of lines.
 const statusScanLines = 8
 
-// waitingMarkers signal the agent is blocked on the user. Matched case-insensitively.
-var waitingMarkers = []string{
+// defaultWaitingMarkers signal the agent is blocked on the user. These are
+// cross-tool terminal conventions (every CLI agent prints them the same way) and
+// are applied to every manifest, not special-cased per tool. A manifest's own
+// heuristics.waiting is merged on top for genuinely tool-specific phrasing.
+// Matched case-insensitively.
+var defaultWaitingMarkers = []string{
 	"do you want to",
 	"(y/n)", "[y/n]", "y/n)", "(yes/no)",
 	"press enter",
@@ -52,12 +58,15 @@ var waitingMarkers = []string{
 	"confirm",
 }
 
-// workingMarkers signal the agent is actively running. Matched case-insensitively.
-var workingMarkers = []string{
+// defaultWorkingMarkers signal the agent is actively running. Cross-tool
+// defaults (see defaultWaitingMarkers); a manifest's heuristics.working adds to
+// these. Matched case-insensitively.
+var defaultWorkingMarkers = []string{
 	"esc to interrupt",
 	"ctrl+c to", "ctrl-c to",
 	"thinking", "working…", "working...",
-	"generating", "running",
+	"generating", "running", "running command",
+	"reading file",
 	"tokens", "esc to cancel",
 }
 
@@ -67,26 +76,40 @@ const spinnerRunes = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷◐�
 // ClassifyStatus inspects the tail of a captured pane and returns a best-effort
 // status. Waiting (needs you) takes precedence over working, which takes
 // precedence over idle. Empty input is StatusUnknown.
-func ClassifyStatus(pane string) AgentStatus {
+func ClassifyStatus(pane string, manifest adapter.Manifest) AgentStatus {
 	tail := lastLines(pane, statusScanLines)
 	if tail == "" {
 		return StatusUnknown
 	}
 	low := strings.ToLower(tail)
-	for _, m := range waitingMarkers {
-		if strings.Contains(low, m) {
-			return StatusWaiting
-		}
+	// Default markers are cross-tool defaults; the manifest adds tool-specific
+	// ones. Check the lists separately rather than append()-ing the per-tool
+	// slice onto the shared package slice: ClassifyStatus runs concurrently (one
+	// goroutine per fleet row), and appending could write into the defaults'
+	// backing array and race.
+	if containsAny(low, defaultWaitingMarkers, manifest.Heuristics.Waiting) {
+		return StatusWaiting
 	}
-	for _, m := range workingMarkers {
-		if strings.Contains(low, m) {
-			return StatusWorking
-		}
+	if containsAny(low, defaultWorkingMarkers, manifest.Heuristics.Working) {
+		return StatusWorking
 	}
 	if strings.ContainsAny(tail, spinnerRunes) {
 		return StatusWorking
 	}
 	return StatusIdle
+}
+
+// containsAny reports whether low (already lowercased) contains any marker from
+// any of the given lists, matched case-insensitively.
+func containsAny(low string, lists ...[]string) bool {
+	for _, list := range lists {
+		for _, m := range list {
+			if strings.Contains(low, strings.ToLower(m)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Answer is a choice the agent is offering at a blocking prompt. Key is what to

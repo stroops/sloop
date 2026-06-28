@@ -43,7 +43,7 @@ func RunStatus(startDir string, w io.Writer) error {
 		}
 		tools = append(tools, label)
 		m := manifests[t]
-		if m.Hooks.Install == "settings-json" {
+		if hookInstaller(m.Hooks.Install) != nil {
 			autoHooks = append(autoHooks, t)
 		}
 		if m.Skills.Target != "" && syncpkg.SkillsState(ws.Root, ws.SloopDir(), m) == "linked" {

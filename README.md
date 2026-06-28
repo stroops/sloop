@@ -3,7 +3,7 @@
 > **The local-first control layer for your AI coding CLIs.**
 > One canonical context for every tool, and one cross-repo view of every agent you're running.
 
-[Documentation](docs/USAGE.md) 
+[Documentation](docs/guide/USAGE.md) 
 
 Sloop is a single, lightweight Go binary that sits **above** your AI coding tools — Claude Code,
 Cursor CLI, Codex CLI, GitHub Copilot CLI, Gemini CLI, Google Antigravity, and future agents. It
@@ -22,6 +22,25 @@ Running AI coding agents is powerful but quickly gets messy:
   *which agent is waiting for you* and which is still working.
 - **Per-tool knobs everywhere** — skills, hooks, and standard folders differ per provider, so setup is
   ad-hoc and hard to share with a team.
+
+Concretely, running two AI CLIs (say Claude and Cursor's `agent`) in one project today means juggling
+tmux by hand:
+
+```
+# The manual way — fiddly and easy to mix up
+Terminal 1 → tmux new -s claude_api → cd ~/code/api → claude
+Terminal 2 → tmux new -s cursor_api → cd ~/code/api → agent
+# …now switch between them yourself, and remember which window is which,
+#    across every repo, while CLAUDE.md and AGENTS.md drift apart.
+```
+
+```
+# With sloop — named sessions per workspace+tool, one fleet view, one context
+cd ~/code/api
+sloop run claude            # session api__claude, sees AGENTS.md
+sloop run cursor            # session api__cursor, same context
+sloop ps                    # one board: who's waiting, who's working — jump/reply/kill in place
+```
 
 Sloop fixes these with three ideas:
 
@@ -94,6 +113,31 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 
 ---
 
+## Daily use — `sloop ps` is home base
+
+Most days you live in **one screen**:
+
+1. **`sloop ps`** — the fleet board. Agents *waiting on you* float to the top, colored by status.
+2. **`Enter`** on a row jumps you straight into that agent (attaches its tmux session).
+3. Work with the agent. To step out, **detach**: press your tmux prefix then `d` — `Ctrl+b d` by
+   default, or `Ctrl+a d` if you remapped it. The agent **keeps running**; you land back at the fleet.
+4. Back in `sloop ps`, triage without attaching: answer a waiting agent in one key (`y` / `1` …),
+   `s` to send a line, `x` to kill, or `Enter` into the next one.
+
+You never lose an agent — detaching hides it, it doesn't stop it. Every sloop session's status bar
+shows **`⚓ detach: <prefix> d`** so you always know how to get back, and `sloop ps` is one keystroke
+away. Rebooted? **`sloop restore`** relaunches the fleet. No name to type? **`sloop a`** opens the same
+picker.
+
+> The status bar is set **per session** (`set-option -t`) — sloop never edits your `~/.tmux.conf`, and
+> only touches `status-left`/`status-right` (not your colors/theme). Keep your own bar fully intact with
+> `SLOOP_STATUSLINE=0`.
+
+`sloop ls` is the companion view — your registered **workspaces** (running or not) with their live
+agents — to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` to jump in.
+
+---
+
 ## Commands (the menu)
 
 `alias` = command shortcut · `-x` = short flag.
@@ -108,9 +152,10 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 | `send <target> <msg>` | — | `--waiting`, `--all`, `--yes` | Reply to a running agent without attaching; `--waiting`/`--all` broadcast. |
 | `kill <target>` | — | `--all`, `--waiting`, `--yes` | End session(s) — confirms (skip with `--yes` or global `-y`). |
 | `adopt <tmux-session>` | — | `-w/--workspace`, `--as` | Bring an external tmux session (one you started yourself) into the fleet. |
-| `popup` / `popup setup` | — | `--key` | Open the fleet `ps` as a floating tmux popup (HUD); `setup` binds a key. Needs tmux ≥ 3.2. |
+| `restore` | — | `--resume`, `--yes` | Relaunch your recent agents (detached) after a reboot / tmux restart. `--resume` continues each tool's prior conversation. |
+| `popup` / `popup setup` | `hud` | `--key` | Open the fleet `ps` as a floating tmux popup / HUD; `setup` binds a key. Needs tmux ≥ 3.2. |
 | `statusline setup` | — | — | Show a session's live status (`⚓ repo tool ◆ waiting`) in its tmux status bar. |
-| `attach <session>` | `a` | — | Attach to a session by full name. |
+| `attach [session]` | `a` | — | Attach to a session by name, or `sloop a` (no name) to pick from the fleet. |
 | `skills new\|add <…>` | `sk`, `skill` | `new`→`n`, `add`→`import` | Scaffold or import a reusable skill (shared across every tool). |
 | `hooks install\|list\|print [tool]` | — | — | Wire a tool's own hooks so `ps` status is authoritative. |
 | `tools` | — | — | Capability matrix (context / skills / hooks per tool). |
@@ -123,7 +168,7 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 **Global flags** (any command): `-y/--auto` (assume yes), `--no-color`, `--no-input`, `--config <file>`,
 `--debug` (log diagnostics to stderr; or set `SLOOP_DEBUG=1` — shows every multiplexer call sloop makes).
 
-Full, example-driven walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
+Full, example-driven walkthrough: **[docs/guide/USAGE.md](docs/guide/USAGE.md)**.
 
 ---
 
@@ -137,7 +182,7 @@ skills dir. Delivery is **create-if-missing** — sloop never overwrites a file 
 Launch happens in a tmux/psmux session named `<workspace>__<tool>`, which is what makes the fleet
 view, `send`, and `attach` possible.
 
-Architecture & internals: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+Architecture & internals: **[docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md)**.
 
 ---
 
@@ -157,7 +202,12 @@ Architecture & internals: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 Machine-local state lives under `~/.sloop/`: the workspaces registry + session history (`sloop.db`,
 SQLite with WAL), hook status markers (`state/`), and any user adapter manifests (`adapters/*.yaml`).
-Config layering is documented in **[docs/CONFIG.md](docs/CONFIG.md)**.
+Config layering is documented in **[docs/reference/CONFIG.md](docs/reference/CONFIG.md)**.
+
+**Across restarts.** tmux sessions live in memory, so a reboot ends them (sloop is not tmux-resurrect).
+What sloop keeps is the **registry**: after a restart your workspaces and recent sessions are still
+there, so `sloop ls` / `sloop ps --all` show them and `sloop run -w <name>` relaunches from anywhere.
+The agent's own conversation is the provider's to resume (e.g. `claude` continues a prior session).
 
 ---
 
@@ -165,7 +215,7 @@ Config layering is documented in **[docs/CONFIG.md](docs/CONFIG.md)**.
 
 Every tool is a declarative YAML manifest — adding a CLI is adding a file, never editing Go. Built-ins
 are embedded; user adapters/overrides live in `~/.sloop/adapters/*.yaml`. `sloop tools` shows the
-capability matrix. See **[docs/ADAPTERS.md](docs/ADAPTERS.md)** for the contract.
+capability matrix. See **[docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md)** for the contract.
 
 ```yaml
 name: Claude Code
@@ -192,10 +242,14 @@ hooks:                                          # status hooks for `sloop ps`
 
 ## Docs
 
-- [docs/USAGE.md](docs/USAGE.md) — hands-on guide, every command with examples
-- [docs/CONFIG.md](docs/CONFIG.md) — the three config layers (local / global / built-in)
-- [docs/ADAPTERS.md](docs/ADAPTERS.md) — the provider-aware adapter contract
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — packages, data flow, internals
+- [ROADMAP.md](ROADMAP.md) — pillars, what's next (v0.2.0 workflow hooks), how to contribute
+- [docs/guide/USAGE.md](docs/guide/USAGE.md) — hands-on guide, every command with examples
+- [docs/reference/CONFIG.md](docs/reference/CONFIG.md) — the three config layers (local / global / built-in)
+- [docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md) — the provider-aware adapter contract
+- [docs/design/run.md](docs/design/run.md) — `sloop run` design: CLI · model · effort resolution
+- [docs/design/skills.md](docs/design/skills.md) — skills model, lockfile, registry roadmap
+- [docs/design/hooks.md](docs/design/hooks.md) — status hooks today, workflow-hook design for v0.2.0
+- [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) — packages, data flow, internals
 
 ## License
 

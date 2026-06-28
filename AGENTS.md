@@ -10,8 +10,8 @@ design: **all per-provider knowledge lives in the adapter manifest** (`internal/
 Detect, launch, context delivery, skills, hooks, and completion are all manifest-driven. To support a
 new CLI, drop in one `<tool>.yaml` — no Go changes unless it needs a brand-new mechanism.
 
-- Provider contract + manifest schema: `docs/ADAPTERS.md`
-- Config layering (unified user config vs per-provider manifests): `docs/CONFIG.md`
+- Provider contract + manifest schema: `docs/reference/ADAPTERS.md`
+- Config layering (unified user config vs per-provider manifests): `docs/reference/CONFIG.md`
 - Runtime capability matrix: `sloop tools`
 
 User config is **unified** (one local `.sloop/config.yaml` + one global `~/.sloop/config.yaml` +

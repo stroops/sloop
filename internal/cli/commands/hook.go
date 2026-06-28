@@ -39,25 +39,32 @@ func RunHook(state string) error {
 	return fleetstate.Write(session, state)
 }
 
-var hookCmd = &cobra.Command{
-	Use:    "hook <waiting|working|idle>",
+// hookRunE validates the state argument, drains any hook payload on stdin, and
+// records the marker. It backs the hidden `hooks emit` callback that a provider's
+// own lifecycle hooks invoke.
+func hookRunE(cmd *cobra.Command, args []string) error {
+	// Drain any hook payload the tool sends on stdin; we don't need it, but
+	// reading avoids a broken pipe on the tool's side.
+	if cmd.InOrStdin() != nil {
+		_, _ = io.Copy(io.Discard, cmd.InOrStdin())
+	}
+	state := args[0]
+	switch state {
+	case "waiting", "working", "idle":
+	default:
+		return fmt.Errorf("unknown state %q (want waiting|working|idle)", state)
+	}
+	return RunHook(state)
+}
+
+// hooksEmitCmd is the internal callback an AI tool's own hooks invoke
+// (`sloop hooks emit <state>`). It lives under the `hooks` namespace for
+// consistency with `skills`; it is hidden because users never type it — it is
+// wired into a provider's hook config by `sloop hooks install`.
+var hooksEmitCmd = &cobra.Command{
+	Use:    "emit <waiting|working|idle>",
 	Short:  "Internal: record agent status (called by an AI tool's own hooks)",
 	Hidden: true,
 	Args:   cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Drain any hook payload the tool sends on stdin; we don't need it, but
-		// reading avoids a broken pipe on the tool's side.
-		if cmd.InOrStdin() != nil {
-			_, _ = io.Copy(io.Discard, cmd.InOrStdin())
-		}
-		state := args[0]
-		switch state {
-		case "waiting", "working", "idle":
-		default:
-			return fmt.Errorf("unknown state %q (want waiting|working|idle)", state)
-		}
-		return RunHook(state)
-	},
+	RunE:   hookRunE,
 }
-
-func RegisterHook(cmd *cobra.Command) { cmd.AddCommand(hookCmd) }

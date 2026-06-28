@@ -1,5 +1,6 @@
 version: 1
 tools:
+    - agy
     - claude
     - codex
     - cursor

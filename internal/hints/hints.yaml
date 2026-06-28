@@ -113,8 +113,14 @@ hints:
   - id: hooks-multi
     context: hooks
     text:
-      en: "`sloop hooks list` shows every provider; claude and gemini auto-install, others print the exact wiring."
-      vi: "`sloop hooks list` liệt kê mọi provider; claude và gemini tự cài, các tool khác in sẵn cách nối."
+      en: "`sloop hooks list` shows every provider; claude, gemini and cursor auto-install, others print the exact wiring."
+      vi: "`sloop hooks list` liệt kê mọi provider; claude, gemini và cursor tự cài, các tool khác in sẵn cách nối."
+
+  - id: hooks-what
+    context: hooks
+    text:
+      en: "Hooks let a tool report its status to sloop directly — more precise than reading the screen, and the marker expires so it never goes stale."
+      vi: "Hook cho phép tool tự báo trạng thái cho sloop — chính xác hơn đọc màn hình, và marker tự hết hạn nên không bao giờ cũ."
 
   - id: detach-general
     context: general

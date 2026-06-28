@@ -30,6 +30,27 @@ func completeTools(_ *cobra.Command, _ []string, _ string) ([]string, cobra.Shel
 	return names, cobra.ShellCompDirectiveNoFileComp
 }
 
+// completeModels suggests the model aliases every adapter declares (run.models),
+// e.g. for `run -m`. Aliases only — full API ids still work but aren't listed.
+func completeModels(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	manifests, err := adapter.Load()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	seen := map[string]bool{}
+	var models []string
+	for _, m := range manifests {
+		for _, a := range m.Run.Models {
+			if !seen[a] {
+				seen[a] = true
+				models = append(models, a)
+			}
+		}
+	}
+	sort.Strings(models)
+	return models, cobra.ShellCompDirectiveNoFileComp
+}
+
 // completeWorkspaces suggests registered workspace names (for -w/--workspace).
 func completeWorkspaces(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 	return workspaceNames(), cobra.ShellCompDirectiveNoFileComp
