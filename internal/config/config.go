@@ -42,6 +42,14 @@ func UserAdaptersDir() (string, error) {
 // files so future schema changes can migrate safely.
 const ConfigVersion = 1
 
+// Profile is a named launch variant of a provider: the same tool with extra
+// env (e.g. CLAUDE_CONFIG_DIR to select a second account). Invoked as
+// `sloop run @<name>`; the profile name becomes the session's instance suffix.
+type Profile struct {
+	Tool string            `yaml:"tool"`
+	Env  map[string]string `yaml:"env,omitempty"`
+}
+
 // Global is the machine-local config at ~/.sloop/config.yaml.
 type Global struct {
 	Version int    `yaml:"version"`
@@ -50,6 +58,8 @@ type Global struct {
 	// auto from $SLOOP_LANG/$LANG. Hints nil = enabled, false = off.
 	Lang  string `yaml:"lang,omitempty"`
 	Hints *bool  `yaml:"hints,omitempty"`
+	// Profiles are reusable launch variants, keyed by name.
+	Profiles map[string]Profile `yaml:"profiles,omitempty"`
 }
 
 func GlobalConfigPath() (string, error) {
