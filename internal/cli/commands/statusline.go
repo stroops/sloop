@@ -56,7 +56,9 @@ var statuslineCmd = &cobra.Command{
 		if len(args) == 1 {
 			session = args[0]
 		}
-		cmd.Print(renderStatusline(session))
+		// Must go to stdout: tmux's #() in the status bar captures stdout only.
+		// (cobra's cmd.Print writes to stderr, which the status bar never sees.)
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), renderStatusline(session))
 		return nil
 	},
 }
