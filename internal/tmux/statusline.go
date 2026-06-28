@@ -25,4 +25,9 @@ func SetStatusLine(session string) {
 	set("status-right", StatusRightFormat(exe, session))
 	set("status-right-length", "60")
 	set("status-interval", "2")
+	// status-left becomes a persistent "how to get back" tip, using the user's
+	// real prefix, so anyone inside the session can see how to detach (return to
+	// the fleet without stopping the agent).
+	set("status-left", fmt.Sprintf(" ⚓ detach: %s d ", PrefixRaw()))
+	set("status-left-length", "24")
 }

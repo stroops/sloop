@@ -113,6 +113,21 @@ func Prefix() string {
 	return "Ctrl+b"
 }
 
+// PrefixRaw returns the tmux prefix key in tmux's own notation (e.g. "C-a"), for
+// compact display in a status bar; falls back to "C-b". (Prefix returns the
+// human "Ctrl+a" form for prose; this is the terse form for the status line.)
+func PrefixRaw() string {
+	out, err := Output("show-options", "-g", "prefix")
+	if err != nil {
+		return "C-b"
+	}
+	parts := strings.Fields(strings.TrimSpace(string(out)))
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return "C-b"
+}
+
 func sanitize(s string) string {
 	var b strings.Builder
 	for _, r := range s {

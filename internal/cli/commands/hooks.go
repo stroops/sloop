@@ -256,7 +256,7 @@ func manifestForTool(tool string) (adapter.Manifest, error) {
 
 var hooksCmd = &cobra.Command{
 	Use:     "hooks",
-	Aliases: []string{"hk"},
+	Aliases: []string{"hk", "hook"},
 	Short:   "Wire a tool's status hooks so `sloop ps` knows agent state precisely",
 	Long: `Manage status hooks: each tool calls sloop from its own lifecycle events so
 sloop ps reports waiting/working/idle precisely (not just a screen guess).

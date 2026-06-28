@@ -113,6 +113,27 @@ In the `sloop ps` menu: `↑/↓` move · `Enter` jump in · `s` reply · `x` ki
 
 ---
 
+## Daily use — `sloop ps` is home base
+
+Most days you live in **one screen**:
+
+1. **`sloop ps`** — the fleet board. Agents *waiting on you* float to the top, colored by status.
+2. **`Enter`** on a row jumps you straight into that agent (attaches its tmux session).
+3. Work with the agent. To step out, **detach**: press your tmux prefix then `d` — `Ctrl+b d` by
+   default, or `Ctrl+a d` if you remapped it. The agent **keeps running**; you land back at the fleet.
+4. Back in `sloop ps`, triage without attaching: answer a waiting agent in one key (`y` / `1` …),
+   `s` to send a line, `x` to kill, or `Enter` into the next one.
+
+You never lose an agent — detaching hides it, it doesn't stop it. Every sloop session's status bar
+shows **`⚓ detach: <prefix> d`** so you always know how to get back, and `sloop ps` is one keystroke
+away. Rebooted? **`sloop restore`** relaunches the fleet. No name to type? **`sloop a`** opens the same
+picker.
+
+`sloop ls` is the companion view — your registered **workspaces** (running or not) with their live
+agents — to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` to jump in.
+
+---
+
 ## Commands (the menu)
 
 `alias` = command shortcut · `-x` = short flag.
