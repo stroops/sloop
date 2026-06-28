@@ -43,7 +43,7 @@ func launchWorkspaceDefault(startDir string) error {
 	if err != nil {
 		return err
 	}
-	return RunRun(startDir, "", "", "", "", nil, selectRunner(ws.Name, plan.toolKey))
+	return RunRun(startDir, "", "", "", "", "", nil, selectRunner(ws.Name, plan.toolKey))
 }
 
 func RunLs(w io.Writer) error {
@@ -120,21 +120,27 @@ var lsCmd = &cobra.Command{
 		}
 
 		prompt := fmt.Sprintf("⚓ Sloop workspaces · %d", len(workspaces)) +
-			"\r\n" + tui.Grey("  ↑/↓ move · ⏎ jump in (attach or launch) · q quit")
-		selected, err := tui.SelectMenu(prompt, options)
+			"\r\n" + tui.Grey("  ↑/↓ move · ⏎ attach/show path · r launch tool · q quit")
+		// Enter is safe (attach a live session, or just show the path); launching a
+		// tool is the explicit `r` action, so Enter never spawns an agent by surprise.
+		selected, key, err := tui.SelectAction(prompt, options, []byte{'r'})
 		if err != nil {
 			return err
 		}
-		if selected < 0 {
+		if selected < 0 || key == 0 {
 			return nil
 		}
 		ws := workspaces[selected]
-		// Jump into work: attach to a live session if one exists, otherwise launch
-		// the workspace's default tool right there.
-		if rows := live[ws.Name]; len(rows) > 0 {
-			return attachSession(rows[0].Name)
+		switch key {
+		case 'r':
+			return launchWorkspaceDefault(ws.Path)
+		default: // Enter
+			if rows := live[ws.Name]; len(rows) > 0 {
+				return attachSession(rows[0].Name)
+			}
+			fmt.Printf("\n%s has no running agent. Open it with:\n  cd %s\nor press r in the menu to launch its default tool.\n", ws.Name, ws.Path)
+			return nil
 		}
-		return launchWorkspaceDefault(ws.Path)
 	},
 }
 
