@@ -43,7 +43,35 @@ func renderStatusline(session string) string {
 		manifests, _ := adapter.Load()
 		st = tmux.ClassifyStatus(string(out), manifests[tool])
 	}
-	return fmt.Sprintf("⚓ %s %s %s", ws, tool, tmuxStatusLabel(st))
+	return fmt.Sprintf("⚓ %s %s %s%s", ws, tool, tmuxStatusLabel(st), renderFleetBadge(session))
+}
+
+// waitingBadge formats the fleet-wide waiting count for the status bar, empty
+// when nothing is waiting so the bar stays clean.
+func waitingBadge(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return fmt.Sprintf(" #[fg=yellow]⏳ %d waiting#[default]", n)
+}
+
+// renderFleetBadge counts sloop sessions whose fresh marker is `waiting`,
+// excluding the current session (so it reads "others need you"). Markers only —
+// no capture-pane — because this re-renders every status-interval.
+func renderFleetBadge(exclude string) string {
+	n := 0
+	for _, s := range tmux.ParseSessions(tmuxList()) {
+		if s.Name == exclude {
+			continue
+		}
+		if strings.LastIndex(s.Name, "__") < 0 {
+			continue
+		}
+		if m, ok := fleetstate.Read(s.Name); ok && m.Status == "waiting" {
+			n++
+		}
+	}
+	return waitingBadge(n)
 }
 
 var statuslineCmd = &cobra.Command{
