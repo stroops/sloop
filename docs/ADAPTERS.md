@@ -61,7 +61,7 @@ The runtime view of all of this is **`sloop tools`** (capability matrix:
 
 ## Hook install strategies
 
-- `settings-json` — merge `events → "sloop hook <state>"` into a JSON settings file
+- `settings-json` — merge `events → "sloop hooks emit <state>"` into a JSON settings file
   (`mergeSettingsHooks`/`installSettingsHooks`). Used by **claude** and **gemini** (identical nested
   `hooks[event] = [{hooks:[{type,command}]}]` shape). Written idempotently, never clobbering keys.
 - `cursor-json` — merge into `.cursor/hooks.json`, Cursor's flatter shape

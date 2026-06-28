@@ -21,8 +21,10 @@ import (
 // working/waiting/idle states. Each event calls `sloop hook <state>`, which
 // records a marker `sloop ps` reads.
 
-// hookCommandFor is the shell command a tool runs for a sloop state.
-func hookCommandFor(state string) string { return appName + " hook " + state }
+// hookCommandFor is the shell command a tool runs for a sloop state. It is the
+// reserved `sloop hooks emit <state>` callback — its prefix is how sloop's own
+// status hooks stay identifiable and never collide with workflow hooks.
+func hookCommandFor(state string) string { return appName + " hooks emit " + state }
 
 // eventCommands turns a manifest's event→state mapping into the event→command
 // map the installers and printers use, skipping states the tool can't signal.
@@ -253,8 +255,9 @@ func manifestForTool(tool string) (adapter.Manifest, error) {
 }
 
 var hooksCmd = &cobra.Command{
-	Use:   "hooks",
-	Short: "Install AI tool hooks so `sloop ps` knows agent status precisely",
+	Use:     "hooks",
+	Aliases: []string{"hk"},
+	Short:   "Install AI tool hooks so `sloop ps` knows agent status precisely",
 }
 
 var hooksInstallCmd = &cobra.Command{
@@ -373,5 +376,6 @@ func RegisterHooks(cmd *cobra.Command) {
 	hooksCmd.AddCommand(hooksInstallCmd)
 	hooksCmd.AddCommand(hooksPrintCmd)
 	hooksCmd.AddCommand(hooksListCmd)
+	hooksCmd.AddCommand(hooksEmitCmd)
 	cmd.AddCommand(hooksCmd)
 }

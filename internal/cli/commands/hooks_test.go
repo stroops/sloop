@@ -9,17 +9,17 @@ import (
 
 // claudeEvents mirrors the claude manifest's event→command mapping.
 var claudeEvents = map[string]string{
-	"UserPromptSubmit": "sloop hook working",
-	"Notification":     "sloop hook waiting",
-	"Stop":             "sloop hook idle",
+	"UserPromptSubmit": "sloop hooks emit working",
+	"Notification":     "sloop hooks emit waiting",
+	"Stop":             "sloop hooks emit idle",
 }
 
 // geminiEvents mirrors the gemini manifest's mapping (different event names,
 // same settings.json shape) — proves the installer is multi-provider.
 var geminiEvents = map[string]string{
-	"BeforeAgent":  "sloop hook working",
-	"Notification": "sloop hook waiting",
-	"AfterAgent":   "sloop hook idle",
+	"BeforeAgent":  "sloop hooks emit working",
+	"Notification": "sloop hooks emit waiting",
+	"AfterAgent":   "sloop hooks emit idle",
 }
 
 func TestMergeSettingsHooksIdempotentAndPreserving(t *testing.T) {
@@ -71,7 +71,7 @@ func TestInstallSettingsHooksGemini(t *testing.T) {
 		t.Fatalf("written file not valid JSON: %v", err)
 	}
 	hooks := doc["hooks"].(map[string]any)
-	if !hasCommandHook(hooks["Notification"], "sloop hook waiting") {
+	if !hasCommandHook(hooks["Notification"], "sloop hooks emit waiting") {
 		t.Fatal("gemini Notification hook missing")
 	}
 	// Re-install is idempotent.
@@ -83,8 +83,8 @@ func TestInstallSettingsHooksGemini(t *testing.T) {
 // cursorEvents mirrors the cursor manifest's mapping (no waiting event; flat
 // hooks.json shape).
 var cursorEvents = map[string]string{
-	"beforeSubmitPrompt": "sloop hook working",
-	"stop":               "sloop hook idle",
+	"beforeSubmitPrompt": "sloop hooks emit working",
+	"stop":               "sloop hooks emit idle",
 }
 
 func TestMergeCursorHooksIdempotentAndPreserving(t *testing.T) {
@@ -133,7 +133,7 @@ func TestInstallCursorHooks(t *testing.T) {
 		t.Fatalf("version = %v, want 1", doc["version"])
 	}
 	hooks := doc["hooks"].(map[string]any)
-	if !hasCursorCommand(hooks["beforeSubmitPrompt"], "sloop hook working") {
+	if !hasCursorCommand(hooks["beforeSubmitPrompt"], "sloop hooks emit working") {
 		t.Fatal("cursor beforeSubmitPrompt hook missing")
 	}
 	if changed, _ := installCursorHooks(path, cursorEvents); changed {
