@@ -27,26 +27,29 @@ func TestReadinessChecklist(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Two tools (claude pointer + cursor native) → canonical workspace, so the
+	// AGENTS.md + context checks apply.
 	manifests := map[string]adapter.Manifest{
 		"claude": {
 			Name:    "Claude Code",
 			Context: adapter.ContextSpec{Mode: "pointer", File: "CLAUDE.md"},
 			Hooks:   adapter.HooksSpec{Install: "settings-json", Config: ".claude/settings.local.json", Events: adapter.HookEvents{Idle: "Stop"}},
 		},
+		"cursor": {Name: "Cursor CLI", Context: adapter.ContextSpec{Mode: "native"}},
 	}
-	proj := &config.Project{Tools: []string{"claude"}, DefaultTool: "claude"}
+	proj := &config.Project{Tools: []string{"claude", "cursor"}, DefaultTool: "claude"}
 
 	// Bare workspace: no AGENTS.md, no pointer, no hooks → those should be gaps.
 	items := readinessChecklist(root, sloopDir, proj, manifests)
 
-	if it, ok := findItem(items, "AGENTS.md"); !ok || it.OK {
+	if it, ok := findItem(items, "AGENTS.md present"); !ok || it.OK {
 		t.Fatalf("AGENTS.md should be a gap: %+v", it)
 	}
 	if it, ok := findItem(items, "Default tool"); !ok || !it.OK {
 		t.Fatalf("default tool should pass: %+v", it)
 	}
-	if it, ok := findItem(items, "context pointer not delivered"); !ok || it.OK || it.Fix != "sloop sync" {
-		t.Fatalf("missing pointer should suggest sloop sync: %+v", it)
+	if it, ok := findItem(items, "no context yet"); !ok || it.OK || it.Fix != "sloop sync" {
+		t.Fatalf("missing context should suggest sloop sync: %+v", it)
 	}
 	if it, ok := findItem(items, "status hooks not installed"); !ok || it.OK || !strings.Contains(it.Fix, "hooks install") {
 		t.Fatalf("missing hooks should suggest install: %+v", it)

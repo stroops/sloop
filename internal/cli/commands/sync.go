@@ -13,6 +13,23 @@ import (
 	"github.com/stroops/sloop/internal/workspace"
 )
 
+// needsCanonical reports whether a workspace needs sloop's portable-context layer
+// (AGENTS.md + pointer files). It's only worth it when there's something to be
+// portable across: two or more tools, or a native-mode tool that reads AGENTS.md
+// directly. A lone pointer-mode tool (e.g. just Claude) keeps its own context
+// file — sloop stays out of the way and just manages the fleet/skills.
+func needsCanonical(tools []string, manifests map[string]adapter.Manifest) bool {
+	if len(tools) >= 2 {
+		return true
+	}
+	for _, t := range tools {
+		if m, ok := manifests[t]; ok && m.Context.Mode != "pointer" {
+			return true
+		}
+	}
+	return false
+}
+
 // resolveTool picks the target tool: the given target, or the project default.
 // (Enabled tools live in .sloop/config.yaml; there is no per-tool profile file.)
 func resolveTool(target, defaultTool string) (string, error) {
@@ -48,15 +65,20 @@ func RunSync(startDir, target string, repair bool) ([]string, error) {
 		return nil, fmt.Errorf("unknown tool %q (no adapter)", tool)
 	}
 
-	return syncOne(ws.Root, ws.SloopDir(), m, repair)
+	return syncOne(ws.Root, ws.SloopDir(), m, repair, needsCanonical(proj.Tools, manifests))
 }
 
-func syncOne(root, sloopDir string, m adapter.Manifest, repair bool) ([]string, error) {
+// syncOne delivers context + skills for one tool. canonical gates the portable-
+// context layer (AGENTS.md + pointer file): when false (a lone pointer-mode
+// tool) sloop leaves context to the tool's own file and only manages skills.
+func syncOne(root, sloopDir string, m adapter.Manifest, repair, canonical bool) ([]string, error) {
 	var log []string
-	if a, err := syncpkg.EnsureAgents(root); err != nil {
-		return nil, err
-	} else if a == syncpkg.ActionCreated {
-		log = append(log, "created AGENTS.md")
+	if canonical {
+		if a, err := syncpkg.EnsureAgents(root); err != nil {
+			return nil, err
+		} else if a == syncpkg.ActionCreated {
+			log = append(log, "created AGENTS.md")
+		}
 	}
 	ctx := syncpkg.SyncContext
 	skl := syncpkg.SyncSkills
@@ -65,15 +87,17 @@ func syncOne(root, sloopDir string, m adapter.Manifest, repair bool) ([]string, 
 		skl = func(r, s string, mm adapter.Manifest) (syncpkg.Action, error) { return syncpkg.RepairSkills(r, s, mm) }
 	}
 
-	switch a, err := ctx(root, m); {
-	case err != nil:
-		return nil, err
-	case a == syncpkg.ActionCreated:
-		log = append(log, "created "+m.Context.File)
-	case a == syncpkg.ActionForeign:
-		log = append(log, m.Context.File+" exists, left as-is")
-	case a == syncpkg.ActionRepaired:
-		log = append(log, "repaired "+m.Context.File)
+	if canonical {
+		switch a, err := ctx(root, m); {
+		case err != nil:
+			return nil, err
+		case a == syncpkg.ActionCreated:
+			log = append(log, "created "+m.Context.File)
+		case a == syncpkg.ActionForeign:
+			log = append(log, m.Context.File+" exists, left as-is")
+		case a == syncpkg.ActionRepaired:
+			log = append(log, "repaired "+m.Context.File)
+		}
 	}
 	switch a, err := skl(root, sloopDir, m); {
 	case err != nil:
@@ -107,6 +131,7 @@ func RunSyncAll(startDir string, repair bool) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	canonical := needsCanonical(proj.Tools, manifests)
 	var log []string
 	for _, tool := range proj.Tools {
 		m, ok := manifests[tool]
@@ -114,7 +139,7 @@ func RunSyncAll(startDir string, repair bool) ([]string, error) {
 			log = append(log, tool+": unknown tool (no adapter), skipped")
 			continue
 		}
-		lines, err := syncOne(ws.Root, ws.SloopDir(), m, repair)
+		lines, err := syncOne(ws.Root, ws.SloopDir(), m, repair, canonical)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", tool, err)
 		}

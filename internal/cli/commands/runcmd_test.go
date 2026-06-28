@@ -15,7 +15,8 @@ func (f *fakeRunner) Launch(s runner.Spec) error { f.got = s; return nil }
 func TestRunRunSyncsAndLaunches(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	// Two tools → canonical workspace, so the CLAUDE.md pointer is delivered.
+	if _, err := RunInit(dir, []string{"claude", "cursor"}, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 
@@ -42,7 +43,7 @@ func TestRunRunSyncsAndLaunches(t *testing.T) {
 func TestRunRunPassesThroughArgs(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if _, err := RunInit(dir, false); err != nil {
+	if _, err := RunInit(dir, nil, false); err != nil {
 		t.Fatalf("RunInit: %v", err)
 	}
 

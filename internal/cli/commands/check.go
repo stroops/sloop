@@ -62,21 +62,25 @@ type checkItem struct {
 func readinessChecklist(root, sloopDir string, proj *config.Project, manifests map[string]adapter.Manifest) []checkItem {
 	var items []checkItem
 
-	// Workspace-level basics.
-	agentsOK := syncpkg.AgentsState(root) == "ok"
-	items = append(items, checkItem{
-		OK:    agentsOK,
-		Label: "AGENTS.md present (canonical context)",
-		Fix:   "sloop init",
-	})
-	// Canonical context should be committed so the team shares it (a best practice
-	// every provider echoes). Only meaningful once it exists and we're in a repo.
-	if agentsOK && inGitRepo(root) {
+	// AGENTS.md is sloop's portable-context layer — only relevant when the
+	// workspace actually uses it (≥2 tools or a native-mode tool). A lone
+	// pointer-mode tool keeps its own context file, so we don't ask for AGENTS.md.
+	canonical := needsCanonical(proj.Tools, manifests)
+	if canonical {
+		agentsOK := syncpkg.AgentsState(root) == "ok"
 		items = append(items, checkItem{
-			OK:    gitTracked(root, "AGENTS.md"),
-			Label: "AGENTS.md committed to git (shared with your team)",
-			Fix:   "git add AGENTS.md && git commit",
+			OK:    agentsOK,
+			Label: "AGENTS.md present (canonical context)",
+			Fix:   "sloop init",
 		})
+		// Committed so the team shares it — a best practice every provider echoes.
+		if agentsOK && inGitRepo(root) {
+			items = append(items, checkItem{
+				OK:    gitTracked(root, "AGENTS.md"),
+				Label: "AGENTS.md committed to git (shared with your team)",
+				Fix:   "git add AGENTS.md && git commit",
+			})
+		}
 	}
 	_, hasDefault := manifests[proj.DefaultTool]
 	items = append(items, checkItem{
@@ -93,14 +97,20 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 			continue
 		}
 
-		// Context delivery (pointer-mode tools only; native tools need nothing).
+		// Context: the tool can see project context. We respect a context file the
+		// tool already owns (e.g. from its own /init) — that counts as ready, never
+		// a "repair me" nag. Native tools read AGENTS.md directly (only canonical).
 		switch syncpkg.ContextState(root, m) {
 		case "ok":
 			items = append(items, checkItem{OK: true, Label: m.Name + ": context delivered (" + m.Context.File + ")"})
 		case "foreign":
-			items = append(items, checkItem{Label: m.Name + ": " + m.Context.File + " is a hand-authored file, not a sloop pointer", Fix: "sloop sync --repair"})
+			items = append(items, checkItem{OK: true, Label: m.Name + ": has its own context (" + m.Context.File + ")"})
 		case "missing":
-			items = append(items, checkItem{Label: m.Name + ": context pointer not delivered (" + m.Context.File + ")", Fix: "sloop sync"})
+			fix := "sloop sync"
+			if !canonical {
+				fix = "run `" + t + "` then /init"
+			}
+			items = append(items, checkItem{Label: m.Name + ": no context yet (" + m.Context.File + ")", Fix: fix})
 		}
 
 		// Skills linked — only relevant once there are skills to deliver.
