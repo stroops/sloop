@@ -90,20 +90,22 @@ run:
     low: ""
     medium: ""
     high: ""
+  models: [opus, sonnet, haiku]   # model aliases this CLI serves (Phase 2 bare-model resolution)
 ```
 
-**Model catalog (embedded `models.yaml`, user-overridable at `~/.sloop/models.yaml`):**
-```yaml
-# alias → vendor (+ optional canonical id to forward instead of the alias)
-opus:   { vendor: anthropic }
-sonnet: { vendor: anthropic }
-gpt-5:  { vendor: openai }
-gemini-2.5-pro: { vendor: google }
-```
+**No separate model catalog file.** Model aliases live in the manifest's `run.models`, so the
+alias→CLI map is just a reverse index over manifests — one mechanism, zero new files, embedded in the
+binary and overridable the same way as any manifest (`~/.sloop/adapters/<tool>.yaml`). A bare
+`sloop run opus` finds the manifest serving `opus`; if several do, `default_for` picks the home CLI.
+The alias's vendor is implied by its home CLI's `run.vendor` — no global `models.yaml` to maintain.
 
-**What sloop deliberately does *not* do:** maintain a full, churning model catalog (ids, pricing,
-context windows). It learns just enough — alias → vendor (to pick the CLI) — and **forwards the model
-string to the CLI**, letting the CLI validate it. Light, and resilient to new models.
+**What sloop deliberately does *not* do:** keep a full, churning model catalog (ids, pricing, context
+windows), nor **validate** the model. It learns just enough to pick the CLI, then **forwards the model
+string to the CLI**, letting the CLI accept or reject it. Light, and resilient to new models.
+
+> **User preference vs. reference knowledge.** The `run.*`/`models` above is *provider reference
+> knowledge* (manifest). A user's own default — "this repo defaults to sonnet at high effort" — is
+> *user config* and belongs in `.sloop/config.yaml` (Phase 3), never mixed into the catalog.
 
 ## What we borrow (and don't) from aider & the CLIs
 
@@ -117,9 +119,10 @@ string to the CLI**, letting the CLI validate it. Light, and resilient to new mo
 
 - **Phase 1 — explicit flags (deterministic).** `-p/--provider`, `-m/--model`, `-e/--effort` forwarded
   via manifest `run.*`; plus binary-alias resolution (`run agent` == `run cursor`). No inference, so no
-  ambiguity — and it forces the `run.*` schema that Phase 2 builds on.
-- **Phase 2 — smart positional.** Classify `T` as tool | model | alias using the vendor catalog, so
-  `sloop run opus` / `sloop run sonnet` work.
+  ambiguity — and it forces the `run.*` schema that Phase 2 builds on. **Zero new files, zero new
+  dependencies** — just new manifest fields (already embedded) and flag parsing.
+- **Phase 2 — smart positional.** Classify `T` as tool | model | alias by reverse-indexing manifest
+  `run.models`, so `sloop run opus` / `sloop run sonnet` work. Still no new files.
 - **Phase 3 — profiles & session identity.** User aliases (`sloop run myopus`), and session naming that
   includes the model so two Claude sessions (opus + sonnet) can coexist in one repo (today the session
   is `<workspace>__<tool>`, which would collide).
@@ -127,12 +130,12 @@ string to the CLI**, letting the CLI validate it. Light, and resilient to new mo
 ## Open questions (feedback before/while building)
 
 - Effort vocabulary: is `low|medium|high` enough, or do some CLIs need a numeric/thinking-budget form?
-- Catalog ownership: keep `models.yaml` tiny and curated, or let each manifest also declare the models
-  it serves (and reverse-index)?
 - Session identity with model (Phase 3): always include the model in the name, or only when asked?
+- User default model/effort (Phase 3): the shape of the `.sloop/config.yaml` preference (global vs
+  per-tool).
 
 ## Contributing
 
 Teaching sloop to launch a tool with a model/effort is **manifest-only**: add a `run:` block to the
 tool's adapter (see [ADAPTERS.md](../reference/ADAPTERS.md)) — `model_flag`, `effort_flag`/`effort_values`,
-`vendor`, `default_for`. No Go changes unless the CLI needs a brand-new launch mechanism.
+`vendor`, `default_for`, `models`. No Go changes unless the CLI needs a brand-new launch mechanism.
