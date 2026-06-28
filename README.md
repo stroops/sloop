@@ -129,6 +129,10 @@ shows **`⚓ detach: <prefix> d`** so you always know how to get back, and `sloo
 away. Rebooted? **`sloop restore`** relaunches the fleet. No name to type? **`sloop a`** opens the same
 picker.
 
+> The status bar is set **per session** (`set-option -t`) — sloop never edits your `~/.tmux.conf`, and
+> only touches `status-left`/`status-right` (not your colors/theme). Keep your own bar fully intact with
+> `SLOOP_STATUSLINE=0`.
+
 `sloop ls` is the companion view — your registered **workspaces** (running or not) with their live
 agents — to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` to jump in.
 
