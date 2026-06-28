@@ -202,21 +202,6 @@ func primaryFirst(detected []string, primary string) []string {
 	return out
 }
 
-// missingScaffold lists the enabled tools' standard folders that don't exist yet
-// (deduped, ordered). init only offers scaffolding for these — and only creates
-// these — so it never claims to make a folder you already have.
-func missingScaffold(root string, tools []string, manifests map[string]adapter.Manifest) []string {
-	var out []string
-	for _, t := range tools {
-		for _, d := range manifests[t].Scaffold {
-			if _, err := os.Stat(filepath.Join(root, d)); os.IsNotExist(err) && !contains(out, d) {
-				out = append(out, d)
-			}
-		}
-	}
-	return out
-}
-
 // hooksNeeded reports whether any enabled tool's status hooks aren't installed.
 func hooksNeeded(root string, tools []string, manifests map[string]adapter.Manifest) bool {
 	for _, t := range tools {
@@ -255,9 +240,9 @@ var initCmd = &cobra.Command{
 			if canonical && syncpkg.AgentsState(cwd) != "ok" {
 				initScan = ix.Ask("Pre-fill AGENTS.md from your codebase?", true, r, cmd.OutOrStdout())
 			}
-			if missing := missingScaffold(cwd, tools, manifests); len(missing) > 0 {
-				initScaffold = ix.Ask("Create standard folders ("+strings.Join(missing, ", ")+")?", false, r, cmd.OutOrStdout())
-			}
+			// Scaffolding provider folders isn't asked: tools create their own
+			// layout, and sloop already creates the skills dir it needs. It stays
+			// available as the explicit `--scaffold` opt-in.
 			if hooksNeeded(cwd, tools, manifests) {
 				wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())
 			}
@@ -335,7 +320,7 @@ func installHooksForEnabled(root string) []string {
 
 func RegisterInit(cmd *cobra.Command) {
 	initCmd.Flags().BoolVarP(&initScan, "scan", "s", false, "scan the existing codebase to pre-fill AGENTS.md")
-	initCmd.Flags().BoolVarP(&initScaffold, "scaffold", "S", false, "also create each enabled tool's standard folders (.claude/skills, .cursor/rules, …)")
+	initCmd.Flags().BoolVarP(&initScaffold, "scaffold", "S", false, "opt-in: also create each enabled tool's standard folders (.claude/skills, .cursor/rules, …); off by default since tools create their own")
 	initCmd.Flags().StringVar(&initTools, "tools", "", "comma-separated tools to enable for this workspace (default: your primary tool)")
 	cmd.AddCommand(initCmd)
 }

@@ -26,26 +26,6 @@ func TestResolveInitToolsFlag(t *testing.T) {
 	}
 }
 
-func TestMissingScaffold(t *testing.T) {
-	root := t.TempDir()
-	manifests := map[string]adapter.Manifest{
-		"claude": {Scaffold: []string{".claude/skills", ".claude/agents"}},
-	}
-	tools := []string{"claude"}
-
-	// Pre-create one of the two → only the other should be reported missing.
-	_ = os.MkdirAll(filepath.Join(root, ".claude/skills"), 0o755)
-	got := missingScaffold(root, tools, manifests)
-	if len(got) != 1 || got[0] != ".claude/agents" {
-		t.Fatalf("missingScaffold = %v, want [.claude/agents]", got)
-	}
-
-	_ = os.MkdirAll(filepath.Join(root, ".claude/agents"), 0o755)
-	if got := missingScaffold(root, tools, manifests); len(got) != 0 {
-		t.Fatalf("all folders exist → want none, got %v", got)
-	}
-}
-
 func TestPrimaryFirst(t *testing.T) {
 	got := primaryFirst([]string{"agy", "claude", "cursor"}, "claude")
 	if len(got) != 3 || got[0] != "claude" {
