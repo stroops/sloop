@@ -21,7 +21,20 @@ version: 1
 mode: ask
 lang: vi        # optional: hint language (en/vi); empty = auto from $SLOOP_LANG/$LANG
 hints: false    # optional: turn the 💡 education tips off (omit/true = on)
+
+# optional: reusable run profiles — a named tool + env, launched as `sloop run @<name>`.
+# Manage with `sloop profile add|ls|rm`, or hand-edit here.
+profiles:
+  sec:                                  # → sloop run @sec  (session <repo>__claude__sec)
+    tool: claude                        # a manifest key (or its binary alias)
+    env:
+      CLAUDE_CONFIG_DIR: ~/.claude-sec  # ~ and $VAR are expanded at launch
 ```
+
+Profiles are **global on purpose**: an alternate account is a personal thing reused across every repo,
+not project state. The profile name becomes the session's instance suffix; `sloop run` flags
+(`-m`, `-e`, `--env`, …) still apply on top. See the
+[profiles design](../design/profiles.md) for the full token grammar (`@profile`, `tool@instance`).
 
 ## 2. Local — `.sloop/` (per repo, committed)
 

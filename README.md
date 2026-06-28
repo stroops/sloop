@@ -133,6 +133,15 @@ picker.
 > only touches `status-left`/`status-right` (not your colors/theme). Keep your own bar fully intact with
 > `SLOOP_STATUSLINE=0`.
 
+**Don't want to leave your screen?** From inside one agent, **`sloop peek`** floats a *waiting* agent's
+live pane over your current work — answer it, close it, and you're exactly where you were (no
+`switch-client` that swaps your whole screen). Bind a key with `sloop peek setup`. Needs tmux ≥ 3.2.
+
+**A second agent, or a second account?** `sloop run claude@review` opens another claude in the same
+repo (`claude·review` in the fleet); `sloop run claude --new` auto-names the next one (`claude·2`). For a
+different account, save a profile once — `sloop profile add sec --tool claude --env CLAUDE_CONFIG_DIR=~/.claude-sec`
+— then `sloop run @sec`.
+
 `sloop ls` is the companion view — your registered **workspaces** (running or not) with their live
 agents — to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` to jump in.
 
@@ -145,7 +154,8 @@ agents — to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` t
 | Command | Alias | Flags (short) | What it does |
 |---|---|---|---|
 | `init` | — | `-s/--scan`, `-S/--scaffold` | Scaffold `AGENTS.md` + `.sloop/`, deliver pointers, register the workspace. `--scan` pre-fills `AGENTS.md` from the codebase; `--scaffold` creates each tool's standard folders. |
-| `run [tool]` | `r` | `-w/--workspace`, `--split`, `-- <args>` | Sync context, then launch a tool (in tmux if present). `--split` runs several side by side; `-w` targets a registered workspace from anywhere. |
+| `run [tool]` | `r` | `-n/--name`, `-N/--new`, `--env`, `-w/--workspace`, `--split`, `-- <args>` | Sync context, then launch a tool (in tmux if present). Run a **2nd agent of the same tool** with `tool@instance`, `-n/--name`, or `-N/--new` (auto-named `tool·2`…); a **different account** with a saved `@profile` or one-off `--env KEY=VAL`. `--split` runs several side by side; `-w` targets any registered workspace. |
+| `profile add\|ls\|rm` | `prof` | `add --tool`, `add --env` | Save reusable run profiles in `~/.sloop/config.yaml` (e.g. a 2nd account's `CLAUDE_CONFIG_DIR`); launch one with `sloop run @<name>`. |
 | `sync [tool]` | `s` | `-a/--all`, `-r/--repair`, `-w/--workspace` | (Re)deliver pointer files + skills symlinks without launching. `--repair` safely moves a foreign file aside (never deletes). |
 | `ps [#]` | — | `-f/--watch`, `-n/--interval`, `--waiting`, `--notify`, `--all` | The cross-repo fleet. Reads what each agent is asking and shows answer keys; `<#>` jumps; `-f` live-monitors + alerts. |
 | `approve <target>` | — | `--waiting`, `--all`, `--yes` | Send the Yes/Approve answer to waiting agent(s) — one-command approve. |
@@ -154,6 +164,7 @@ agents — to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` t
 | `adopt <tmux-session>` | — | `-w/--workspace`, `--as` | Bring an external tmux session (one you started yourself) into the fleet. |
 | `restore` | — | `--resume`, `--yes` | Relaunch your recent agents (detached) after a reboot / tmux restart. `--resume` continues each tool's prior conversation. |
 | `popup` / `popup setup` | `hud` | `--key` | Open the fleet `ps` as a floating tmux popup / HUD; `setup` binds a key. Needs tmux ≥ 3.2. |
+| `peek [agent]` / `peek setup` | `pk` | `--key` | Overlay a waiting agent in a floating popup — answer it and drop back **without switching your whole screen**. No arg → the lone waiting agent or a picker; `setup` binds a key. Needs tmux ≥ 3.2. |
 | `statusline setup` | — | — | Show a session's live status (`⚓ repo tool ◆ waiting`) in its tmux status bar. |
 | `attach [session]` | `a` | — | Attach to a session by name, or `sloop a` (no name) to pick from the fleet. |
 | `skills new\|add <…>` | `sk`, `skill` | `new`→`n`, `add`→`import` | Scaffold or import a reusable skill (shared across every tool). |
@@ -248,6 +259,8 @@ hooks:                                          # status hooks for `sloop ps`
 - [docs/reference/CONFIG.md](docs/reference/CONFIG.md) — the three config layers (local / global / built-in)
 - [docs/reference/ADAPTERS.md](docs/reference/ADAPTERS.md) — the provider-aware adapter contract
 - [docs/design/run.md](docs/design/run.md) — `sloop run` design: CLI · model · effort resolution
+- [docs/design/profiles.md](docs/design/profiles.md) — named instances & profiles: a 2nd agent / 2nd account
+- [docs/design/peek.md](docs/design/peek.md) — overlay a waiting agent without leaving your screen
 - [docs/design/skills.md](docs/design/skills.md) — skills model, lockfile, registry roadmap
 - [docs/design/hooks.md](docs/design/hooks.md) — status hooks today, workflow-hook design for v0.2.0
 - [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) — packages, data flow, internals

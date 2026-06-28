@@ -124,6 +124,41 @@ sloop run --split                    # just the default tool (one pane)
 
 Great for running two agents on the same code and comparing, or a coder + a reviewer.
 
+### A second agent, or a second account (named instances & profiles)
+
+`sloop run claude` a second time just re-attaches the existing `<repo>__claude` — by design, so it
+means "jump back into my claude." To get a **distinct** second agent of the same tool, name it:
+
+```sh
+sloop run claude@review     # an ad-hoc instance → session <repo>__claude__review
+sloop run claude -n review  # same thing, with the flag
+sloop run claude --new      # no name? auto-pick the next free slot: claude·2, claude·3, …
+```
+
+Named instances show up in `sloop ps` as `claude·review` / `claude·2`, so two claudes in one repo are
+never ambiguous.
+
+For a **different account** of the same provider, sloop launches the real binary (not your shell, so a
+`claude-sec` alias won't apply) and injects the env that selects the account. One-off:
+
+```sh
+sloop run claude --name sec --env CLAUDE_CONFIG_DIR=~/.claude-sec
+```
+
+Reusing it daily? Save a **profile** once (global, works from any repo) and call it with `@`:
+
+```sh
+sloop profile add sec --tool claude --env CLAUDE_CONFIG_DIR=~/.claude-sec
+sloop profile ls            # name · tool · env keys
+sloop run @sec              # launches claude under ~/.claude-sec, session <repo>__claude__sec
+sloop profile rm sec        # remove it
+```
+
+The profile name becomes the instance suffix (override with `--name`). Env values expand `~` and
+`$VAR`; `--env` at the call site overrides the profile on a key clash. Profiles live in
+`~/.sloop/config.yaml` (see [CONFIG.md](../reference/CONFIG.md)); the full design is in
+[profiles.md](../design/profiles.md).
+
 ---
 
 ## 3. Manage the fleet (`sloop ps`)
@@ -277,6 +312,23 @@ sloop popup setup --key f    # use a different key
 After `setup`, press your tmux **prefix then `g`** from inside any agent to summon the HUD: the `ps`
 control center appears floating, you answer/jump with one key, and the popup vanishes. (Native Windows
 psmux may not support popups; everything else still works.)
+
+### Peek into a waiting agent (overlay, tmux ≥ 3.2)
+
+`sloop ps` + `Enter` (or `switch-client`) **replaces your whole screen** with the agent. When you just
+need to answer a quick prompt and get back to deep work, **peek** floats that agent's live pane over
+your current one instead:
+
+```sh
+sloop peek                   # overlay the lone waiting agent (or pick when several/none wait)
+sloop peek backend__claude   # overlay a specific session
+sloop peek setup             # bind <prefix> p to peek the waiting agent (prints the ~/.tmux.conf line)
+```
+
+Answer the agent in the floating pane, close it, and you're exactly where you were — the agent keeps
+running (closing the overlay detaches, it never kills the session). Every sloop status bar also shows a
+fleet-wide **`⏳ N waiting`** badge so you know when an agent needs you without leaving your seat. Full
+design: [peek.md](../design/peek.md).
 
 ---
 
