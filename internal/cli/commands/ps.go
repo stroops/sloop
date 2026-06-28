@@ -37,6 +37,16 @@ type FleetRow struct {
 	Path      string           // repo path from the registry (cross-repo context)
 	Prompt    string           // the question the agent is blocked on (when waiting)
 	Answers   []tmux.Answer    // parsed choices the agent offers (answer in one key)
+	Display   string           // provider display name (e.g. "Google Antigravity" for "agy")
+}
+
+// toolName is the row's provider display name, falling back to the tool key when
+// the row hasn't been enriched (e.g. plain listings built straight from tmux).
+func (r FleetRow) toolName() string {
+	if r.Display != "" {
+		return r.Display
+	}
+	return r.Tool
 }
 
 // registryPaths maps each registered workspace name to its repo path, so the
@@ -124,6 +134,7 @@ func enrichGlances(rows []FleetRow, manifests map[string]adapter.Manifest) []Fle
 			defer wg.Done()
 
 			marker, hasMarker := fleetstate.Read(rows[i].Name)
+			rows[i].Display = displayTool(rows[i].Tool, manifests)
 
 			ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 			defer cancel()
@@ -222,8 +233,8 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 	}
 	_, _ = fmt.Fprintf(w, "%s\n\n", header)
 	for i, r := range rows {
-		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-9s %s · %s\n",
-			i+1, r.Workspace, r.Tool, stateLabel(r), humanizeSince(r.Activity))
+		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-18s %s · %s\n",
+			i+1, r.Workspace, r.toolName(), stateLabel(r), humanizeSince(r.Activity))
 		if b := bottomLine(r); b != "" {
 			_, _ = fmt.Fprintf(w, "      └ %s\n", b)
 		}
@@ -422,19 +433,20 @@ var psCmd = &cobra.Command{
 			}
 
 			wsW, _, waiting := columnWidths(rows)
-			toolNames := make([]string, len(rows))
-			toolW := 0
-			for i, r := range rows {
-				toolNames[i] = displayTool(r.Tool, manifests)
-				if len(toolNames[i]) > toolW {
-					toolW = len(toolNames[i])
+			toolW := len("TOOL")
+			for _, r := range rows {
+				if n := len(r.toolName()); n > toolW {
+					toolW = n
 				}
 			}
+			if wsW < len("WORKSPACE") {
+				wsW = len("WORKSPACE")
+			}
 			var options []string
-			for i, r := range rows {
+			for _, r := range rows {
 				dot, label := statusDot(r)
 				line := fmt.Sprintf("%s %-*s %-*s %-16s %s",
-					dot, wsW, r.Workspace, toolW, toolNames[i], label, shortSince(r.Activity))
+					dot, wsW, r.Workspace, toolW, r.toolName(), label, shortSince(r.Activity))
 				if b := bottomLine(r); b != "" {
 					line += "\r\n└ " + tui.Grey(b)
 				}
@@ -445,9 +457,11 @@ var psCmd = &cobra.Command{
 			if waiting > 0 {
 				header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
 			}
-			legend := tui.Grey("  ● working/waiting · ○ idle · trailing age = since last activity")
+			legend := tui.Grey("  ● working/waiting · ○ idle · AGE = since last activity")
 			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q quit")
-			prompt := header + "\r\n" + legend + "\r\n" + keys
+			// Column header aligned under the rows (2 cols for the status dot + space).
+			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-16s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS", "AGE"))
+			prompt := header + "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
 
 			actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 			idx, key, err := tui.SelectAction(prompt, options, actionKeys)
@@ -535,9 +549,11 @@ func sendAnswer(cmd *cobra.Command, row FleetRow, a tmux.Answer) error {
 }
 
 // promptAndSend asks for a line and sends it to the row (used by the ps `s` key).
+// Reading in raw mode means Esc/Ctrl-C cancel back to the fleet instead of
+// killing `ps`, and an empty submit cancels too.
 func promptAndSend(cmd *cobra.Command, row FleetRow) error {
-	msg := promptLine(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("send to %s (empty to cancel): ", row.Name))
-	if strings.TrimSpace(msg) == "" {
+	msg, ok := tui.ReadLine(fmt.Sprintf("send to %s (Enter to send · Esc to cancel): ", row.Name))
+	if !ok || strings.TrimSpace(msg) == "" {
 		return nil
 	}
 	if err := tmux.LaunchSend(row.Name, msg); err != nil {
@@ -549,7 +565,7 @@ func promptAndSend(cmd *cobra.Command, row FleetRow) error {
 
 // confirmAndKill ends the row's session after a y/N confirm (used by ps `x`).
 func confirmAndKill(cmd *cobra.Command, row FleetRow) error {
-	if !confirm(cmd.OutOrStdout(), os.Stdin, fmt.Sprintf("kill %s? [y/N] ", row.Name)) {
+	if !tui.Confirm(fmt.Sprintf("kill %s? [y/N] ", row.Name)) {
 		return nil
 	}
 	if err := killFunc(row.Name); err != nil {

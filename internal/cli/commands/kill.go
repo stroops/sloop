@@ -23,13 +23,6 @@ func confirm(w io.Writer, in io.Reader, prompt string) bool {
 	return line == "y" || line == "yes"
 }
 
-// promptLine prints prompt and returns the entered line (trimmed).
-func promptLine(w io.Writer, in io.Reader, prompt string) string {
-	_, _ = fmt.Fprint(w, prompt)
-	line, _ := bufio.NewReader(in).ReadString('\n')
-	return strings.TrimSpace(line)
-}
-
 func rowNames(rows []FleetRow) []string {
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
