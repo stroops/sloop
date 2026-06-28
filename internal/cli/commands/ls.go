@@ -160,35 +160,30 @@ var lsCmd = &cobra.Command{
 
 		manifests, _ := adapter.Load()
 
-		// Per-workspace columns. Defaults and abbreviated paths don't change between
-		// keystrokes, so compute them once; live agents are re-read each pass.
+		// Per-workspace columns. The default tool doesn't change between keystrokes,
+		// so compute it once; live agents are re-read each pass. The path goes on a
+		// second `└` line (like ps), so only name + default need width here.
 		defaults := make(map[string]string, len(workspaces))
-		paths := make(map[string]string, len(workspaces))
 		nameW, defW := len("WORKSPACE"), len("DEFAULT")
-		pathW := len("PATH")
 		for _, ws := range workspaces {
 			defaults[ws.Name] = workspaceDefault(ws.Path)
-			p := abbrevHome(ws.Path)
-			if len(p) > 40 {
-				p = truncate(p, 40)
-			}
-			paths[ws.Name] = p
 			if len(ws.Name) > nameW {
 				nameW = len(ws.Name)
 			}
 			if len(defaults[ws.Name]) > defW {
 				defW = len(defaults[ws.Name])
 			}
-			if len(p) > pathW {
-				pathW = len(p)
-			}
 		}
 
 		// Same control-center shape as `ps`: arrow-key move + action keys, looping
-		// so light actions (show cd, open a shell) return to the list. Enter stays
-		// safe (attach a live session, else show the path); launching a tool is the
-		// explicit `r` key, so the list never spawns an agent by surprise.
+		// so light actions (cd, open a shell) return to the list. The screen is
+		// cleared each pass and feedback shows in `notice` under the header, so the
+		// list redraws in place instead of stacking. Enter stays safe (attach a live
+		// session, else just point at the workspace); launching is the explicit `r`
+		// key, so the list never spawns an agent by surprise.
+		var notice string
 		for {
+			tui.Clear()
 			live := enrichedByWorkspace(manifests)
 			running := 0
 			var options []string
@@ -199,8 +194,9 @@ var lsCmd = &cobra.Command{
 				}
 				// No leading status glyph (ambiguous-width breaks alignment); the
 				// AGENTS column carries liveness — colored dots when running, "—" idle.
-				line := fmt.Sprintf("%-*s %-*s %-*s %s",
-					nameW, ws.Name, defW, defaults[ws.Name], pathW, paths[ws.Name], agentsInline(agents))
+				line := fmt.Sprintf("%-*s %-*s %s",
+					nameW, ws.Name, defW, defaults[ws.Name], agentsInline(agents))
+				line += "\r\n└ " + tui.Grey(abbrevHome(ws.Path))
 				options = append(options, line)
 			}
 
@@ -209,9 +205,14 @@ var lsCmd = &cobra.Command{
 				header += " · " + tui.Green(fmt.Sprintf("%d running", running))
 			}
 			legend := tui.Grey("  AGENTS = live agents, colored by status (→ sloop ps) · — = idle")
-			keys := tui.Grey("  ↑/↓ move · ⏎ open · r launch · s shell · c cd · q quit")
-			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-*s %s", nameW, "WORKSPACE", defW, "DEFAULT", pathW, "PATH", "AGENTS"))
-			prompt := header + "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
+			keys := tui.Grey("  ↑/↓ move · ⏎ open · r launch · s shell · c cd · q/esc quit")
+			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %s", nameW, "WORKSPACE", defW, "DEFAULT", "AGENTS"))
+			prompt := header
+			if notice != "" {
+				prompt += "\r\n" + notice
+			}
+			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
+			notice = "" // consumed; the handler below sets a fresh one for next pass
 
 			selected, key, err := tui.SelectAction(prompt, options, []byte{'r', 's', 'c'})
 			if err != nil {
@@ -228,13 +229,14 @@ var lsCmd = &cobra.Command{
 				if err := openShellIn(ws.Path); err != nil {
 					return err
 				}
-			case 'c': // print the cd line (a binary can't change the parent shell)
-				fmt.Printf("\ncd %s\n\n", ws.Path)
+			case 'c': // surface the cd line (a binary can't change the parent shell)
+				notice = tui.Cyan("cd " + ws.Path)
 			default: // Enter
 				if rows := live[ws.Name]; len(rows) > 0 {
 					return attachSession(rows[0].Name)
 				}
-				fmt.Printf("\n%s has no running agent — press r to launch it, s for a shell, or:\n  cd %s\n\n", ws.Name, ws.Path)
+				notice = tui.Yellow(ws.Name+" isn't running") +
+					tui.Grey(" — press r to launch · s for a shell · c to copy its cd")
 			}
 		}
 	},

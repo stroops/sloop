@@ -279,6 +279,26 @@ func jumpToFleet(rows []FleetRow, n int) error {
 	return attachSession(rows[n-1].Name)
 }
 
+// pickFleetSession shows a simple menu of the live fleet and returns the chosen
+// session name ("" if cancelled). Backs the no-argument `sloop attach` so you
+// don't have to type a session name.
+func pickFleetSession(prompt string) (string, error) {
+	rows := fleetRows(tmux.ParseSessions(tmuxList()))
+	if len(rows) == 0 {
+		return "", fmt.Errorf("no running AI sessions to attach to (start one with `sloop run <tool>`)")
+	}
+	manifests, _ := adapter.Load()
+	opts := make([]string, len(rows))
+	for i, r := range rows {
+		opts[i] = fmt.Sprintf("%-16s %s", r.Workspace, displayTool(r.Tool, manifests))
+	}
+	idx, err := tui.SelectMenu(prompt, opts)
+	if err != nil || idx < 0 {
+		return "", err
+	}
+	return rows[idx].Name, nil
+}
+
 // attachSession attaches to a session by name (switches client if already inside
 // tmux), replacing this process's foreground with tmux. Shared by `ps` and `ls`.
 func attachSession(name string) error {
@@ -419,8 +439,12 @@ var psCmd = &cobra.Command{
 
 		// Interactive control center: loop so an action (send/answer/kill) or
 		// cancelling returns to the fleet instead of dropping to the shell. The
-		// fleet is re-read each pass, so kills and new sessions show immediately.
+		// screen is cleared each pass and feedback shows in `notice` under the
+		// header, so the fleet redraws in place; it's re-read every pass, so kills
+		// and new sessions show immediately.
+		var notice string
 		for {
+			tui.Clear()
 			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList())), manifests)
 			sortNeedsAttention(rows)
 			annotatePaths(rows, registryPaths())
@@ -460,9 +484,14 @@ var psCmd = &cobra.Command{
 			}
 			legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
 				tui.Blue("attached") + " · " + tui.Green("idle") + tui.Grey(" · AGE = since last activity")
-			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q quit")
+			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q/esc quit")
 			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-16s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS", "AGE"))
-			prompt := header + "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
+			prompt := header
+			if notice != "" {
+				prompt += "\r\n" + notice
+			}
+			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
+			notice = "" // consumed; the handler below sets a fresh one for next pass
 
 			actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 			idx, key, err := tui.SelectAction(prompt, options, actionKeys)
@@ -477,18 +506,24 @@ var psCmd = &cobra.Command{
 			case 13: // Enter → attach (replaces this process)
 				return jumpToFleet(rows, idx+1)
 			case 's': // send a quick prompt; empty cancels back to the fleet
-				if err := promptAndSend(cmd, rows[idx]); err != nil {
+				n, err := promptAndSend(cmd, rows[idx])
+				if err != nil {
 					return err
 				}
+				notice = n
 			case 'x': // kill the highlighted session (with confirm)
-				if err := confirmAndKill(cmd, rows[idx]); err != nil {
+				n, err := confirmAndKill(cmd, rows[idx])
+				if err != nil {
 					return err
 				}
+				notice = n
 			default:
 				if a, ok := matchAnswer(rows[idx], key); ok { // one-key answer
-					if err := sendAnswer(cmd, rows[idx], a); err != nil {
+					n, err := sendAnswer(cmd, rows[idx], a)
+					if err != nil {
 						return err
 					}
+					notice = n
 				}
 			}
 		}
@@ -540,40 +575,40 @@ func matchAnswer(r FleetRow, key byte) (tmux.Answer, bool) {
 	return tmux.Answer{}, false
 }
 
-// sendAnswer types the chosen answer into the session.
-func sendAnswer(cmd *cobra.Command, row FleetRow, a tmux.Answer) error {
+// sendAnswer types the chosen answer into the session, returning a notice line
+// for the control center to show on its next redraw.
+func sendAnswer(_ *cobra.Command, row FleetRow, a tmux.Answer) (string, error) {
 	if err := tmux.LaunchSend(row.Name, a.Key); err != nil {
-		return err
+		return "", err
 	}
-	cmd.Printf("answered %s: %s\n", row.Name, a.Label)
-	return nil
+	return tui.Green(fmt.Sprintf("✓ answered %s: %s", row.Name, a.Label)), nil
 }
 
 // promptAndSend asks for a line and sends it to the row (used by the ps `s` key).
 // Reading in raw mode means Esc/Ctrl-C cancel back to the fleet instead of
-// killing `ps`, and an empty submit cancels too.
-func promptAndSend(cmd *cobra.Command, row FleetRow) error {
+// killing `ps`, and an empty submit cancels too. Returns a notice line ("" when
+// cancelled) for the control center to show on its next redraw.
+func promptAndSend(_ *cobra.Command, row FleetRow) (string, error) {
 	msg, ok := tui.ReadLine(fmt.Sprintf("send to %s (Enter to send · Esc to cancel): ", row.Name))
 	if !ok || strings.TrimSpace(msg) == "" {
-		return nil
+		return "", nil
 	}
 	if err := tmux.LaunchSend(row.Name, msg); err != nil {
-		return err
+		return "", err
 	}
-	cmd.Printf("sent to %s\n", row.Name)
-	return nil
+	return tui.Green("✓ sent to " + row.Name), nil
 }
 
 // confirmAndKill ends the row's session after a y/N confirm (used by ps `x`).
-func confirmAndKill(cmd *cobra.Command, row FleetRow) error {
+// Returns a notice line ("" when declined) for the next redraw.
+func confirmAndKill(_ *cobra.Command, row FleetRow) (string, error) {
 	if !tui.Confirm(fmt.Sprintf("kill %s? [y/N] ", row.Name)) {
-		return nil
+		return "", nil
 	}
 	if err := killFunc(row.Name); err != nil {
-		return err
+		return "", err
 	}
-	cmd.Printf("killed %s\n", row.Name)
-	return nil
+	return tui.Yellow("✓ killed " + row.Name), nil
 }
 
 // displayTool returns a friendly name for a tool key (the manifest's display
