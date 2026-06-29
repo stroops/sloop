@@ -22,7 +22,7 @@ import (
 // records a marker `sloop ps` reads.
 
 // hookCommandFor is the shell command a tool runs for a sloop state. It is the
-// reserved `sloop hooks emit <state>` callback — its prefix is how sloop's own
+// reserved `sloop hooks emit <state>` callback; its prefix is how sloop's own
 // status hooks stay identifiable and never collide with workflow hooks.
 func hookCommandFor(state string) string { return appName + " hooks emit " + state }
 
@@ -275,7 +275,7 @@ func hookTools() []string {
 
 func orDash(s string) string {
 	if s == "" {
-		return "—"
+		return "-"
 	}
 	return s
 }
@@ -299,8 +299,7 @@ var hooksCmd = &cobra.Command{
 	Long: `Manage status hooks: each tool calls sloop from its own lifecycle events so
 sloop ps reports waiting/working/idle precisely (not just a screen guess).
 
-These are status hooks (for the fleet view). Portable workflow hooks —
-format/lint/policy automation installed into each tool — are a v0.2.0 proposal;
+These are status hooks (for the fleet view). Portable workflow hooks (format/lint/policy automation installed into each tool) are a v0.2.0 proposal;
 see docs/design/hooks.md.`,
 }
 
@@ -370,7 +369,7 @@ var hooksPrintCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
+			cmd.Printf("# %s · add to %s\n%s\n", tool, m.Hooks.Config, string(out))
 			return nil
 		case "cursor-json":
 			doc, _ := mergeCursorHooks(nil, eventCommands(m.Hooks))
@@ -378,7 +377,7 @@ var hooksPrintCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			cmd.Printf("# %s — add to %s\n%s\n", tool, m.Hooks.Config, string(out))
+			cmd.Printf("# %s · add to %s\n%s\n", tool, m.Hooks.Config, string(out))
 			return nil
 		}
 		cmd.Printf("# %s hooks → call these from %s\n", tool, m.Hooks.Config)
@@ -404,7 +403,7 @@ var hooksListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		cmd.Println("Status hooks — report waiting/working/idle to `sloop ps`:")
+		cmd.Println("Status hooks report waiting/working/idle to `sloop ps`:")
 		cmd.Printf("%-9s %-12s %s\n", "TOOL", "AUTO-INSTALL", "CONFIG")
 		for _, tool := range hookTools() {
 			m := manifests[tool]
@@ -415,7 +414,7 @@ var hooksListCmd = &cobra.Command{
 			cmd.Printf("%-9s %-12s %s\n", tool, auto, m.Hooks.Config)
 		}
 		cmd.Println("\nDetails: sloop hooks print <tool>")
-		cmd.Println("(Workflow hooks — format/lint/policy — are v0.2.0; see docs/design/hooks.md.)")
+		cmd.Println("(Workflow hooks (format/lint/policy) are v0.2.0; see docs/design/hooks.md.)")
 		hints.Show(cmd.OutOrStdout(), "hooks")
 		return nil
 	},

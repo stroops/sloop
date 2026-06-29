@@ -59,7 +59,7 @@ func hookRunE(cmd *cobra.Command, args []string) error {
 
 // hooksEmitCmd is the internal callback an AI tool's own hooks invoke
 // (`sloop hooks emit <state>`). It lives under the `hooks` namespace for
-// consistency with `skills`; it is hidden because users never type it — it is
+// consistency with `skills`; it is hidden because users never type it; it is
 // wired into a provider's hook config by `sloop hooks install`.
 var hooksEmitCmd = &cobra.Command{
 	Use:    "emit <waiting|working|idle>",

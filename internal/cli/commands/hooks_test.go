@@ -15,7 +15,7 @@ var claudeEvents = map[string]string{
 }
 
 // geminiEvents mirrors the gemini manifest's mapping (different event names,
-// same settings.json shape) — proves the installer is multi-provider.
+// same settings.json shape); proves the installer is multi-provider.
 var geminiEvents = map[string]string{
 	"BeforeAgent":  "sloop hooks emit working",
 	"Notification": "sloop hooks emit waiting",

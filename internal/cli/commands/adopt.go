@@ -46,7 +46,7 @@ func resolveAdopt(sessionName, wsFlag, toolFlag string, adapterKeys []string, pa
 }
 
 // RunAdopt renames a running external tmux session into the sloop
-// `<workspace>__<tool>` convention and registers its workspace — bringing an
+// `<workspace>__<tool>` convention and registers its workspace, bringing an
 // agent you started yourself into the fleet. Returns the new session name.
 func RunAdopt(sessionName, wsFlag, toolFlag string) (string, error) {
 	if !tmux.Available() {

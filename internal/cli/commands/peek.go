@@ -60,10 +60,10 @@ var peekInPopup bool
 var peekCmd = &cobra.Command{
 	Use:     "peek [agent]",
 	Aliases: []string{"pk"},
-	Short:   "Overlay a waiting agent, answer it, and drop back — without losing your spot",
+	Short:   "Overlay a waiting agent, answer it, and drop back, without losing your spot",
 	Long: `Float a running agent's live session in a tmux popup over your current
 pane: answer the prompt it is blocked on, then close the popup and you are
-exactly where you were — unlike ` + "`sloop attach`" + `, which switches your whole
+exactly where you were, unlike ` + "`sloop attach`" + `, which switches your whole
 screen to the agent. With no argument, peek jumps straight to the lone waiting
 agent, or shows the fleet picker when several (or none) are waiting. Bind it to
 a key with ` + "`sloop peek setup`" + `. Needs tmux ≥ 3.2.`,

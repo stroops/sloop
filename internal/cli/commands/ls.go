@@ -17,7 +17,7 @@ import (
 	"github.com/stroops/sloop/internal/workspace"
 )
 
-// openShellIn starts the user's shell with its working directory set to dir — a
+// openShellIn starts the user's shell with its working directory set to dir, a
 // real "go there" for a workspace without a session (a binary can't cd the
 // parent shell). Exiting the shell returns to `sloop ls`.
 func openShellIn(dir string) error {
@@ -25,7 +25,7 @@ func openShellIn(dir string) error {
 	if sh == "" {
 		sh = "/bin/sh"
 	}
-	fmt.Printf("\nshell in %s — type `exit` to return to sloop\n\n", dir)
+	fmt.Printf("\nshell in %s; type `exit` to return to sloop\n\n", dir)
 	c := exec.Command(sh)
 	c.Dir = dir
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -34,7 +34,7 @@ func openShellIn(dir string) error {
 
 // enrichedByWorkspace groups the live fleet by workspace name, classified
 // (waiting/working/idle) so `ls` can show each workspace's agents with the same
-// status dots as `ps` — the bridge between the two views.
+// status dots as `ps`, the bridge between the two views.
 func enrichedByWorkspace(manifests map[string]adapter.Manifest) map[string][]FleetRow {
 	m := map[string][]FleetRow{}
 	for _, r := range enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests) {
@@ -44,20 +44,20 @@ func enrichedByWorkspace(manifests map[string]adapter.Manifest) map[string][]Fle
 }
 
 // workspaceDefault returns a workspace's default tool key (what `r`/launch runs),
-// or "—" when it can't be read.
+// or "-" when it can't be read.
 func workspaceDefault(path string) string {
 	proj, err := config.LoadProject(workspace.Workspace{Root: path}.SloopDir())
 	if err != nil || proj.DefaultTool == "" {
-		return "—"
+		return "-"
 	}
 	return proj.DefaultTool
 }
 
 // agentsInline renders a workspace's live agents as "● Claude  ▸ Cursor" using
-// the same status dots as `ps`; "—" when nothing is running.
+// the same status dots as `ps`; "-" when nothing is running.
 func agentsInline(rows []FleetRow) string {
 	if len(rows) == 0 {
-		return tui.Grey("—")
+		return tui.Grey("-")
 	}
 	parts := make([]string, 0, len(rows))
 	for _, r := range rows {
@@ -80,7 +80,7 @@ func abbrevHome(path string) string {
 	return path
 }
 
-// launchWorkspaceDefault launches a workspace's default tool in its own dir — the
+// launchWorkspaceDefault launches a workspace's default tool in its own dir, the
 // "jump into work" action for a workspace that has no live session yet.
 func launchWorkspaceDefault(startDir string) error {
 	ws, err := workspace.Resolve(startDir)
@@ -157,7 +157,7 @@ var lsCmd = &cobra.Command{
 				return err
 			}
 			if len(pruned) == 0 {
-				cmd.Println("Nothing to prune — all registered workspace paths exist.")
+				cmd.Println("Nothing to prune; all registered workspace paths exist.")
 			} else {
 				for _, name := range pruned {
 					cmd.Printf("pruned: %s\n", name)
@@ -210,7 +210,7 @@ var lsCmd = &cobra.Command{
 					running++
 				}
 				// No leading status glyph (ambiguous-width breaks alignment); the
-				// AGENTS column carries liveness — colored dots when running, "—" idle.
+				// AGENTS column carries liveness: colored dots when running, "-" idle.
 				line := fmt.Sprintf("%-*s %-*s %s",
 					nameW, ws.Name, defW, defaults[ws.Name], agentsInline(agents))
 				line += "\r\n└ " + tui.Grey(abbrevHome(ws.Path))
@@ -221,7 +221,7 @@ var lsCmd = &cobra.Command{
 			if running > 0 {
 				header += " · " + tui.Green(fmt.Sprintf("%d running", running))
 			}
-			legend := tui.Grey("  AGENTS = live agents, colored by status (→ sloop ps) · — = idle")
+			legend := tui.Grey("  AGENTS = live agents, colored by status (→ sloop ps) · - = idle")
 			keys := tui.Grey("  ↑/↓ move · ⏎ open · r launch · s shell · c cd · q/esc quit")
 			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %s", nameW, "WORKSPACE", defW, "DEFAULT", "AGENTS"))
 			prompt := header
@@ -253,7 +253,7 @@ var lsCmd = &cobra.Command{
 					return attachSession(rows[0].Name)
 				}
 				notice = tui.Yellow(ws.Name+" isn't running") +
-					tui.Grey(" — press r to launch · s for a shell · c to copy its cd")
+					tui.Grey(" · press r to launch · s for a shell · c to copy its cd")
 			}
 		}
 	},

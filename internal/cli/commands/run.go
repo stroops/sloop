@@ -26,7 +26,7 @@ type launchPlan struct {
 }
 
 // toolKeyFor resolves a token to a manifest key: an exact key, else a tool whose
-// detect/launch binary matches — so `sloop run agent` == `sloop run cursor`.
+// detect/launch binary matches, so `sloop run agent` == `sloop run cursor`.
 func toolKeyFor(token string, manifests map[string]adapter.Manifest) (string, bool) {
 	if _, ok := manifests[token]; ok {
 		return token, true
@@ -122,12 +122,12 @@ func isToolToken(token string, manifests map[string]adapter.Manifest) bool {
 
 // buildRunArgs turns a resolved model/effort/task into the CLI's own flags (from
 // its manifest), then appends passthrough. Errors clearly if the CLI lacks a
-// knob the user asked for. The model string is forwarded as-is — never validated.
+// knob the user asked for. The model string is forwarded as-is, never validated.
 func buildRunArgs(m adapter.Manifest, model, effort, task string, passthrough []string) ([]string, error) {
 	var args []string
 	if model != "" {
 		if m.Run.ModelFlag == "" {
-			return nil, fmt.Errorf("%s has no model selection via sloop — run it and pick the model inside, or pass flags after `--`", m.Name)
+			return nil, fmt.Errorf("%s has no model selection via sloop; run it and pick the model inside, or pass flags after `--`", m.Name)
 		}
 		args = append(args, m.Run.ModelFlag, model)
 	}
@@ -146,7 +146,7 @@ func buildRunArgs(m adapter.Manifest, model, effort, task string, passthrough []
 	if task != "" {
 		switch m.Run.Prompt {
 		case "":
-			return nil, fmt.Errorf("%s has no initial-task support via sloop — launch it and type the task", m.Name)
+			return nil, fmt.Errorf("%s has no initial-task support via sloop; launch it and type the task", m.Name)
 		case "positional":
 			args = append(args, task) // e.g. `claude "task"` / `agent "task"`
 		default:
@@ -306,7 +306,7 @@ account with a saved profile:
   sloop run claude            # the workspace's claude (re-attaches if running)
   sloop run claude --new      # a fresh claude instance (claude·2, claude·3, …)
   sloop run claude@review     # an ad-hoc instance named "review"
-  sloop run @sec              # the "sec" profile (e.g. a second account)
+  sloop run @work             # the "work" profile (e.g. a second account)
 
 Profiles live in ~/.sloop/config.yaml; manage them with ` + "`sloop profile`" + `.
 Use --env KEY=VAL for a one-off account/env without saving a profile.`,
@@ -398,7 +398,7 @@ func RegisterRun(cmd *cobra.Command) {
 	runCmd.Flags().StringVarP(&runProvider, "provider", "p", "", "AI CLI to launch (overrides the positional target)")
 	runCmd.Flags().StringVarP(&runModel, "model", "m", "", "model to pass to the CLI (forwarded as-is, not validated)")
 	runCmd.Flags().StringVarP(&runEffort, "effort", "e", "", "reasoning effort: low|medium|high (if the CLI supports it)")
-	runCmd.Flags().StringVarP(&runTask, "task", "t", "", "hand the agent an initial task — launches an interactive session already working on it")
+	runCmd.Flags().StringVarP(&runTask, "task", "t", "", "hand the agent an initial task; launches an interactive session already working on it")
 	runCmd.Flags().StringVarP(&runName, "name", "n", "", "name this instance so a second agent of the same tool gets its own session")
 	runCmd.Flags().StringArrayVar(&runEnv, "env", nil, "extra env for the launched tool, KEY=VAL (e.g. a second account's CLAUDE_CONFIG_DIR); repeatable")
 	runCmd.Flags().BoolVarP(&runNew, "new", "N", false, "start a fresh instance (next free slot) instead of re-attaching the existing session")

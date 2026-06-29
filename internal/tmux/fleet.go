@@ -22,15 +22,15 @@ func BuildListArgs() []string {
 	return []string{"list-sessions", "-F", listFormat}
 }
 
-// BuildSwitchArgs switches the current tmux client to a session — used when
+// BuildSwitchArgs switches the current tmux client to a session, used when
 // jumping between sessions while already inside tmux (attach can't nest).
 func BuildSwitchArgs(session string) []string {
 	return []string{"switch-client", "-t", session}
 }
 
 // BuildCaptureArgs reads the visible content of a session's active pane.
-// This only ever reads your own terminal output — never the provider's API or
-// internals — so it stays within what any AI tool's terms allow.
+// This only ever reads your own terminal output, never the provider's API or
+// internals, so it stays within what any AI tool's terms allow.
 func BuildCaptureArgs(session string) []string {
 	return []string{"capture-pane", "-p", "-t", session}
 }

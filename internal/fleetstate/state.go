@@ -1,6 +1,6 @@
 // Package fleetstate stores per-session agent status markers written by AI tool
 // hooks (e.g. Claude's Stop/Notification) and read by `sloop ps`. This makes
-// status authoritative — the tool itself reports waiting/working/idle — instead
+// status authoritative (the tool itself reports waiting/working/idle) instead
 // of relying only on the pane-text heuristic. It is provider-respecting: sloop
 // never intercepts the tool; the tool calls `sloop hook` through its own hook
 // mechanism, and we just persist what it tells us.
@@ -15,7 +15,7 @@ import (
 )
 
 // TTL bounds how long a marker is trusted before `ps` falls back to the live
-// pane heuristic — so a session that exited without firing its Stop hook can't
+// pane heuristic, so a session that exited without firing its Stop hook can't
 // stay "waiting" forever.
 const TTL = 15 * time.Minute
 

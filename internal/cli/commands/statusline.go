@@ -57,8 +57,8 @@ func waitingBadge(n int) string {
 }
 
 // renderFleetBadge counts sloop sessions whose fresh marker is `waiting`,
-// excluding the current session (so it reads "others need you"). Markers only —
-// no capture-pane — because this re-renders every status-interval.
+// excluding the current session (so it reads "others need you"). Markers only,
+// no capture-pane, because this re-renders every status-interval.
 func renderFleetBadge(exclude string) string {
 	n := 0
 	for _, s := range tmux.ParseSessions(tmuxList()) {

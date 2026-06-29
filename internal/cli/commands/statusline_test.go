@@ -9,7 +9,7 @@ import (
 )
 
 // The status bar is rendered by tmux's #(), which captures stdout only. cobra's
-// cmd.Print writes to stderr, so the command must write to stdout explicitly —
+// cmd.Print writes to stderr, so the command must write to stdout explicitly;
 // guard that, or the status bar silently shows nothing.
 func TestStatuslineCommandWritesToStdout(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())

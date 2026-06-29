@@ -8,7 +8,7 @@ import (
 
 // statusLineEnabled reports whether sloop should style a session's status bar.
 // Power users with their own tmux status bar can keep it untouched by setting
-// SLOOP_STATUSLINE=0 (or off/false/no) — sloop then never overrides status-left/
+// SLOOP_STATUSLINE=0 (or off/false/no); sloop then never overrides status-left/
 // status-right, even per session.
 func statusLineEnabled() bool {
 	switch strings.ToLower(os.Getenv("SLOOP_STATUSLINE")) {

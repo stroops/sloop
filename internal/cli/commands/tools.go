@@ -45,11 +45,11 @@ func shortVersion(v string) string {
 }
 
 // contextLabel/skillsLabel/hooksLabel summarize a manifest's per-provider
-// capabilities for the matrix — the runtime view of where sloop is
+// capabilities for the matrix, the runtime view of where sloop is
 // provider-aware (all read from the adapter manifest, the single source).
 func contextLabel(m adapter.Manifest) string {
 	if m.Context.Mode == "" {
-		return "—"
+		return "-"
 	}
 	return m.Context.Mode
 }
@@ -68,7 +68,7 @@ func hooksLabel(m adapter.Manifest) string {
 	if m.Hooks.Events.Working != "" || m.Hooks.Events.Waiting != "" || m.Hooks.Events.Idle != "" {
 		return "manual"
 	}
-	return "—"
+	return "-"
 }
 
 var toolsCmd = &cobra.Command{

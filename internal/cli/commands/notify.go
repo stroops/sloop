@@ -10,7 +10,7 @@ import (
 // osNotify shows a best-effort desktop notification about one of your own
 // sessions (used by `ps --watch`). It shells out to the OS notifier (osascript
 // on macOS, notify-send on Linux, a PowerShell balloon on Windows) and silently
-// does nothing if that's unavailable — a convenience, never a hard dependency,
+// does nothing if that's unavailable; a convenience, never a hard dependency,
 // never touches the provider.
 func osNotify(title, message string) {
 	var cmd *exec.Cmd
@@ -21,7 +21,7 @@ func osNotify(title, message string) {
 	case "linux":
 		cmd = exec.Command("notify-send", title, message)
 	case "windows":
-		// Built-in balloon tip via WinForms — no extra modules required.
+		// Built-in balloon tip via WinForms; no extra modules required.
 		ps := fmt.Sprintf(
 			"Add-Type -AssemblyName System.Windows.Forms;"+
 				"Add-Type -AssemblyName System.Drawing;"+

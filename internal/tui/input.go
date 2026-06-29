@@ -62,7 +62,7 @@ func ReadLine(prompt string) (string, bool) {
 }
 
 // Confirm asks a y/N question in raw mode and returns true only on y/Y. Any
-// other key — including Esc and Ctrl-C — answers no without killing the process,
+// other key (including Esc and Ctrl-C) answers no without killing the process,
 // so a declined confirm returns to the caller's control loop.
 func Confirm(prompt string) bool {
 	fd := int(os.Stdin.Fd())

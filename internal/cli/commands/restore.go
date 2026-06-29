@@ -23,7 +23,7 @@ type restoreTarget struct {
 }
 
 // restoreCandidates picks, from session history (most-recent first), the latest
-// session per (workspace, tool) that is not currently live — i.e. the recent
+// session per (workspace, tool) that is not currently live, i.e. the recent
 // fleet to relaunch after a restart. Pure and testable. Sessions whose workspace
 // is no longer in the registry are skipped.
 func restoreCandidates(sessions []session.Session, wsName, wsPath map[int64]string, live map[string]bool) []restoreTarget {
@@ -41,7 +41,7 @@ func restoreCandidates(sessions []session.Session, wsName, wsPath map[int64]stri
 		seen[key] = true
 		sess := tmux.SessionName(name, s.Tool)
 		if live[sess] {
-			continue // already running — nothing to restore
+			continue // already running, nothing to restore
 		}
 		out = append(out, restoreTarget{WSName: name, Path: path, Tool: s.Tool, Session: sess})
 	}
@@ -89,7 +89,7 @@ func RunRestore(w io.Writer, in io.Reader, resume, yes bool) error {
 
 	targets := restoreCandidates(sessions, wsName, wsPath, liveSessionNames())
 	if len(targets) == 0 {
-		_, _ = fmt.Fprintln(w, "Nothing to restore — your recent agents are already running, or none are recorded yet.")
+		_, _ = fmt.Fprintln(w, "Nothing to restore; your recent agents are already running, or none are recorded yet.")
 		return nil
 	}
 
@@ -126,7 +126,7 @@ func RunRestore(w io.Writer, in io.Reader, resume, yes bool) error {
 		}
 		done++
 	}
-	_, _ = fmt.Fprintf(w, "restored %d agent(s) — `sloop ps` to see them\n", done)
+	_, _ = fmt.Fprintf(w, "restored %d agent(s); `sloop ps` to see them\n", done)
 	return nil
 }
 
@@ -139,7 +139,7 @@ var restoreCmd = &cobra.Command{
 	Use:   "restore",
 	Short: "Relaunch the agents you were recently running (after a reboot / tmux restart)",
 	Long: `tmux sessions don't survive a reboot. restore re-creates the most recent agent
-per workspace that isn't currently running, from sloop's registry — detached, so
+per workspace that isn't currently running, from sloop's registry, detached, so
 the whole fleet comes back at once. With --resume it continues each tool's prior
 conversation where the CLI supports it.`,
 	Args: cobra.NoArgs,

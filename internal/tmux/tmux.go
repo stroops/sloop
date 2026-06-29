@@ -15,7 +15,7 @@ import (
 
 // Run / Output / OutputContext execute a multiplexer subcommand, logging the
 // call (and any error) at debug level so `--debug` shows exactly what sloop
-// asked tmux/psmux to do — the first thing you want when a fleet command
+// asked tmux/psmux to do, the first thing you want when a fleet command
 // misbehaves. All sloop multiplexer access goes through these.
 func Run(args ...string) error {
 	slog.Debug("mux", "bin", Bin(), "args", args)
@@ -98,7 +98,7 @@ func InstanceName(workspace, tool, instance string) string {
 
 // envPrefix returns ["env","K1=V1",…] in sorted key order, or nil when empty, so
 // a launched command can carry extra env (e.g. CLAUDE_CONFIG_DIR for a second
-// account) on any tmux version — no dependency on `new-session -e`.
+// account) on any tmux version, with no dependency on `new-session -e`.
 func envPrefix(env map[string]string) []string {
 	if len(env) == 0 {
 		return nil

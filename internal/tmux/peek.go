@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// peekPopupW/H are the default overlay size for peek — bigger than the HUD
+// peekPopupW/H are the default overlay size for peek, bigger than the HUD
 // because you actually work inside the agent while it floats.
 const (
 	peekPopupW = "90%"

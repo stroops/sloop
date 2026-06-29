@@ -14,7 +14,7 @@ type Store struct{ db *sql.DB }
 
 // migrations are applied in order; the current schema version is the slice
 // length, tracked in SQLite's built-in PRAGMA user_version (no migrations
-// table, no framework). To evolve the schema, append one entry — never edit a
+// table, no framework). To evolve the schema, append one entry, never edit a
 // shipped one. Each must be safe to re-run (IF NOT EXISTS) so existing DBs that
 // predate user_version tracking migrate cleanly.
 var migrations = []string{

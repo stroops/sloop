@@ -100,7 +100,7 @@ var (
 
 var killCmd = &cobra.Command{
 	Use:   "kill [<#|session|workspace>...]",
-	Short: "End running AI session(s) — stops the agent (use -y to skip confirm)",
+	Short: "End running AI session(s); stops the agent (use -y to skip confirm)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		killed, err := RunKill(cmd.OutOrStdout(), cmd.InOrStdin(), args, killAll, killWaiting, assumeYes(cmd, killYes))
 		if err != nil {

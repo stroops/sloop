@@ -226,7 +226,7 @@ func filterWaiting(rows []FleetRow) []FleetRow {
 }
 
 // newlyWaiting returns the names of sessions waiting now that were not waiting
-// in the previous snapshot — the agents that just started needing you.
+// in the previous snapshot: the agents that just started needing you.
 func newlyWaiting(prev, curr []FleetRow) []string {
 	was := make(map[string]bool)
 	for _, r := range prev {
@@ -244,7 +244,7 @@ func newlyWaiting(prev, curr []FleetRow) []string {
 }
 
 // sortNeedsAttention floats sessions waiting on the user to the top, then keeps
-// the stable workspace/tool order — so the agents that need you are listed first.
+// the stable workspace/tool order, so the agents that need you are listed first.
 func sortNeedsAttention(rows []FleetRow) {
 	sort.SliceStable(rows, func(i, j int) bool {
 		return rows[i].Status.NeedsAttention() && !rows[j].Status.NeedsAttention()
@@ -270,7 +270,7 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 			waiting++
 		}
 	}
-	header := fmt.Sprintf("⚓ AI fleet — %d running", len(rows))
+	header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
 	if waiting > 0 {
 		header += fmt.Sprintf(", %d waiting on you", waiting)
 	}
@@ -324,7 +324,7 @@ func jumpToFleet(rows []FleetRow, n int) error {
 
 // pickFleetSession shows the live fleet and returns the chosen session name ("" if
 // cancelled). Backs the no-argument `sloop attach` so you don't have to type a
-// session name — using the same WORKSPACE/TOOL/STATUS columns, colors and
+// session name, using the same WORKSPACE/TOOL/STATUS columns, colors and
 // waiting-first order as `ps`, so the picker reads identically to the fleet view.
 func pickFleetSession(title string) (string, error) {
 	manifests, _ := adapter.Load()
@@ -386,7 +386,7 @@ var (
 )
 
 // notRunningWorkspaces lists registered workspaces that have no live session,
-// sorted by name — the rest of your cross-repo fleet that isn't running yet.
+// sorted by name: the rest of your cross-repo fleet that isn't running yet.
 // Skips registrations whose paths no longer exist (e.g. cleaned-up temp dirs).
 func notRunningWorkspaces(rows []FleetRow, paths map[string]string) []string {
 	running := make(map[string]bool, len(rows))
@@ -397,7 +397,7 @@ func notRunningWorkspaces(rows []FleetRow, paths map[string]string) []string {
 	for name, path := range paths {
 		if !running[name] {
 			if _, err := os.Stat(path); err != nil {
-				continue // stale registration — path gone
+				continue // stale registration, path gone
 			}
 			idle = append(idle, name)
 		}
@@ -427,12 +427,12 @@ func externalNudge(w io.Writer, ext []tmux.Session) {
 	for _, s := range ext {
 		names = append(names, s.Name)
 	}
-	_, _ = fmt.Fprintln(w, tui.Grey(fmt.Sprintf("+ %d tmux session(s) not in sloop (%s) — `sloop adopt <name>` to add",
+	_, _ = fmt.Fprintln(w, tui.Grey(fmt.Sprintf("+ %d tmux session(s) not in sloop (%s); `sloop adopt <name>` to add",
 		len(ext), strings.Join(names, ", "))))
 }
 
 // runPsAll prints the live fleet, the registered workspaces that aren't running,
-// and any unmanaged tmux sessions — the full picture, not just what sloop runs.
+// and any unmanaged tmux sessions: the full picture, not just what sloop runs.
 func runPsAll(w io.Writer, rows []FleetRow, paths map[string]string, ext []tmux.Session) error {
 	_ = RunPs(w, rows)
 	if idle := notRunningWorkspaces(rows, paths); len(idle) > 0 {
@@ -508,7 +508,7 @@ var psCmd = &cobra.Command{
 		// header, so the fleet redraws in place; it's re-read every pass, so kills
 		// and new sessions show immediately.
 		var notice string
-		detach := tui.Grey("  ⏎ enters an agent — to come back, detach (keeps it running): " + tmux.Prefix() + " d")
+		detach := tui.Grey("  ⏎ enters an agent; to come back, detach (keeps it running): " + tmux.Prefix() + " d")
 		for {
 			tui.Clear()
 			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
@@ -761,7 +761,7 @@ func columnWidths(rows []FleetRow) (wsW, toolW, waiting int) {
 }
 
 // runWatch re-renders the fleet on an interval (until Ctrl-C), ringing the
-// terminal bell — and optionally a desktop notification — whenever a session
+// terminal bell (and optionally a desktop notification) whenever a session
 // newly starts waiting on you. This turns `ps` from a snapshot into a live
 // monitor: you no longer have to keep re-running it to catch who needs you.
 func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) error {
