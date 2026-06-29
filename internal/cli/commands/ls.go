@@ -135,6 +135,8 @@ func RunLs(w io.Writer) error {
 	return nil
 }
 
+var lsPrune bool
+
 var lsCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List sloop workspaces and recent sessions",
@@ -148,6 +150,21 @@ var lsCmd = &cobra.Command{
 			return err
 		}
 		defer func() { _ = store.Close() }()
+
+		if lsPrune {
+			pruned, err := store.PruneWorkspaces()
+			if err != nil {
+				return err
+			}
+			if len(pruned) == 0 {
+				cmd.Println("Nothing to prune — all registered workspace paths exist.")
+			} else {
+				for _, name := range pruned {
+					cmd.Printf("pruned: %s\n", name)
+				}
+			}
+			return nil
+		}
 
 		workspaces, err := store.ListWorkspaces()
 		if err != nil {
@@ -242,4 +259,7 @@ var lsCmd = &cobra.Command{
 	},
 }
 
-func RegisterLs(cmd *cobra.Command) { cmd.AddCommand(lsCmd) }
+func RegisterLs(cmd *cobra.Command) {
+	lsCmd.Flags().BoolVar(&lsPrune, "prune", false, "remove workspace registrations whose paths no longer exist on disk")
+	cmd.AddCommand(lsCmd)
+}

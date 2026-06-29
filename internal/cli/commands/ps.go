@@ -387,14 +387,18 @@ var (
 
 // notRunningWorkspaces lists registered workspaces that have no live session,
 // sorted by name — the rest of your cross-repo fleet that isn't running yet.
+// Skips registrations whose paths no longer exist (e.g. cleaned-up temp dirs).
 func notRunningWorkspaces(rows []FleetRow, paths map[string]string) []string {
 	running := make(map[string]bool, len(rows))
 	for _, r := range rows {
 		running[r.Workspace] = true
 	}
 	var idle []string
-	for name := range paths {
+	for name, path := range paths {
 		if !running[name] {
+			if _, err := os.Stat(path); err != nil {
+				continue // stale registration — path gone
+			}
 			idle = append(idle, name)
 		}
 	}
@@ -504,7 +508,7 @@ var psCmd = &cobra.Command{
 		// header, so the fleet redraws in place; it's re-read every pass, so kills
 		// and new sessions show immediately.
 		var notice string
-		detach := tui.Grey("  ⏎ enters an agent — to come back, detach (keeps it running): " + tmux.PrefixRaw() + " d")
+		detach := tui.Grey("  ⏎ enters an agent — to come back, detach (keeps it running): " + tmux.Prefix() + " d")
 		for {
 			tui.Clear()
 			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)

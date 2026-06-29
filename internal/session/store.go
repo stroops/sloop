@@ -145,6 +145,30 @@ func (s *Store) ListWorkspaces() ([]Workspace, error) {
 	return out, rows.Err()
 }
 
+// PruneWorkspaces removes workspace registrations whose paths no longer exist on
+// disk (e.g. temp directories from sloop run/init in $TMPDIR). Also removes the
+// associated session records. Returns the names of deleted workspaces.
+func (s *Store) PruneWorkspaces() ([]string, error) {
+	wss, err := s.ListWorkspaces()
+	if err != nil {
+		return nil, err
+	}
+	var pruned []string
+	for _, ws := range wss {
+		if _, err := os.Stat(ws.Path); err == nil {
+			continue
+		}
+		if _, err := s.db.Exec(`DELETE FROM sessions WHERE workspace_id = ?`, ws.ID); err != nil {
+			return pruned, err
+		}
+		if _, err := s.db.Exec(`DELETE FROM workspaces WHERE id = ?`, ws.ID); err != nil {
+			return pruned, err
+		}
+		pruned = append(pruned, ws.Name)
+	}
+	return pruned, nil
+}
+
 type Session struct {
 	ID          int64
 	WorkspaceID int64
