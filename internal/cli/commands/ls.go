@@ -67,19 +67,6 @@ func agentsInline(rows []FleetRow) string {
 	return strings.Join(parts, "  ")
 }
 
-// abbrevHome shortens a path under $HOME to a leading ~ for compact display.
-func abbrevHome(path string) string {
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		if path == home {
-			return "~"
-		}
-		if strings.HasPrefix(path, home+"/") {
-			return "~" + path[len(home):]
-		}
-	}
-	return path
-}
-
 // launchWorkspaceDefault launches a workspace's default tool in its own dir, the
 // "jump into work" action for a workspace that has no live session yet.
 func launchWorkspaceDefault(startDir string) error {
@@ -213,7 +200,7 @@ var lsCmd = &cobra.Command{
 				// AGENTS column carries liveness: colored dots when running, "-" idle.
 				line := fmt.Sprintf("%-*s %-*s %s",
 					nameW, ws.Name, defW, defaults[ws.Name], agentsInline(agents))
-				line += "\r\n└ " + tui.Grey(abbrevHome(ws.Path))
+				line += "\r\n└ " + tui.Grey(tui.AbbreviateHome(ws.Path))
 				options = append(options, line)
 			}
 
@@ -228,10 +215,17 @@ var lsCmd = &cobra.Command{
 			if notice != "" {
 				prompt += "\r\n" + notice
 			}
-			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n\r\n" + cols
+			prompt += "\r\n" + legend + "\r\n\r\n" + cols
 			notice = "" // consumed; the handler below sets a fresh one for next pass
 
-			selected, key, err := tui.SelectAction(prompt, options, []byte{'r', 's', 'c'})
+			selected, key, err := tui.Menu{
+				Prompt:     prompt,
+				Footer:     keys,
+				Options:    options,
+				ActionKeys: []byte{'r', 's', 'c'},
+				Highlight:  tui.HighlightFirstCol,
+				TopPad:     true,
+			}.Run()
 			if err != nil {
 				return err
 			}

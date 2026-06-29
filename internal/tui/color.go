@@ -2,9 +2,17 @@ package tui
 
 import (
 	"os"
+	"regexp"
 
 	"golang.org/x/term"
 )
+
+// ansiRe matches SGR color/style escape sequences (e.g. "\033[1;36m").
+var ansiRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// StripANSI removes SGR escape sequences so a string can be recolored uniformly
+// (e.g. lighting a whole highlighted menu row regardless of its inner colors).
+func StripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
 // ColorEnabled reports whether ANSI color should be emitted. Color is off when
 // NO_COLOR is set (https://no-color.org) or stdout is not a terminal (piped or

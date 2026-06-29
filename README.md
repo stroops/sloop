@@ -77,7 +77,6 @@ Sloop fixes these with three ideas:
 ```sh
 # Homebrew (macOS / Linux)
 brew install stroops/tap/sloop
-brew upgrade sloop           # to update later
 
 # With Go (always works)
 go install github.com/stroops/sloop/cmd/sloop@latest
@@ -88,6 +87,16 @@ make build                   # → ./sloop   (or: make install)
 
 # Prebuilt binaries: see the GitHub Releases page.
 ```
+
+To update later, run **`sloop update`**: it detects how sloop was installed and
+upgrades the same way (`brew upgrade sloop`, `go install …@latest`, …). sloop
+also checks for new releases in the background — throttled, and never on the
+critical path of a command — and shows a one-line notice on the menu and the
+`sloop ps` header when one is available.
+
+Running **`sloop`** with no arguments opens an interactive menu over the common
+commands (fleet, run, sync, check, init, doctor). Set `SLOOP_NO_MENU=1` to keep
+the plain help output instead.
 
 Verify and (optionally) enable shell completion:
 
@@ -222,6 +231,7 @@ agents, to launch (`r`), open a shell (`s`), `c` to copy a `cd`, or `Enter` to j
 | `check` | - | - | AI-readiness checklist for the workspace (AGENTS.md, context, skills, hooks) with a fix command per gap. |
 | `ls` | - | - | Registered workspaces + recent sessions. |
 | `doctor` | - | - | Environment health (tools, multiplexer, mode). |
+| `update` | - | - | Update sloop to the latest release, the same way it was installed (Homebrew / `go install` / manual). |
 | `hints [list\|on\|off]` | - | - | Contextual education tips (en/vi). |
 | `completion <shell>` / `version` | - | - | Shell completion · version info. |
 

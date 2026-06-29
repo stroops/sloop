@@ -42,6 +42,8 @@ var (
 // SetVersion called from main.go (ldflags)
 func SetVersion(v, c, d string) {
 	version, commit, date = v, c, d
+	rootCmd.Version = v
+	commands.SetVersion(v)
 }
 
 var rootCmd = &cobra.Command{
@@ -54,6 +56,8 @@ Create, detach, attach, and navigate between AI workspaces without losing flow.`
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Version:       version,
+	Args:          cobra.NoArgs,
+	RunE:          runHome,
 }
 
 func Execute() error {
@@ -100,7 +104,7 @@ func initConfig() {
 	viper.SetEnvPrefix("SLOOP")
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err == nil {
+	if err := viper.ReadInConfig(); err == nil && debug {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 }

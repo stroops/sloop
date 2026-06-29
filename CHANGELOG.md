@@ -3,6 +3,74 @@
 All notable changes to Sloop are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v0.1.2 - 2026-06-30
+
+A home base when you type `sloop` with nothing after it, plus first-class updates.
+
+### A menu on bare `sloop`
+- Running `sloop` with no arguments now opens an interactive launcher over the
+  commands you reach for most (fleet, run, sync, check, init, doctor) instead of
+  dumping help. It reuses the same arrow-key menu as `sloop ps`, and degrades to
+  the plain help output when piped, in CI, under `--no-input`, or when you set
+  `SLOOP_NO_MENU=1`.
+- The launcher is drawn under a small masthead that also shows the current
+  directory (which AI CLIs treat as the project root) and whether sloop is
+  initialized there, highlights the row under the cursor, and carries a `↑/↓
+  move · ⏎ select · q quit` guide along the bottom.
+- Picking **Run** opens a second menu of the tools you have installed and your
+  saved profiles — default tool first, with the working directory shown — so you
+  choose what to launch instead of always getting the default. If the current
+  directory isn't a sloop workspace yet, Run offers to initialize it for the
+  chosen tool first (instead of failing with "no .sloop workspace").
+- A **More** entry (or `m`) opens the full command reference — every command with
+  a one-line description — and runs the one you pick; `q` returns to the menu.
+
+### Consistent interactive screens
+- `sloop ps` and `sloop ls` now share one menu component with the home launcher:
+  the same cursor highlight, the navigation guide moved to the bottom, and a
+  blank line of top padding, so every interactive screen looks and moves the
+  same. Plain menus (home, Run picker) light the whole cursor row in the `❯`
+  pointer's cyan; status-colored menus (ps, ls) light just the first column so
+  each row keeps its waiting/working/idle color. Skipped under `NO_COLOR`.
+- `sloop version` / `sloop --version` now report the real build version (it was
+  blank in some builds because the version was wired after the command was
+  defined).
+- The `Using config file: …` line no longer prints on every command; it is now
+  shown only under `--debug`.
+
+### Update awareness
+- New `sloop update` upgrades sloop the way it was installed: it detects a
+  Homebrew install and runs `brew upgrade sloop`, a `go install` build and
+  re-runs `go install …@latest`, and otherwise prints the right command rather
+  than overwriting a binary it doesn't manage.
+- sloop checks GitHub for newer releases in a detached background process —
+  throttled to at most once a day and never on the critical path of a command —
+  and shows a one-line `⬆ Update X available — run sloop update` notice on the
+  menu and the `sloop ps` header. Dev/source builds never check or nag.
+
+### Reach a waiting agent in one key
+- Zero-config keys: `sloop run` now binds the peek and hud popups to a free tmux prefix key the first
+  time it creates a session on a server (peek tries `j → a → f → p`, hud `h → g → G`), so you no longer
+  have to remember `peek setup`. It only ever takes a key that is free, never clobbering your own
+  binding, and records the choice in a tmux server option; opt out with `SLOOP_KEYS=0`.
+- Actionable badge: the fleet-wide `⏳ N waiting` status badge now shows the exact keystroke that gets
+  you there, e.g. `⏳ 1 waiting → Ctrl+b j`, using your real tmux prefix.
+- Peek now floats with a titled border (`👀 peek · <session> — Ctrl+b d to close`) on tmux ≥ 3.3, so a
+  peek reads as distinct from a full attach and tells you how to drop back.
+
+### A second Claude account
+- `sloop profile add --config-dir <dir>` sets up a profile that runs a tool under its own config dir
+  (Claude via `CLAUDE_CONFIG_DIR`), so two logins live side by side. It creates the dir, symlinks the
+  tool's shareable tooling by default, offers (opt-in) to share conversation history for cross-account
+  resume, and never shares credentials so the logins stay separate. Launch it with `sloop run @<name>`;
+  pass `--tool` to pick when several tools qualify.
+
+### Enhancements
+- `sloop ps` truncates rows to your actual terminal width instead of a fixed 72 columns.
+- Clearer "how to get back" detach hint in the session status bar, and `sloop ls --prune` drops
+  workspace registrations whose paths no longer exist on disk.
+- Windows: install via Scoop.
+
 ## v0.1.1 - 2026-06-28
 
 Run more than one agent per repo, peek into a waiting agent without leaving your

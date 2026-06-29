@@ -64,14 +64,19 @@ func ReadLine(prompt string) (string, bool) {
 // Confirm asks a y/N question in raw mode and returns true only on y/Y. Any
 // other key (including Esc and Ctrl-C) answers no without killing the process,
 // so a declined confirm returns to the caller's control loop.
-func Confirm(prompt string) bool {
+func Confirm(prompt string) bool { return ConfirmDefault(prompt, false) }
+
+// ConfirmDefault is Confirm with a configurable default: y/Y is yes, n/N is no,
+// and Enter or any other key takes def. This lets a "[Y/n]" prompt treat a bare
+// Enter as yes while still never killing the process on Esc/Ctrl-C.
+func ConfirmDefault(prompt string, def bool) bool {
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
-		return false
+		return def
 	}
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		return false
+		return def
 	}
 	defer func() { _ = term.Restore(fd, oldState) }()
 
@@ -80,14 +85,20 @@ func Confirm(prompt string) bool {
 	for {
 		n, err := os.Stdin.Read(in)
 		if err != nil {
-			return false // stdin closed / hard error → treat as "no" (never spin)
+			return def // stdin closed / hard error → take the default (never spin)
 		}
 		if n == 0 {
 			continue
 		}
-		yes := in[0] == 'y' || in[0] == 'Y'
 		fmt.Print("\r\n")
-		return yes
+		switch in[0] {
+		case 'y', 'Y':
+			return true
+		case 'n', 'N':
+			return false
+		default: // Enter, Esc, Ctrl-C, anything else
+			return def
+		}
 	}
 }
 

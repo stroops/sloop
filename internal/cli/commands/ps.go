@@ -22,6 +22,7 @@ import (
 	"github.com/stroops/sloop/internal/session"
 	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
+	"github.com/stroops/sloop/internal/update"
 )
 
 // FleetRow is one running sloop AI session, ready to display.
@@ -360,7 +361,13 @@ func pickFleetSession(title string) (string, error) {
 		tui.Blue("attached") + " · " + tui.Green("idle")
 	cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS"))
 	tui.Clear()
-	idx, err := tui.SelectMenu(title+"\r\n"+legend+"\r\n\r\n"+cols, opts)
+	idx, _, err := tui.Menu{
+		Prompt:    title + "\r\n" + legend + "\r\n\r\n" + cols,
+		Footer:    tui.Grey("  ↑/↓ move · ⏎ open · q quit"),
+		Options:   opts,
+		Highlight: tui.HighlightFirstCol,
+		TopPad:    true,
+	}.Run()
 	if err != nil || idx < 0 {
 		return "", err
 	}
@@ -515,6 +522,9 @@ var psCmd = &cobra.Command{
 		// header, so the fleet redraws in place; it's re-read every pass, so kills
 		// and new sessions show immediately.
 		var notice string
+		// Keep the update cache fresh from this entry point too, so the banner
+		// works whether the user comes in via `sloop` or `sloop ps`. Non-blocking.
+		update.MaybeTriggerBackground(version)
 		detach := tui.Grey("  ⏎ enters an agent; to come back, detach (keeps it running): " + tmux.Prefix() + " d")
 		for {
 			tui.Clear()
@@ -561,14 +571,24 @@ var psCmd = &cobra.Command{
 			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q/esc quit")
 			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-16s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS", "AGE"))
 			prompt := header
+			if b := update.Banner(version); b != "" {
+				prompt += "\r\n" + b
+			}
 			if notice != "" {
 				prompt += "\r\n" + notice
 			}
-			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n" + detach + "\r\n\r\n" + cols
+			prompt += "\r\n" + legend + "\r\n\r\n" + cols
 			notice = "" // consumed; the handler below sets a fresh one for next pass
 
 			actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-			idx, key, err := tui.SelectAction(prompt, options, actionKeys)
+			idx, key, err := tui.Menu{
+				Prompt:     prompt,
+				Footer:     keys + "\r\n" + detach,
+				Options:    options,
+				ActionKeys: actionKeys,
+				Highlight:  tui.HighlightFirstCol,
+				TopPad:     true,
+			}.Run()
 			if err != nil {
 				return err
 			}
