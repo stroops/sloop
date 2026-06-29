@@ -18,6 +18,11 @@ hooks:
     working: UserPromptSubmit
     waiting: Notification
     idle: Stop
+account:
+  config_dir_env: CLAUDE_CONFIG_DIR   # `sloop profile add --config-dir` sets this
+  default_dir: ~/.claude              # source to share tooling/history from
+  share: [plugins, agents, commands, skills, CLAUDE.md]   # tooling — same across accounts
+  share_state: [projects, todos]      # conversation history — opt-in, for cross-account resume
 run:
   vendor: anthropic
   default_for: [anthropic]

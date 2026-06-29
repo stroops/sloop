@@ -10,6 +10,27 @@ func row(name string, st tmux.AgentStatus) FleetRow {
 	return FleetRow{Name: name, Status: st}
 }
 
+func TestExcludeSession(t *testing.T) {
+	rows := []FleetRow{
+		row("ws__claude", tmux.StatusWorking),
+		row("ws__gemini", tmux.StatusWaiting),
+	}
+	got := excludeSession(rows, "ws__claude")
+	if len(got) != 1 || got[0].Name != "ws__gemini" {
+		t.Fatalf("expected only ws__gemini, got %+v", got)
+	}
+	// empty self → no filtering
+	all := excludeSession(rows, "")
+	if len(all) != 2 {
+		t.Fatalf("empty self should keep all rows, got %+v", all)
+	}
+	// unknown self → no filtering
+	same := excludeSession(rows, "other")
+	if len(same) != 2 {
+		t.Fatalf("non-matching self should keep all rows, got %+v", same)
+	}
+}
+
 func TestSoleWaiting(t *testing.T) {
 	cases := []struct {
 		name     string

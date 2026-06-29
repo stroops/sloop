@@ -14,7 +14,7 @@ type Store struct{ db *sql.DB }
 
 // migrations are applied in order; the current schema version is the slice
 // length, tracked in SQLite's built-in PRAGMA user_version (no migrations
-// table, no framework). To evolve the schema, append one entry — never edit a
+// table, no framework). To evolve the schema, append one entry, never edit a
 // shipped one. Each must be safe to re-run (IF NOT EXISTS) so existing DBs that
 // predate user_version tracking migrate cleanly.
 var migrations = []string{
@@ -143,6 +143,30 @@ func (s *Store) ListWorkspaces() ([]Workspace, error) {
 		out = append(out, w)
 	}
 	return out, rows.Err()
+}
+
+// PruneWorkspaces removes workspace registrations whose paths no longer exist on
+// disk (e.g. temp directories from sloop run/init in $TMPDIR). Also removes the
+// associated session records. Returns the names of deleted workspaces.
+func (s *Store) PruneWorkspaces() ([]string, error) {
+	wss, err := s.ListWorkspaces()
+	if err != nil {
+		return nil, err
+	}
+	var pruned []string
+	for _, ws := range wss {
+		if _, err := os.Stat(ws.Path); err == nil {
+			continue
+		}
+		if _, err := s.db.Exec(`DELETE FROM sessions WHERE workspace_id = ?`, ws.ID); err != nil {
+			return pruned, err
+		}
+		if _, err := s.db.Exec(`DELETE FROM workspaces WHERE id = ?`, ws.ID); err != nil {
+			return pruned, err
+		}
+		pruned = append(pruned, ws.Name)
+	}
+	return pruned, nil
 }
 
 type Session struct {

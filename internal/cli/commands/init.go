@@ -22,11 +22,11 @@ import (
 const sloopGitignore = `# Local, machine-specific caches
 cache/
 *.local
-# Personal notes — not shared with the team
+# Personal notes, not shared with the team
 vault/
 `
 
-// defaultPrimary is the single tool a bare `init` enables — the user's installed
+// defaultPrimary is the single tool a bare `init` enables: the user's installed
 // default (claude when present), keeping a fresh workspace minimal rather than
 // turning on every CLI on the machine.
 func defaultPrimary(manifests map[string]adapter.Manifest) string {
@@ -100,7 +100,7 @@ func RunInit(dir string, tools []string, scan bool) ([]string, error) {
 			for _, d := range m.Scaffold {
 				target := filepath.Join(dir, d)
 				if _, err := os.Stat(target); err == nil {
-					continue // already there — don't claim to have scaffolded it
+					continue // already there, don't claim to have scaffolded it
 				}
 				if err := os.MkdirAll(target, 0o755); err != nil {
 					return nil, err
@@ -171,7 +171,7 @@ func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest,
 		return []string{primary} // minimal default
 	}
 
-	// Ask about every detected tool (including the primary — it isn't always
+	// Ask about every detected tool (including the primary, it isn't always
 	// Claude), primary first and defaulted on so a quick Enter keeps it simple.
 	cmd.Printf("Detected tools: %s\n", strings.Join(detected, ", "))
 	var selected []string
@@ -181,7 +181,7 @@ func resolveInitTools(cmd *cobra.Command, manifests map[string]adapter.Manifest,
 		}
 	}
 	if len(selected) == 0 {
-		cmd.Println(tui.Grey("none selected — enabling " + displayTool(primary, manifests)))
+		cmd.Println(tui.Grey("none selected; enabling " + displayTool(primary, manifests)))
 		selected = []string{primary}
 	}
 	return selected

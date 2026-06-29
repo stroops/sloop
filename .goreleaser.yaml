@@ -69,3 +69,15 @@ brews:
       bin.install "sloop"
     test: |
       system "#{bin}/sloop", "version"
+
+scoops:
+  - name: sloop
+    repository:
+      owner: stroops
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: bucket
+    homepage: "https://stroops.tech"
+    description: "Sloop - the local-first control layer for your AI coding CLIs."
+    license: "MIT"

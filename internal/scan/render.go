@@ -19,7 +19,7 @@ func (r Report) AgentsMarkdown() string {
 		name = "this project"
 	}
 	b.WriteString("## Project\n\n")
-	fmt.Fprintf(&b, "**%s** — <!-- one-line description -->\n", name)
+	fmt.Fprintf(&b, "**%s**: <!-- one-line description -->\n", name)
 	if r.Summary != "" {
 		fmt.Fprintf(&b, "\n> %s\n", r.Summary)
 	}

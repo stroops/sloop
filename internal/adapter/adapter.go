@@ -53,7 +53,7 @@ type HeuristicsSpec struct {
 // RunSpec declares how `sloop run` launches a tool with an optional model and
 // reasoning effort. Every field is optional: an empty flag means the CLI has no
 // such knob, and sloop errors clearly if the user asks for it. sloop never
-// validates the model — it forwards the string and lets the CLI accept/reject it.
+// validates the model; it forwards the string and lets the CLI accept/reject it.
 type RunSpec struct {
 	// Vendor is the model vendor this CLI natively serves (e.g. "anthropic").
 	Vendor string `yaml:"vendor"`
@@ -96,8 +96,31 @@ type Manifest struct {
 	// provider's expected layout instead of an ad-hoc one.
 	Scaffold []string `yaml:"scaffold"`
 	// Readiness declares extra best-practice checks for `sloop check`, sourced
-	// from the provider's own docs — so the checklist deepens by editing data.
+	// from the provider's own docs, so the checklist deepens by editing data.
 	Readiness ReadinessSpec `yaml:"readiness"`
+	// Account declares how the tool selects a separate account/config dir, so
+	// `sloop profile add --config-dir` works without the user knowing the env var.
+	Account AccountSpec `yaml:"account"`
+}
+
+// AccountSpec declares how a tool points at an alternate account/config
+// directory, so `sloop profile add --config-dir <dir>` can target it without the
+// user having to know the tool's environment variable. Only tools with a
+// non-empty ConfigDirEnv support `--config-dir`.
+type AccountSpec struct {
+	// ConfigDirEnv is the environment variable that selects an alternate config/
+	// account directory (e.g. CLAUDE_CONFIG_DIR). Its presence is what makes a
+	// tool eligible for `--config-dir`.
+	ConfigDirEnv string `yaml:"config_dir_env"`
+	// DefaultDir is the tool's standard config dir (e.g. ~/.claude), the source
+	// to optionally share tooling/history from when wiring up a second account.
+	DefaultDir string `yaml:"default_dir"`
+	// Share lists subpaths under DefaultDir that are safe to symlink into a new
+	// account dir (tooling/config, the same across accounts). Never credentials.
+	Share []string `yaml:"share"`
+	// ShareState lists subpaths carrying conversation/session state; sharing them
+	// lets a second account resume the first's sessions (opt-in, off by default).
+	ShareState []string `yaml:"share_state"`
 }
 
 // ReadinessSpec is a provider's best-practice checklist for `sloop check`. Docs

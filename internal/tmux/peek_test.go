@@ -29,3 +29,27 @@ func TestBuildPeekBindArgs(t *testing.T) {
 		t.Fatalf("got %v want %v", got, want)
 	}
 }
+
+func TestPeekTitle(t *testing.T) {
+	if got := peekTitle("api__claude", "Ctrl+b"); got != " 👀 peek · api__claude — Ctrl+b d to close " {
+		t.Fatalf("named: got %q", got)
+	}
+	if got := peekTitle("", "Ctrl+b"); got != " 👀 peek — Ctrl+b d to close " {
+		t.Fatalf("generic: got %q", got)
+	}
+}
+
+func TestWithTitle(t *testing.T) {
+	base := []string{"display-popup", "-w", "90%", "-h", "80%", "-E", "CMD"}
+	want := []string{"display-popup", "-w", "90%", "-h", "80%", "-T", "T", "-E", "CMD"}
+	if got := withTitle(base, "T"); strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("got %v want %v", got, want)
+	}
+	if got := withTitle(base, ""); strings.Join(got, " ") != strings.Join(base, " ") {
+		t.Fatalf("empty title should be a no-op, got %v", got)
+	}
+	short := []string{"one"}
+	if got := withTitle(short, "T"); strings.Join(got, " ") != strings.Join(short, " ") {
+		t.Fatalf("len(args) < 2 should be a no-op, got %v", got)
+	}
+}

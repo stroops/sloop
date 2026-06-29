@@ -35,7 +35,7 @@ func TestBottomLineWaitingShowsAnswers(t *testing.T) {
 		Prompt:  "Apply changes?",
 		Answers: []tmux.Answer{{Key: "y", Label: "Yes"}, {Key: "n", Label: "No"}},
 	}
-	b := bottomLine(r)
+	b := bottomLine(r, 120)
 	if b == "" || !bytes.Contains([]byte(b), []byte("answer: [y]Yes")) {
 		t.Fatalf("bottomLine = %q", b)
 	}

@@ -17,7 +17,7 @@ import (
 // (AGENTS.md + pointer files). It's only worth it when there's something to be
 // portable across: two or more tools, or a native-mode tool that reads AGENTS.md
 // directly. A lone pointer-mode tool (e.g. just Claude) keeps its own context
-// file — sloop stays out of the way and just manages the fleet/skills.
+// file; sloop stays out of the way and just manages the fleet/skills.
 func needsCanonical(tools []string, manifests map[string]adapter.Manifest) bool {
 	if len(tools) >= 2 {
 		return true

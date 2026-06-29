@@ -24,7 +24,7 @@ func hasSession(session string) bool {
 }
 
 // LaunchSplit creates (idempotently) a tmux session with one pane per command,
-// all rooted at dir and tiled, then attaches — or switches the client when
+// all rooted at dir and tiled, then attaches, or switches the client when
 // already inside tmux, since attach cannot nest.
 func LaunchSplit(session, dir string, cmds []string) error {
 	if len(cmds) == 0 {

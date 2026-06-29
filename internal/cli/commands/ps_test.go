@@ -123,21 +123,35 @@ func TestFilterWaitingAndNewlyWaiting(t *testing.T) {
 
 func TestNotRunningWorkspaces(t *testing.T) {
 	rows := []FleetRow{{Workspace: "api"}, {Workspace: "web"}}
-	paths := map[string]string{"api": "/a", "web": "/w", "infra": "/i", "docs": "/d"}
+	// Non-running workspace paths must exist on disk (stale/missing paths are filtered).
+	infraDir := t.TempDir()
+	docsDir := t.TempDir()
+	paths := map[string]string{"api": "/a", "web": "/w", "infra": infraDir, "docs": docsDir}
 	got := notRunningWorkspaces(rows, paths)
 	if len(got) != 2 || got[0] != "docs" || got[1] != "infra" {
 		t.Fatalf("got %v, want [docs infra]", got)
 	}
 }
 
+func TestNotRunningWorkspacesSkipsStale(t *testing.T) {
+	rows := []FleetRow{{Workspace: "api"}}
+	infraDir := t.TempDir()
+	paths := map[string]string{"api": "/a", "infra": infraDir, "stale": "/nonexistent/path/xyz"}
+	got := notRunningWorkspaces(rows, paths)
+	if len(got) != 1 || got[0] != "infra" {
+		t.Fatalf("got %v, want [infra] (stale should be filtered)", got)
+	}
+}
+
 func TestRunPsAllShowsNotRunning(t *testing.T) {
 	var b bytes.Buffer
 	rows := []FleetRow{{Workspace: "api", Tool: "claude", Name: "api__claude", Activity: time.Now()}}
-	paths := map[string]string{"api": "/a", "infra": "/srv/infra"}
+	infraDir := t.TempDir()
+	paths := map[string]string{"api": "/a", "infra": infraDir}
 	_ = runPsAll(&b, rows, paths, nil)
 	out := b.String()
 	if !strings.Contains(out, "Known workspaces (not running)") ||
-		!strings.Contains(out, "infra") || !strings.Contains(out, "/srv/infra") {
+		!strings.Contains(out, "infra") || !strings.Contains(out, infraDir) {
 		t.Fatalf("missing not-running section: %s", out)
 	}
 }

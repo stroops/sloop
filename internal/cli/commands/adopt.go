@@ -46,7 +46,7 @@ func resolveAdopt(sessionName, wsFlag, toolFlag string, adapterKeys []string, pa
 }
 
 // RunAdopt renames a running external tmux session into the sloop
-// `<workspace>__<tool>` convention and registers its workspace — bringing an
+// `<workspace>__<tool>` convention and registers its workspace, bringing an
 // agent you started yourself into the fleet. Returns the new session name.
 func RunAdopt(sessionName, wsFlag, toolFlag string) (string, error) {
 	if !tmux.Available() {
@@ -82,6 +82,7 @@ func RunAdopt(sessionName, wsFlag, toolFlag string) (string, error) {
 		return "", err
 	}
 	tmux.SetStatusLine(newName) // give the adopted session sloop's status bar
+	tmux.EnsureFleetKeys()      // bind the fleet popup keys (once per server)
 	if path != "" {
 		if dbPath, err := config.GlobalDBPath(); err == nil {
 			if store, err := session.Open(dbPath); err == nil {

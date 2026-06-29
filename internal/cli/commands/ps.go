@@ -183,7 +183,7 @@ func enrichGlances(rows []FleetRow, manifests map[string]adapter.Manifest) []Fle
 			defer cancel()
 			out, err := tmux.OutputContext(ctx, tmux.BuildCaptureArgs(rows[i].Name)...)
 			if err == nil {
-				rows[i].Glance = truncate(tmux.LastNonEmptyLine(string(out)), 72)
+				rows[i].Glance = tmux.LastNonEmptyLine(string(out))
 				rows[i].Status = tmux.ClassifyStatus(string(out), manifests[rows[i].Tool])
 			}
 			if hasMarker {
@@ -226,7 +226,7 @@ func filterWaiting(rows []FleetRow) []FleetRow {
 }
 
 // newlyWaiting returns the names of sessions waiting now that were not waiting
-// in the previous snapshot — the agents that just started needing you.
+// in the previous snapshot: the agents that just started needing you.
 func newlyWaiting(prev, curr []FleetRow) []string {
 	was := make(map[string]bool)
 	for _, r := range prev {
@@ -244,7 +244,7 @@ func newlyWaiting(prev, curr []FleetRow) []string {
 }
 
 // sortNeedsAttention floats sessions waiting on the user to the top, then keeps
-// the stable workspace/tool order — so the agents that need you are listed first.
+// the stable workspace/tool order, so the agents that need you are listed first.
 func sortNeedsAttention(rows []FleetRow) {
 	sort.SliceStable(rows, func(i, j int) bool {
 		return rows[i].Status.NeedsAttention() && !rows[j].Status.NeedsAttention()
@@ -264,13 +264,14 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 		_, _ = fmt.Fprintln(w, "⚓ No running AI sessions. Start one with `sloop run <tool>`.")
 		return nil
 	}
+	maxWidth := terminalWidth()
 	waiting := 0
 	for _, r := range rows {
 		if r.Status.NeedsAttention() {
 			waiting++
 		}
 	}
-	header := fmt.Sprintf("⚓ AI fleet — %d running", len(rows))
+	header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
 	if waiting > 0 {
 		header += fmt.Sprintf(", %d waiting on you", waiting)
 	}
@@ -278,7 +279,7 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 	for i, r := range rows {
 		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-18s %s · %s\n",
 			i+1, r.Workspace, r.toolName(), stateLabel(r), humanizeSince(r.Activity))
-		if b := bottomLine(r); b != "" {
+		if b := bottomLine(r, maxWidth-8); b != "" {
 			_, _ = fmt.Fprintf(w, "      └ %s\n", b)
 		}
 	}
@@ -324,7 +325,7 @@ func jumpToFleet(rows []FleetRow, n int) error {
 
 // pickFleetSession shows the live fleet and returns the chosen session name ("" if
 // cancelled). Backs the no-argument `sloop attach` so you don't have to type a
-// session name — using the same WORKSPACE/TOOL/STATUS columns, colors and
+// session name, using the same WORKSPACE/TOOL/STATUS columns, colors and
 // waiting-first order as `ps`, so the picker reads identically to the fleet view.
 func pickFleetSession(title string) (string, error) {
 	manifests, _ := adapter.Load()
@@ -333,6 +334,8 @@ func pickFleetSession(title string) (string, error) {
 		return "", fmt.Errorf("no running AI sessions to attach to (start one with `sloop run <tool>`)")
 	}
 	sortNeedsAttention(rows)
+
+	maxWidth := terminalWidth()
 
 	wsW, _, _ := columnWidths(rows)
 	if wsW < len("WORKSPACE") {
@@ -346,7 +349,11 @@ func pickFleetSession(title string) (string, error) {
 	}
 	opts := make([]string, len(rows))
 	for i, r := range rows {
-		opts[i] = fmt.Sprintf("%-*s %-*s %s", wsW, r.Workspace, toolW, r.toolName(), statusText(r))
+		line := fmt.Sprintf("%-*s %-*s %s", wsW, r.Workspace, toolW, r.toolName(), statusText(r))
+		if b := bottomLine(r, maxWidth-2); b != "" {
+			line += "\r\n└ " + tui.Grey(b)
+		}
+		opts[i] = line
 	}
 
 	legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
@@ -386,15 +393,19 @@ var (
 )
 
 // notRunningWorkspaces lists registered workspaces that have no live session,
-// sorted by name — the rest of your cross-repo fleet that isn't running yet.
+// sorted by name: the rest of your cross-repo fleet that isn't running yet.
+// Skips registrations whose paths no longer exist (e.g. cleaned-up temp dirs).
 func notRunningWorkspaces(rows []FleetRow, paths map[string]string) []string {
 	running := make(map[string]bool, len(rows))
 	for _, r := range rows {
 		running[r.Workspace] = true
 	}
 	var idle []string
-	for name := range paths {
+	for name, path := range paths {
 		if !running[name] {
+			if _, err := os.Stat(path); err != nil {
+				continue // stale registration, path gone
+			}
 			idle = append(idle, name)
 		}
 	}
@@ -423,12 +434,12 @@ func externalNudge(w io.Writer, ext []tmux.Session) {
 	for _, s := range ext {
 		names = append(names, s.Name)
 	}
-	_, _ = fmt.Fprintln(w, tui.Grey(fmt.Sprintf("+ %d tmux session(s) not in sloop (%s) — `sloop adopt <name>` to add",
+	_, _ = fmt.Fprintln(w, tui.Grey(fmt.Sprintf("+ %d tmux session(s) not in sloop (%s); `sloop adopt <name>` to add",
 		len(ext), strings.Join(names, ", "))))
 }
 
 // runPsAll prints the live fleet, the registered workspaces that aren't running,
-// and any unmanaged tmux sessions — the full picture, not just what sloop runs.
+// and any unmanaged tmux sessions: the full picture, not just what sloop runs.
 func runPsAll(w io.Writer, rows []FleetRow, paths map[string]string, ext []tmux.Session) error {
 	_ = RunPs(w, rows)
 	if idle := notRunningWorkspaces(rows, paths); len(idle) > 0 {
@@ -504,7 +515,7 @@ var psCmd = &cobra.Command{
 		// header, so the fleet redraws in place; it's re-read every pass, so kills
 		// and new sessions show immediately.
 		var notice string
-		detach := tui.Grey("  ⏎ enters an agent — to come back, detach (keeps it running): " + tmux.PrefixRaw() + " d")
+		detach := tui.Grey("  ⏎ enters an agent; to come back, detach (keeps it running): " + tmux.Prefix() + " d")
 		for {
 			tui.Clear()
 			rows = enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
@@ -528,13 +539,14 @@ var psCmd = &cobra.Command{
 			if wsW < len("WORKSPACE") {
 				wsW = len("WORKSPACE")
 			}
+			maxWidth := terminalWidth()
 			var options []string
 			for _, r := range rows {
 				// No leading status glyph: ●/○ are ambiguous-width and break column
 				// alignment. Status is the colored STATUS column instead.
 				line := fmt.Sprintf("%-*s %-*s %s %s",
 					wsW, r.Workspace, toolW, r.toolName(), statusText(r), shortSince(r.Activity))
-				if b := bottomLine(r); b != "" {
+				if b := bottomLine(r, maxWidth-2); b != "" {
 					line += "\r\n└ " + tui.Grey(b)
 				}
 				options = append(options, line)
@@ -613,10 +625,18 @@ func answerHint(answers []tmux.Answer) string {
 
 // bottomLine is the indented detail under a fleet row: the agent's question +
 // answer keys when waiting, else the last output glance.
-func bottomLine(r FleetRow) string {
+func bottomLine(r FleetRow, maxWidth int) string {
 	if r.Status == tmux.StatusWaiting && (r.Prompt != "" || len(r.Answers) > 0) {
-		s := r.Prompt
-		if h := answerHint(r.Answers); h != "" {
+		promptMax := maxWidth
+		h := answerHint(r.Answers)
+		if h != "" {
+			promptMax -= len("  ·  answer: ") + len(h)
+		}
+		if promptMax < 10 {
+			promptMax = 10
+		}
+		s := truncate(r.Prompt, promptMax)
+		if h != "" {
 			if s != "" {
 				s += "  ·  "
 			}
@@ -624,7 +644,7 @@ func bottomLine(r FleetRow) string {
 		}
 		return s
 	}
-	return r.Glance
+	return truncate(r.Glance, maxWidth)
 }
 
 // matchAnswer returns the row's Answer whose Key equals the pressed key.
@@ -756,8 +776,16 @@ func columnWidths(rows []FleetRow) (wsW, toolW, waiting int) {
 	return wsW, toolW, waiting
 }
 
+// terminalWidth returns the width of the terminal or a fallback of 120 columns.
+func terminalWidth() int {
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+		return w
+	}
+	return 120
+}
+
 // runWatch re-renders the fleet on an interval (until Ctrl-C), ringing the
-// terminal bell — and optionally a desktop notification — whenever a session
+// terminal bell (and optionally a desktop notification) whenever a session
 // newly starts waiting on you. This turns `ps` from a snapshot into a live
 // monitor: you no longer have to keep re-running it to catch who needs you.
 func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) error {

@@ -120,7 +120,7 @@ func mergeEnv(base, over map[string]string) map[string]string {
 }
 
 // nextFreeInstance returns the first instance suffix whose session name is not
-// already taken: "" (ws__tool), then "2" (ws__tool__2), "3", … — so `--new`
+// already taken: "" (ws__tool), then "2" (ws__tool__2), "3", …; so `--new`
 // spins a fresh agent instead of re-attaching the existing one.
 func nextFreeInstance(ws, tool string, sessions []tmux.Session) string {
 	taken := make(map[string]bool, len(sessions))

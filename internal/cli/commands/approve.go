@@ -14,7 +14,7 @@ import (
 var sendFunc = tmux.LaunchSend
 
 // RunApprove sends each targeted waiting agent its affirmative answer (the
-// parsed Yes/Approve/Continue choice). Reads the agents' own prompts — no LLM.
+// parsed Yes/Approve/Continue choice). Reads the agents' own prompts, no LLM.
 func RunApprove(w io.Writer, in io.Reader, targets []string, all, waiting, yes bool) ([]string, error) {
 	if !tmux.Available() {
 		return nil, fmt.Errorf("tmux is not installed; `sloop approve` needs tmux")
@@ -55,7 +55,7 @@ var (
 
 var approveCmd = &cobra.Command{
 	Use:   "approve [<#|session|workspace>...]",
-	Short: "Send the affirmative answer to waiting agent(s) — one-key approve",
+	Short: "Send the affirmative answer to waiting agent(s); one-key approve",
 	Long: `Read what each waiting agent is asking and send its Yes/Approve/Continue
 answer. ` + "`approve --waiting`" + ` approves every agent waiting on you at once.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

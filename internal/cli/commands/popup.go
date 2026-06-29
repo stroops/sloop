@@ -18,7 +18,7 @@ var popupCmd = &cobra.Command{
 	Short:   "Open the cross-repo fleet (`ps`) as a floating tmux popup / HUD",
 	Long: `Open ` + "`sloop ps`" + ` in a tmux popup over your current pane: glance at
 every agent, answer or jump with one key, then the popup closes back to your
-work — a heads-up display for the fleet. Aliased as ` + "`sloop hud`" + `. Bind it to
+work, a heads-up display for the fleet. Aliased as ` + "`sloop hud`" + `. Bind it to
 a key with ` + "`sloop popup setup`" + ` (or ` + "`sloop hud setup`" + `). Needs tmux ≥ 3.2.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

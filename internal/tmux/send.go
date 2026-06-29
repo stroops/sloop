@@ -2,7 +2,7 @@ package tmux
 
 // Send delivers a prompt to a running session without attaching. It is
 // non-invasive: send-keys types into your own tmux pane exactly as if you did
-// so at the keyboard — sloop never injects into the provider's process or API.
+// so at the keyboard, sloop never injects into the provider's process or API.
 
 // BuildSendTextArgs types msg literally into a session's active pane. The
 // -l flag sends the bytes verbatim (no key-name lookup) and -- ends option

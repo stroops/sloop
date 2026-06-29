@@ -1,5 +1,5 @@
 // Package hints shows occasional, contextual education tips after sloop
-// commands — demystifying tmux/CLI for newcomers. Hints are embedded (offline,
+// commands, demystifying tmux/CLI for newcomers. Hints are embedded (offline,
 // ship with each release), localized (en/vi today), throttled so they never
 // spam, and easy to turn off. A future registry/global-DB overlay can extend
 // Load() without changing callers.

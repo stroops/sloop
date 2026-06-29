@@ -31,7 +31,7 @@ func completeTools(_ *cobra.Command, _ []string, _ string) ([]string, cobra.Shel
 }
 
 // completeModels suggests the model aliases every adapter declares (run.models),
-// e.g. for `run -m`. Aliases only — full API ids still work but aren't listed.
+// e.g. for `run -m`. Aliases only; full API ids still work but aren't listed.
 func completeModels(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 	manifests, err := adapter.Load()
 	if err != nil {

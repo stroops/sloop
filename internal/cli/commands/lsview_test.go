@@ -23,8 +23,8 @@ func TestAbbrevHome(t *testing.T) {
 
 func TestAgentsInline(t *testing.T) {
 	// Color is off in tests (stdout isn't a tty), so dots render plain.
-	if got := agentsInline(nil); got != "—" {
-		t.Errorf("empty = %q, want —", got)
+	if got := agentsInline(nil); got != "-" {
+		t.Errorf("empty = %q, want -", got)
 	}
 	rows := []FleetRow{
 		{Tool: "claude", Display: "Claude Code", Status: tmux.StatusWaiting},

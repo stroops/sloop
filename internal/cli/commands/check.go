@@ -55,14 +55,14 @@ type checkItem struct {
 
 // readinessChecklist builds the workspace readiness checklist. Criteria are NOT
 // sloop's own opinion: the per-tool checks are derived from each enabled tool's
-// adapter manifest (context/skills/hooks — the single provider-aware source) and
+// adapter manifest (context/skills/hooks, the single provider-aware source) and
 // the on-disk delivery state. Only workspace-level basics (AGENTS.md, a default
 // tool) are sloop's own minimal model. Pure aside from filesystem reads, so it's
 // directly testable.
 func readinessChecklist(root, sloopDir string, proj *config.Project, manifests map[string]adapter.Manifest) []checkItem {
 	var items []checkItem
 
-	// AGENTS.md is sloop's portable-context layer — only relevant when the
+	// AGENTS.md is sloop's portable-context layer, only relevant when the
 	// workspace actually uses it (≥2 tools or a native-mode tool). A lone
 	// pointer-mode tool keeps its own context file, so we don't ask for AGENTS.md.
 	canonical := needsCanonical(proj.Tools, manifests)
@@ -73,7 +73,7 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 			Label: "AGENTS.md present (canonical context)",
 			Fix:   "sloop init",
 		})
-		// Committed so the team shares it — a best practice every provider echoes.
+		// Committed so the team shares it, a best practice every provider echoes.
 		if agentsOK && inGitRepo(root) {
 			items = append(items, checkItem{
 				OK:    gitTracked(root, "AGENTS.md"),
@@ -98,7 +98,7 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 		}
 
 		// Context: the tool can see project context. We respect a context file the
-		// tool already owns (e.g. from its own /init) — that counts as ready, never
+		// tool already owns (e.g. from its own /init); that counts as ready, never
 		// a "repair me" nag. Native tools read AGENTS.md directly (only canonical).
 		switch syncpkg.ContextState(root, m) {
 		case "ok":
@@ -113,7 +113,7 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 			items = append(items, checkItem{Label: m.Name + ": no context yet (" + m.Context.File + ")", Fix: fix})
 		}
 
-		// Skills linked — only relevant once there are skills to deliver.
+		// Skills linked, only relevant once there are skills to deliver.
 		if m.Skills.Target != "" && hasSkills {
 			if syncpkg.SkillsState(root, sloopDir, m) == "linked" {
 				items = append(items, checkItem{OK: true, Label: m.Name + ": skills linked"})
@@ -122,7 +122,7 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 			}
 		}
 
-		// Status hooks — only flag tools sloop can auto-install for.
+		// Status hooks: only flag tools sloop can auto-install for.
 		if hookInstaller(m.Hooks.Install) != nil {
 			if hooksInstalledFor(root, m) {
 				items = append(items, checkItem{OK: true, Label: m.Name + ": status hooks installed"})
@@ -149,10 +149,10 @@ func readinessChecklist(root, sloopDir string, proj *config.Project, manifests m
 }
 
 // renderChecklist writes the checklist with ✓/✗ marks, a fix command per gap,
-// and a one-line summary — a checklist of best practices, deliberately not a
+// and a one-line summary, a checklist of best practices, deliberately not a
 // score (sloop checks presence, it can't judge content quality).
 func renderChecklist(w io.Writer, name string, items []checkItem) {
-	_, _ = fmt.Fprintf(w, "⚓ Workspace readiness — %s\n\n", tui.Bold(name))
+	_, _ = fmt.Fprintf(w, "⚓ Workspace readiness · %s\n\n", tui.Bold(name))
 	gaps := 0
 	for _, it := range items {
 		switch {
@@ -170,10 +170,10 @@ func renderChecklist(w io.Writer, name string, items []checkItem) {
 		}
 	}
 	if gaps == 0 {
-		_, _ = fmt.Fprintf(w, "\n%s\n", tui.Green("Ready — every best practice is in place."))
+		_, _ = fmt.Fprintf(w, "\n%s\n", tui.Green("Ready: every best practice is in place."))
 		return
 	}
-	_, _ = fmt.Fprintf(w, "\n%s\n", tui.Yellow(fmt.Sprintf("%d to improve", gaps))+tui.Grey(" — run the suggested commands above."))
+	_, _ = fmt.Fprintf(w, "\n%s\n", tui.Yellow(fmt.Sprintf("%d to improve", gaps))+tui.Grey(" · run the suggested commands above."))
 }
 
 // RunCheck resolves the workspace and prints its readiness checklist.
@@ -199,7 +199,7 @@ func RunCheck(startDir string, w io.Writer) error {
 		m := manifests[t]
 		if m.Readiness.Docs != "" && !seen[m.Readiness.Docs] {
 			seen[m.Readiness.Docs] = true
-			_, _ = fmt.Fprintf(w, "%s %s — %s\n", tui.Grey("  learn more:"), m.Name, tui.Grey(m.Readiness.Docs))
+			_, _ = fmt.Fprintf(w, "%s %s · %s\n", tui.Grey("  learn more:"), m.Name, tui.Grey(m.Readiness.Docs))
 		}
 	}
 	return nil
@@ -213,7 +213,7 @@ is context delivered to each enabled tool, are skills linked, are status hooks
 installed? Each gap comes with the command that fixes it.
 
 The per-tool criteria come from each tool's adapter manifest (context/skills/
-hooks), not from sloop's own opinion — so they deepen as the manifests do.`,
+hooks), not from sloop's own opinion, so they deepen as the manifests do.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {

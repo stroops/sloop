@@ -205,3 +205,55 @@ func TestStatuslineSetup(t *testing.T) {
 		t.Fatalf("status-right not set: %q", got)
 	}
 }
+
+func TestFleetKeysAutoBound(t *testing.T) {
+	requireTmux(t)
+	bin := buildSloop(t)
+	home := t.TempDir()
+
+	// Start from a clean slate: a previous run may have left @sloop_peek_key set,
+	// which would make EnsureFleetKeys a no-op.
+	tmuxRun("set-option", "-gu", "@sloop_peek_key")
+	tmuxRun("set-option", "-gu", "@sloop_hud_key")
+
+	// adopt creates a managed session and runs the same SetStatusLine +
+	// EnsureFleetKeys path as `run`, without needing a real AI CLI installed.
+	ext := prefix + "keys_ext"
+	tmuxNew(t, ext)
+	adopted := prefix + "kws__claude"
+	t.Cleanup(func() {
+		// Unbind only the keys this test actually bound.
+		pk, _ := exec.Command("tmux", "show-options", "-gv", "@sloop_peek_key").Output()
+		hk, _ := exec.Command("tmux", "show-options", "-gv", "@sloop_hud_key").Output()
+		tmuxRun("kill-session", "-t", ext)
+		tmuxRun("kill-session", "-t", adopted)
+		if k := strings.TrimSpace(string(pk)); k != "" {
+			tmuxRun("unbind-key", k)
+		}
+		if k := strings.TrimSpace(string(hk)); k != "" {
+			tmuxRun("unbind-key", k)
+		}
+		tmuxRun("set-option", "-gu", "@sloop_peek_key")
+		tmuxRun("set-option", "-gu", "@sloop_hud_key")
+	})
+
+	sloop(t, bin, home, "adopt", ext, "-w", prefix+"kws", "--as", "claude")
+
+	waitFor(t, "auto-bind to record @sloop_peek_key", func() bool {
+		out, _ := exec.Command("tmux", "show-options", "-gv", "@sloop_peek_key").Output()
+		return strings.TrimSpace(string(out)) != ""
+	})
+	keys, _ := exec.Command("tmux", "list-keys", "-T", "prefix").Output()
+	if !strings.Contains(string(keys), "peek --in-popup") {
+		t.Fatalf("peek not auto-bound to a prefix key:\n%s", keys)
+	}
+
+	// Verify hud was also auto-bound.
+	out, _ := exec.Command("tmux", "show-options", "-gv", "@sloop_hud_key").Output()
+	if strings.TrimSpace(string(out)) == "" {
+		t.Fatalf("@sloop_hud_key not set after auto-bind")
+	}
+	if !strings.Contains(string(keys), " ps") {
+		t.Fatalf("hud not auto-bound to a prefix key:\n%s", keys)
+	}
+}

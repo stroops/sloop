@@ -108,7 +108,7 @@ var skillUpdateCmd = &cobra.Command{
 			return err
 		}
 		if len(res.Outcomes) == 0 {
-			cmd.Println("no locked skills — import one with `sloop skills add <url>`")
+			cmd.Println("no locked skills; import one with `sloop skills add <url>`")
 			return nil
 		}
 		updated, failed := 0, 0

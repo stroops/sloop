@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// peekPopupW/H are the default overlay size for peek — bigger than the HUD
+// peekPopupW/H are the default overlay size for peek, bigger than the HUD
 // because you actually work inside the agent while it floats.
 const (
 	peekPopupW = "90%"
@@ -50,10 +50,46 @@ func clearTmuxEnv(env []string) []string {
 	return out
 }
 
+// peekTitle is the caption shown on a peek popup's border (tmux ≥ 3.3): it marks
+// the overlay as a peek and shows how to close it. session may be "" (the keybind
+// path doesn't know the target until runtime) → a generic caption.
+func peekTitle(session, prefix string) string {
+	if session == "" {
+		return fmt.Sprintf(" 👀 peek — %s d to close ", prefix)
+	}
+	return fmt.Sprintf(" 👀 peek · %s — %s d to close ", session, prefix)
+}
+
+// withTitle inserts `-T <title>` before the trailing `-E <command>` of a
+// display-popup arg list, so the popup shows a titled border. A no-op when title
+// is "". It assumes the last two args are `-E` and the command (true for
+// BuildPopupArgs and BuildPeekBindArgs).
+func withTitle(args []string, title string) []string {
+	if title == "" || len(args) < 2 {
+		return args
+	}
+	n := len(args)
+	out := make([]string, 0, n+2)
+	out = append(out, args[:n-2]...)
+	out = append(out, "-T", title)
+	out = append(out, args[n-2:]...)
+	return out
+}
+
+// peekTitleNow resolves the live peek caption: empty when tmux can't render a
+// popup title (< 3.3), else peekTitle with the user's real prefix.
+func peekTitleNow(session string) string {
+	if !TitleSupported() {
+		return ""
+	}
+	return peekTitle(session, Prefix())
+}
+
 // Peek floats session's live pane over the current pane in a display-popup
 // (must be run inside tmux ≥ 3.2). The overlay closes back to your work on exit.
 func Peek(session string) error {
-	cmd := exec.Command(Bin(), BuildPopupArgs(peekPopupW, peekPopupH, BuildNestedAttachCmd(session))...)
+	args := withTitle(BuildPopupArgs(peekPopupW, peekPopupH, BuildNestedAttachCmd(session)), peekTitleNow(session))
+	cmd := exec.Command(Bin(), args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
 }
@@ -63,7 +99,9 @@ func BuildPeekBindArgs(key, command string) []string {
 	return append([]string{"bind-key", key}, BuildPopupArgs(peekPopupW, peekPopupH, command)...)
 }
 
-// BindPeek binds the peek key on the live tmux server.
+// BindPeek binds the peek key on the live tmux server, with a titled popup
+// border when supported (the keybind path doesn't know the target session yet,
+// so the caption is generic).
 func BindPeek(key, command string) error {
-	return Run(BuildPeekBindArgs(key, command)...)
+	return Run(withTitle(BuildPeekBindArgs(key, command), peekTitleNow(""))...)
 }

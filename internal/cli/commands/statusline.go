@@ -48,17 +48,28 @@ func renderStatusline(session string) string {
 }
 
 // waitingBadge formats the fleet-wide waiting count for the status bar, empty
-// when nothing is waiting so the bar stays clean.
-func waitingBadge(n int) string {
+// when nothing is waiting so the bar stays clean. hint is the actionable suffix
+// (e.g. " → Ctrl+b j") appended inside the badge, or "" when no peek key is bound.
+func waitingBadge(n int, hint string) string {
 	if n <= 0 {
 		return ""
 	}
-	return fmt.Sprintf(" #[fg=yellow]⏳ %d waiting#[default]", n)
+	return fmt.Sprintf(" #[fg=yellow]⏳ %d waiting%s#[default]", n, hint)
+}
+
+// peekHint is the status-bar suffix that tells you which keystroke reaches the
+// waiting agent, e.g. " → Ctrl+b j"; empty when no peek key is bound on this
+// server. prefix is the human form ("Ctrl+b"); key is the bound peek key.
+func peekHint(prefix, key string) string {
+	if key == "" {
+		return ""
+	}
+	return " → " + prefix + " " + key
 }
 
 // renderFleetBadge counts sloop sessions whose fresh marker is `waiting`,
-// excluding the current session (so it reads "others need you"). Markers only —
-// no capture-pane — because this re-renders every status-interval.
+// excluding the current session (so it reads "others need you"). Markers only,
+// no capture-pane, because this re-renders every status-interval.
 func renderFleetBadge(exclude string) string {
 	n := 0
 	for _, s := range tmux.ParseSessions(tmuxList()) {
@@ -72,7 +83,10 @@ func renderFleetBadge(exclude string) string {
 			n++
 		}
 	}
-	return waitingBadge(n)
+	if n == 0 {
+		return ""
+	}
+	return waitingBadge(n, peekHint(tmux.Prefix(), tmux.PeekKey()))
 }
 
 var statuslineCmd = &cobra.Command{

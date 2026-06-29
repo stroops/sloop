@@ -109,7 +109,7 @@ var sendCmd = &cobra.Command{
 The target is a fleet number (from ` + "`sloop ps`" + `), a full session name
 (<workspace>__<tool>), or a workspace name when only one session runs in it.
 With --waiting / --all, omit the target to broadcast to every waiting / running
-session. send-keys types into your own pane exactly as if you typed it — the
+session. send-keys types into your own pane exactly as if you typed it, the
 provider is never intercepted.`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if sendAll || sendWaiting {

@@ -16,7 +16,7 @@ const (
 	StatusUnknown AgentStatus = iota // no pane text / can't tell
 	StatusIdle                       // at an empty prompt, nothing pending
 	StatusWorking                    // actively producing output / running a tool
-	StatusWaiting                    // blocked on you (approval, a question) — "needs me"
+	StatusWaiting                    // blocked on you (approval, a question): "needs me"
 )
 
 func (s AgentStatus) String() string {

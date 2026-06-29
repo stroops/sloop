@@ -55,8 +55,26 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 	}
 	defer func() { _ = term.Restore(fd, oldState) }()
 
+	// Use the terminal's alternate screen buffer so the menu has a clean
+	// viewport with no scrollback. Without this, drawing more lines than the
+	// terminal height causes scroll, and the subsequent cursor-up escape
+	// overshoots (cursor-up clamps at line 1, but the menu's first row has
+	// shifted up), so each arrow key press renders a fresh copy of the list
+	// below the previous one instead of redrawing in place.
+	fmt.Print("\033[?1049h")       // enter alternate screen
+	defer fmt.Print("\033[?1049l") // exit alternate screen (restores main buffer)
+
 	fmt.Print("\033[?25l")       // hide cursor
 	defer fmt.Print("\033[?25h") // restore cursor
+
+	// Disable autowrap (DECAWM) while the menu owns the screen. The in-place
+	// redraw below (see draw/total) assumes exactly one terminal row per option
+	// line; a line wider than the pane would wrap onto extra rows, desync the
+	// cursor-up count, and smear the menu on every keypress. Clipping instead of
+	// wrapping keeps the invariant for any content width (ls rows are short, so
+	// it never showed there; ps glance lines can be long). Restore on exit.
+	fmt.Print("\033[?7l")
+	defer fmt.Print("\033[?7h")
 
 	fmt.Printf("%s\r\n\r\n", prompt)
 

@@ -112,7 +112,7 @@ func commands(root string, langs []Lang) []Command {
 			}
 		}
 	}
-	// A Makefile declares the project's own canonical commands — it wins.
+	// A Makefile declares the project's own canonical commands, so it wins.
 	for _, label := range []string{"build", "test", "lint", "run"} {
 		if makefileHasTarget(root, label) {
 			m[label] = "make " + label
