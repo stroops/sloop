@@ -361,7 +361,13 @@ func pickFleetSession(title string) (string, error) {
 		tui.Blue("attached") + " · " + tui.Green("idle")
 	cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS"))
 	tui.Clear()
-	idx, err := tui.SelectMenu(title+"\r\n"+legend+"\r\n\r\n"+cols, opts)
+	idx, _, err := tui.Menu{
+		Prompt:    title + "\r\n" + legend + "\r\n\r\n" + cols,
+		Footer:    tui.Grey("  ↑/↓ move · ⏎ open · q quit"),
+		Options:   opts,
+		Highlight: tui.HighlightFirstCol,
+		TopPad:    true,
+	}.Run()
 	if err != nil || idx < 0 {
 		return "", err
 	}
@@ -571,11 +577,18 @@ var psCmd = &cobra.Command{
 			if notice != "" {
 				prompt += "\r\n" + notice
 			}
-			prompt += "\r\n" + legend + "\r\n" + keys + "\r\n" + detach + "\r\n\r\n" + cols
+			prompt += "\r\n" + legend + "\r\n\r\n" + cols
 			notice = "" // consumed; the handler below sets a fresh one for next pass
 
 			actionKeys := []byte{'s', 'x', 'y', 'n', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-			idx, key, err := tui.SelectAction(prompt, options, actionKeys)
+			idx, key, err := tui.Menu{
+				Prompt:     prompt,
+				Footer:     keys + "\r\n" + detach,
+				Options:    options,
+				ActionKeys: actionKeys,
+				Highlight:  tui.HighlightFirstCol,
+				TopPad:     true,
+			}.Run()
 			if err != nil {
 				return err
 			}

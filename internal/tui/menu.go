@@ -22,7 +22,7 @@ func Clear() {
 // run without a terminal. An option may contain "\r\n" to add indented
 // continuation lines (e.g. a glance); only its first line gets the pointer.
 func SelectMenu(prompt string, options []string) (int, error) {
-	idx, key, err := SelectAction(prompt, options, nil)
+	idx, key, err := Menu{Prompt: prompt, Options: options}.Run()
 	if err != nil || key == 0 {
 		return -1, err
 	}
@@ -34,7 +34,46 @@ func SelectMenu(prompt string, options []string) (int, error) {
 // is 13 (Enter), one of actionKeys, or 0 when cancelled (q/Esc/Ctrl-C) or run
 // without a terminal. Callers can then act on the highlighted row in place.
 func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte, error) {
-	if len(options) == 0 {
+	return Menu{Prompt: prompt, Options: options, ActionKeys: actionKeys}.Run()
+}
+
+// cursorColor is the SGR code (bold cyan) for the pointer and the highlight of
+// the row under the cursor, shared so the marker and its row always match.
+const cursorColor = "1;36"
+
+// HighlightMode selects how the row under the cursor is emphasized.
+type HighlightMode int
+
+const (
+	// HighlightOff carries only the pointer, no recoloring (the default).
+	HighlightOff HighlightMode = iota
+	// HighlightRow lights the whole row in the pointer's cyan. Best for plain
+	// menus (home, Run picker) where rows have no colors worth keeping.
+	HighlightRow
+	// HighlightFirstCol lights only the first column, leaving later columns
+	// their own color. Best for rows that encode meaning in color (ps/ls status).
+	HighlightFirstCol
+)
+
+// Menu is an arrow-key list selector shared by every interactive sloop screen
+// (the home launcher, `ps`, `ls`, the Run picker) so they navigate, highlight,
+// and space themselves identically. Prompt is drawn once above the list; Footer
+// (optional) is drawn below it, separated by a blank line, and redrawn in place
+// as the selection moves. TopPad adds one blank line above the prompt for
+// breathing room. Highlight chooses how the selected row is emphasized.
+type Menu struct {
+	Prompt     string
+	Footer     string
+	Options    []string
+	ActionKeys []byte
+	Highlight  HighlightMode
+	TopPad     bool
+}
+
+// Run draws the menu and blocks for a selection. See SelectAction for the
+// return-value contract.
+func (m Menu) Run() (int, byte, error) {
+	if len(m.Options) == 0 {
 		return -1, 0, nil
 	}
 
@@ -42,9 +81,12 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 	if !term.IsTerminal(fd) {
 		// No tty (piped/CI): print a plain listing and return "no selection"
 		// rather than erroring, so callers degrade gracefully.
-		fmt.Println(prompt)
-		for _, opt := range options {
+		fmt.Println(m.Prompt)
+		for _, opt := range m.Options {
 			fmt.Println("  " + strings.ReplaceAll(opt, "\r\n", "\n  "))
+		}
+		if m.Footer != "" {
+			fmt.Println(m.Footer)
 		}
 		return -1, 0, nil
 	}
@@ -76,20 +118,33 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 	fmt.Print("\033[?7l")
 	defer fmt.Print("\033[?7h")
 
-	fmt.Printf("%s\r\n\r\n", prompt)
+	if m.TopPad {
+		fmt.Print("\r\n")
+	}
+	fmt.Printf("%s\r\n\r\n", m.Prompt)
 
 	selected := 0
-	pointer := paint("1;36", "❯") // bold cyan
+	pointer := paint(cursorColor, "❯")
 
-	// render returns the physical lines for one option, with the pointer on the
-	// first line of the selected option and a two-space gutter otherwise.
+	// render returns the physical lines for one option. The first line of the
+	// selected option gets the pointer; with Highlight set, its first column is
+	// also recolored to the pointer's cyan, so the cursor reads as "arrow + the
+	// name lit up" while every other column keeps its own color (e.g. ps status).
 	render := func(i int) []string {
 		var out []string
-		for li, ln := range strings.Split(options[i], "\n") {
+		for li, ln := range strings.Split(m.Options[i], "\n") {
 			ln = strings.TrimRight(ln, "\r")
 			gutter := "  "
 			if li == 0 && i == selected {
 				gutter = pointer + " "
+				if ColorEnabled() {
+					switch m.Highlight {
+					case HighlightRow:
+						ln = paint(cursorColor, StripANSI(ln))
+					case HighlightFirstCol:
+						ln = highlightFirstCol(ln)
+					}
+				}
 			}
 			out = append(out, gutter+ln)
 		}
@@ -98,28 +153,47 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 
 	// Total physical lines is constant (the pointer doesn't change line count).
 	total := 0
-	for i := range options {
+	for i := range m.Options {
 		total += len(render(i))
+	}
+	// Footer occupies its own lines plus one blank separator above it.
+	footerLines := 0
+	if m.Footer != "" {
+		footerLines = strings.Count(m.Footer, "\n") + 2
 	}
 
 	draw := func() {
-		for i := range options {
+		for i := range m.Options {
 			for _, ln := range render(i) {
 				fmt.Printf("\r\033[K%s\r\n", ln) // clear each line before writing
 			}
 		}
-		fmt.Printf("\033[%dA", total) // back to the top of the list
+		if m.Footer != "" {
+			fmt.Print("\r\033[K\r\n") // blank separator line
+			for _, fl := range strings.Split(m.Footer, "\n") {
+				fmt.Printf("\r\033[K%s\r\n", strings.TrimRight(fl, "\r"))
+			}
+		}
+		fmt.Printf("\033[%dA", total+footerLines) // back to the top of the list
 	}
 	draw()
 
 	// leave moves the cursor below the (still-drawn) menu before returning.
 	leave := func() {
-		fmt.Printf("\033[%dB\r\n", total)
+		fmt.Printf("\033[%dB\r\n", total+footerLines)
 	}
 
 	buf := make([]byte, 3)
 	for {
-		n, _ := os.Stdin.Read(buf)
+		n, err := os.Stdin.Read(buf)
+		if err != nil {
+			// EOF or a closed stdin: cancel cleanly rather than spin. A real
+			// terminal blocks here until a key is pressed, so this only fires
+			// when input is exhausted (e.g. stdin redirected from a finished
+			// stream). Treated as a cancel, not an error.
+			leave()
+			return -1, 0, nil
+		}
 		if n == 0 {
 			continue
 		}
@@ -132,13 +206,13 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 				leave()
 				return selected, 13, nil
 			case 'k': // vim up
-				selected = (selected - 1 + len(options)) % len(options)
+				selected = (selected - 1 + len(m.Options)) % len(m.Options)
 				draw()
 			case 'j': // vim down
-				selected = (selected + 1) % len(options)
+				selected = (selected + 1) % len(m.Options)
 				draw()
 			default:
-				for _, k := range actionKeys {
+				for _, k := range m.ActionKeys {
 					if buf[0] == k {
 						leave()
 						return selected, k, nil
@@ -150,12 +224,32 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 		if n == 3 && buf[0] == 27 && buf[1] == 91 {
 			switch buf[2] {
 			case 65: // Up
-				selected = (selected - 1 + len(options)) % len(options)
+				selected = (selected - 1 + len(m.Options)) % len(m.Options)
 				draw()
 			case 66: // Down
-				selected = (selected + 1) % len(options)
+				selected = (selected + 1) % len(m.Options)
 				draw()
 			}
 		}
 	}
+}
+
+// highlightFirstCol recolors the first column of a row (the leading run of
+// non-space characters, after any leading spaces) in the pointer's bold cyan,
+// leaving the rest — including its column padding and any later colored
+// segments — untouched. It no-ops on a row that begins with an escape sequence
+// (already colored) so it never double-wraps.
+func highlightFirstCol(s string) string {
+	i := 0
+	for i < len(s) && s[i] == ' ' {
+		i++
+	}
+	if i >= len(s) || s[i] == '\x1b' {
+		return s
+	}
+	j := i
+	for j < len(s) && s[j] != ' ' {
+		j++
+	}
+	return s[:i] + paint(cursorColor, s[i:j]) + s[j:]
 }

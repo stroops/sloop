@@ -165,7 +165,7 @@ var internalUpdateCheckCmd = &cobra.Command{
 	Hidden: true,
 	Args:   cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		update.RunCheck(version)
+		update.RunCheck()
 		return nil
 	},
 }

@@ -134,7 +134,6 @@ func MaybeTriggerBackground(current string) {
 	}
 	cmd := exec.Command(exe, "internal-update-check")
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
-	cmd.Env = append(os.Environ(), "SLOOP_INTERNAL_UPDATE_CHECK=1")
 	detach(cmd) // platform-specific: start in its own session so it isn't killed
 	if err := cmd.Start(); err != nil {
 		return
@@ -146,7 +145,7 @@ func MaybeTriggerBackground(current string) {
 // RunCheck performs the network fetch and writes the cache. It is invoked by the
 // hidden `internal-update-check` command in the detached child. It always
 // records the attempt time so a failed fetch still throttles future checks.
-func RunCheck(current string) {
+func RunCheck() {
 	s, _ := readState()
 	s.CheckedAt = time.Now()
 	if latest, err := fetchLatest(); err == nil && latest != "" {
