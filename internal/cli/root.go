@@ -42,6 +42,8 @@ var (
 // SetVersion called from main.go (ldflags)
 func SetVersion(v, c, d string) {
 	version, commit, date = v, c, d
+	rootCmd.Version = v
+	commands.SetVersion(v)
 }
 
 var rootCmd = &cobra.Command{

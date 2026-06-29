@@ -22,6 +22,7 @@ import (
 	"github.com/stroops/sloop/internal/session"
 	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/tui"
+	"github.com/stroops/sloop/internal/update"
 )
 
 // FleetRow is one running sloop AI session, ready to display.
@@ -515,6 +516,9 @@ var psCmd = &cobra.Command{
 		// header, so the fleet redraws in place; it's re-read every pass, so kills
 		// and new sessions show immediately.
 		var notice string
+		// Keep the update cache fresh from this entry point too, so the banner
+		// works whether the user comes in via `sloop` or `sloop ps`. Non-blocking.
+		update.MaybeTriggerBackground(version)
 		detach := tui.Grey("  ⏎ enters an agent; to come back, detach (keeps it running): " + tmux.Prefix() + " d")
 		for {
 			tui.Clear()
@@ -561,6 +565,9 @@ var psCmd = &cobra.Command{
 			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q/esc quit")
 			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-16s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS", "AGE"))
 			prompt := header
+			if b := update.Banner(version); b != "" {
+				prompt += "\r\n" + b
+			}
 			if notice != "" {
 				prompt += "\r\n" + notice
 			}
