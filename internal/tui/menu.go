@@ -55,6 +55,15 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 	}
 	defer func() { _ = term.Restore(fd, oldState) }()
 
+	// Use the terminal's alternate screen buffer so the menu has a clean
+	// viewport with no scrollback. Without this, drawing more lines than the
+	// terminal height causes scroll, and the subsequent cursor-up escape
+	// overshoots (cursor-up clamps at line 1, but the menu's first row has
+	// shifted up), so each arrow key press renders a fresh copy of the list
+	// below the previous one instead of redrawing in place.
+	fmt.Print("\033[?1049h")       // enter alternate screen
+	defer fmt.Print("\033[?1049l") // exit alternate screen (restores main buffer)
+
 	fmt.Print("\033[?25l")       // hide cursor
 	defer fmt.Print("\033[?25h") // restore cursor
 
