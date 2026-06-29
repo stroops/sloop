@@ -232,6 +232,7 @@ func LaunchDetached(session, dir, command string, args []string) error {
 		return err
 	}
 	SetStatusLine(session)
+	EnsureFleetKeys()
 	return nil
 }
 
@@ -250,6 +251,7 @@ func (r Runner) Launch(s runner.Spec) error {
 			return err
 		}
 		SetStatusLine(r.Session)
+		EnsureFleetKeys()
 	}
 	args := BuildAttachArgs(r.Session)
 	if os.Getenv("TMUX") != "" {

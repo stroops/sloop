@@ -82,6 +82,7 @@ func RunAdopt(sessionName, wsFlag, toolFlag string) (string, error) {
 		return "", err
 	}
 	tmux.SetStatusLine(newName) // give the adopted session sloop's status bar
+	tmux.EnsureFleetKeys()      // bind the fleet popup keys (once per server)
 	if path != "" {
 		if dbPath, err := config.GlobalDBPath(); err == nil {
 			if store, err := session.Open(dbPath); err == nil {
