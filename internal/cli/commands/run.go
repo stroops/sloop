@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -373,6 +374,16 @@ Use --env KEY=VAL for a one-off account/env without saving a profile.`,
 		res, err := resolveInstance(target, runName, runEnv, glob.Profiles, manifests)
 		if err != nil {
 			return err
+		}
+		// When running via a profile, confirm which tool + env are active so the
+		// user can verify the right account/config is being used.
+		if strings.HasPrefix(target, "@") && len(res.env) > 0 {
+			envKeys := make([]string, 0, len(res.env))
+			for k := range res.env {
+				envKeys = append(envKeys, k)
+			}
+			sort.Strings(envKeys)
+			cmd.Printf("profile %q: %s  env: %s\n", res.instance, res.target, strings.Join(envKeys, ", "))
 		}
 		plan, err := planLaunch(res.target, runProvider, runModel, runEffort, proj.DefaultTool, manifests)
 		if err != nil {

@@ -81,12 +81,45 @@ var profileCmd = &cobra.Command{
 	Use:     "profile",
 	Aliases: []string{"prof", "profiles"},
 	Short:   "Manage reusable run profiles (e.g. a second account) in ~/.sloop/config.yaml",
+	Long: `Profiles are saved launch shortcuts: a tool plus optional env vars, stored in
+~/.sloop/config.yaml. Use them to switch accounts, configs, or tools without
+re-typing flags every time.
+
+Run a profile:  sloop run @<name>
+List profiles:  sloop profile ls
+Remove:         sloop profile rm <name>
+
+Typical use-cases:
+  • A second Claude account  →  --env CLAUDE_CONFIG_DIR=~/.claude-work
+  • A Gemini key override    →  --env GEMINI_API_KEY=$GEMINI_WORK_KEY
+  • A specific model alias   →  combine with sloop run @<name> -m <model>`,
 }
 
 var profileAddCmd = &cobra.Command{
 	Use:   "add <name>",
 	Short: "Add or overwrite a profile: `sloop run @<name>` launches its tool with its env",
-	Args:  cobra.ExactArgs(1),
+	Long: `Save a named profile to ~/.sloop/config.yaml. Once saved, launch it with
+` + "`sloop run @<name>`" + `, which starts the tool in a new tmux session with the
+specified env vars already set — the AI provider CLI starts automatically.
+
+Each env value is expanded at run time: ~/... expands to the home directory and
+$VAR/${VAR} references the current shell environment.
+
+Examples:
+
+  # A second Claude account (work config dir):
+  sloop profile add work --tool claude --env CLAUDE_CONFIG_DIR=~/.claude-work
+  sloop run @work                         # opens Claude with the work account
+
+  # Multiple env vars:
+  sloop profile add sec --tool gemini \
+    --env GEMINI_API_KEY=$GEMINI_SEC_KEY \
+    --env GEMINI_PROJECT=my-project
+  sloop run @sec                          # opens Gemini with those vars
+
+  # Override env for a one-off run without saving a profile:
+  sloop run claude --env CLAUDE_CONFIG_DIR=~/.claude-work`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manifests, err := adapter.Load()
 		if err != nil {

@@ -10,6 +10,21 @@ import (
 	"github.com/stroops/sloop/internal/tmux"
 )
 
+// excludeSession removes any row whose Name equals self (the current session),
+// so peek never offers to attach to the session the user is already in.
+func excludeSession(rows []FleetRow, self string) []FleetRow {
+	if self == "" {
+		return rows
+	}
+	out := rows[:0]
+	for _, r := range rows {
+		if r.Name != self {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // soleWaiting returns the session name when exactly one row is waiting, so
 // `sloop peek` with no argument can jump straight to the agent that needs you.
 func soleWaiting(rows []FleetRow) (string, bool) {
@@ -28,13 +43,18 @@ func soleWaiting(rows []FleetRow) (string, bool) {
 
 // resolvePeekTarget chooses which agent to peek: an explicit arg wins; else a
 // lone waiting agent is auto-selected; 0 or many fall back to the fleet picker
-// (already sorted waiting-first).
+// (already sorted waiting-first). The current session is always excluded to
+// prevent peeking into the session you are already in (which would loop).
 func resolvePeekTarget(args []string) (string, error) {
+	self := currentSession()
 	if len(args) == 1 {
+		if self != "" && args[0] == self {
+			return "", fmt.Errorf("cannot peek into the current session %q — that would loop", self)
+		}
 		return args[0], nil
 	}
 	manifests, _ := adapter.Load()
-	rows := enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests)
+	rows := excludeSession(enrichGlances(fleetRows(tmux.ParseSessions(tmuxList()), manifests), manifests), self)
 	if len(rows) == 0 {
 		return "", fmt.Errorf("no running AI sessions to peek (start one with `sloop run <tool>`)")
 	}
@@ -65,8 +85,8 @@ var peekCmd = &cobra.Command{
 pane: answer the prompt it is blocked on, then close the popup and you are
 exactly where you were, unlike ` + "`sloop attach`" + `, which switches your whole
 screen to the agent. With no argument, peek jumps straight to the lone waiting
-agent, or shows the fleet picker when several (or none) are waiting. Bind it to
-a key with ` + "`sloop peek setup`" + `. Needs tmux ≥ 3.2.`,
+agent, or shows the fleet picker when several (or none) are waiting; the current
+session is excluded so you never peek into yourself. Bind it to a key with ` + "`sloop peek setup`" + `. Needs tmux ≥ 3.2.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := requirePeekEnv(); err != nil {
