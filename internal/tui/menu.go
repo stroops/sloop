@@ -58,6 +58,15 @@ func SelectAction(prompt string, options []string, actionKeys []byte) (int, byte
 	fmt.Print("\033[?25l")       // hide cursor
 	defer fmt.Print("\033[?25h") // restore cursor
 
+	// Disable autowrap (DECAWM) while the menu owns the screen. The in-place
+	// redraw below (see draw/total) assumes exactly one terminal row per option
+	// line; a line wider than the pane would wrap onto extra rows, desync the
+	// cursor-up count, and smear the menu on every keypress. Clipping instead of
+	// wrapping keeps the invariant for any content width (ls rows are short, so
+	// it never showed there; ps glance lines can be long). Restore on exit.
+	fmt.Print("\033[?7l")
+	defer fmt.Print("\033[?7h")
+
 	fmt.Printf("%s\r\n\r\n", prompt)
 
 	selected := 0
