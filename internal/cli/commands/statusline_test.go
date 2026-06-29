@@ -39,14 +39,26 @@ func TestRenderStatusline(t *testing.T) {
 }
 
 func TestWaitingBadge(t *testing.T) {
-	if got := waitingBadge(0); got != "" {
+	if got := waitingBadge(0, ""); got != "" {
 		t.Fatalf("zero should be empty, got %q", got)
 	}
-	if got := waitingBadge(-1); got != "" {
+	if got := waitingBadge(-1, ""); got != "" {
 		t.Fatalf("negative should be empty, got %q", got)
 	}
-	got := waitingBadge(2)
+	got := waitingBadge(2, " → Ctrl+b j")
 	if !strings.Contains(got, "2 waiting") || !strings.Contains(got, "fg=yellow") {
+		t.Fatalf("got %q", got)
+	}
+	if !strings.Contains(got, "→ Ctrl+b j") {
+		t.Fatalf("badge should carry the hint, got %q", got)
+	}
+}
+
+func TestPeekHint(t *testing.T) {
+	if got := peekHint("Ctrl+b", ""); got != "" {
+		t.Fatalf("no key should give no hint, got %q", got)
+	}
+	if got := peekHint("Ctrl+b", "j"); got != " → Ctrl+b j" {
 		t.Fatalf("got %q", got)
 	}
 }

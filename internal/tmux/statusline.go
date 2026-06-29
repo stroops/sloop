@@ -41,7 +41,7 @@ func SetStatusLine(session string) {
 		_ = Run("set-option", "-t", session, opt, val)
 	}
 	set("status-right", StatusRightFormat(exe, session))
-	set("status-right-length", "60")
+	set("status-right-length", "80") // room for the "→ Ctrl+b j" hint when waiting
 	set("status-interval", "2")
 	// status-left becomes a persistent "how to get back" tip, using the user's
 	// real prefix, so anyone inside the session can see how to detach (return to
