@@ -222,9 +222,15 @@ func TestFleetKeysAutoBound(t *testing.T) {
 	tmuxNew(t, ext)
 	adopted := prefix + "kws__claude"
 	t.Cleanup(func() {
+		// Unbind only the keys this test actually bound.
+		pk, _ := exec.Command("tmux", "show-options", "-gv", "@sloop_peek_key").Output()
+		hk, _ := exec.Command("tmux", "show-options", "-gv", "@sloop_hud_key").Output()
 		tmuxRun("kill-session", "-t", ext)
 		tmuxRun("kill-session", "-t", adopted)
-		for _, k := range []string{"j", "a", "f", "p", "h", "g", "G"} {
+		if k := strings.TrimSpace(string(pk)); k != "" {
+			tmuxRun("unbind-key", k)
+		}
+		if k := strings.TrimSpace(string(hk)); k != "" {
 			tmuxRun("unbind-key", k)
 		}
 		tmuxRun("set-option", "-gu", "@sloop_peek_key")
@@ -240,5 +246,14 @@ func TestFleetKeysAutoBound(t *testing.T) {
 	keys, _ := exec.Command("tmux", "list-keys", "-T", "prefix").Output()
 	if !strings.Contains(string(keys), "peek --in-popup") {
 		t.Fatalf("peek not auto-bound to a prefix key:\n%s", keys)
+	}
+
+	// Verify hud was also auto-bound.
+	out, _ := exec.Command("tmux", "show-options", "-gv", "@sloop_hud_key").Output()
+	if strings.TrimSpace(string(out)) == "" {
+		t.Fatalf("@sloop_hud_key not set after auto-bind")
+	}
+	if !strings.Contains(string(keys), " ps") {
+		t.Fatalf("hud not auto-bound to a prefix key:\n%s", keys)
 	}
 }

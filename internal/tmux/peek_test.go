@@ -48,4 +48,8 @@ func TestWithTitle(t *testing.T) {
 	if got := withTitle(base, ""); strings.Join(got, " ") != strings.Join(base, " ") {
 		t.Fatalf("empty title should be a no-op, got %v", got)
 	}
+	short := []string{"one"}
+	if got := withTitle(short, "T"); strings.Join(got, " ") != strings.Join(short, " ") {
+		t.Fatalf("len(args) < 2 should be a no-op, got %v", got)
+	}
 }
