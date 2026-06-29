@@ -58,3 +58,9 @@ func PopupSupported() bool {
 	maj, min := Version()
 	return maj > 3 || (maj == 3 && min >= 2)
 }
+
+// TitleSupported reports whether display-popup supports a -T title (tmux ≥ 3.3).
+func TitleSupported() bool {
+	maj, min := Version()
+	return maj > 3 || (maj == 3 && min >= 3)
+}
