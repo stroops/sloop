@@ -8,7 +8,7 @@ design: **all per-provider knowledge lives in the adapter manifest** (`internal/
 
 **The rule: never hardcode a tool name in a feature. Add capability to the manifest instead.**
 Detect, launch, context delivery, skills, hooks, and completion are all manifest-driven. To support a
-new CLI, drop in one `<tool>.yaml` — no Go changes unless it needs a brand-new mechanism.
+new CLI, drop in one `<tool>.yaml`; no Go changes unless it needs a brand-new mechanism.
 
 - Provider contract + manifest schema: `docs/reference/ADAPTERS.md`
 - Config layering (unified user config vs per-provider manifests): `docs/reference/CONFIG.md`

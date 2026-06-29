@@ -3,16 +3,16 @@
 All notable changes to Sloop are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## v0.1.1 — 2026-06-28
+## v0.1.1 - 2026-06-28
 
 Run more than one agent per repo, peek into a waiting agent without leaving your
-screen, and a sharper first-run experience — all on top of v0.1.0.
+screen, and a sharper first-run experience, all on top of v0.1.0.
 
 ### Run multiple agents & accounts
 - Named instances: `sloop run claude@review` / `-n/--name` runs a second agent of the same tool in one
   repo (session `<repo>__tool__instance`); `-N/--new` auto-names the next free slot (`claude·2`…).
 - Profiles: save a tool + env once with `sloop profile add|ls|rm` (global `~/.sloop/config.yaml`) and
-  launch it as `sloop run @<name>` — e.g. a different account via `CLAUDE_CONFIG_DIR`. `--env KEY=VAL`
+  launch it as `sloop run @<name>`, e.g. a different account via `CLAUDE_CONFIG_DIR`. `--env KEY=VAL`
   injects env one-off without a profile (`~`/`$VAR` expanded). The fleet view shows instances as
   `tool·instance`.
 
@@ -28,13 +28,13 @@ screen, and a sharper first-run experience — all on top of v0.1.0.
 - `sloop check` gains more AI-readiness criteria, sourced from each tool's adapter manifest.
 - `sloop doctor` groups and colors its output and explains the `mode` line.
 
-## v0.1.0 — first release
+## v0.1.0 - first release
 
 The initial public release: the local-first control layer for your AI coding CLIs.
 
 ### Portable context
 - `AGENTS.md` as the single canonical context; create-if-missing pointer files
-  (`CLAUDE.md`, `GEMINI.md`, …) — never overwrites your files.
+  (`CLAUDE.md`, `GEMINI.md`, …); never overwrites your files.
 - `.sloop/skills` symlinked into each tool's skills dir (self-healing, copy fallback).
 - `sloop sync` (`--all`, `--repair`) and `sloop status`.
 - `sloop init` scaffolds the workspace and delivers context immediately; `--scan`
@@ -50,24 +50,24 @@ The initial public release: the local-first control layer for your AI coding CLI
   `--split` runs several tools side by side; `-w` targets a registered workspace.
 
 ### Cross-repo fleet
-- `sloop ps` — every running agent across all your repos; agents waiting on you float to
+- `sloop ps`: every running agent across all your repos; agents waiting on you float to
   the top. It reads each waiting agent's own prompt and shows the answer keys, so you can
   reply in one keystroke. `--watch` live-monitors and alerts (terminal bell + desktop
   notify); `--waiting`, `--all`, and `ps <#>` to jump.
 - Interactive control center: arrow-key nav, `Enter` to attach, one key to answer a waiting
-  agent (`y`/`n`/`1`…), `s` to send a line, `x` to kill — all in place, and Esc/Ctrl-C cancel
+  agent (`y`/`n`/`1`…), `s` to send a line, `x` to kill, all in place; Esc/Ctrl-C cancel
   back to the fleet (never drops you to a shell). Provider display names, status colors, and
   column headers; the screen redraws cleanly with an action notice.
-- `sloop approve` — send the affirmative answer to waiting agent(s) in one command
+- `sloop approve`: send the affirmative answer to waiting agent(s) in one command
   (`--waiting`/`--all`).
-- `sloop ls` — registered workspaces with their live agents (colored by status, the same
+- `sloop ls`: registered workspaces with their live agents (colored by status, the same
   language as `ps`); `Enter` attaches, `r` launches the default tool, `s` opens a shell, `c`
   copies a `cd`.
-- `sloop attach` (`a`) — by session name, or with no argument a fleet picker that matches
+- `sloop attach` (`a`): by session name, or with no argument a fleet picker that matches
   the `ps` view. `sloop adopt` brings an external tmux session into the fleet.
-- `sloop restore` — relaunch the agents you were recently running after a reboot / tmux
+- `sloop restore`: relaunch the agents you were recently running after a reboot / tmux
   restart, each detached; `--resume` continues each tool's prior conversation where supported.
-- `sloop popup` / `sloop hud` — the fleet as a floating tmux popup (HUD); `popup setup` binds
+- `sloop popup` / `sloop hud`: the fleet as a floating tmux popup (HUD); `popup setup` binds
   a key (needs tmux ≥ 3.2).
 - Per-session status bar (`sloop statusline`) shows live `⚓ repo tool ◆ waiting` plus a
   persistent detach tip using your real tmux prefix; set only per session (never touches
@@ -81,7 +81,7 @@ The initial public release: the local-first control layer for your AI coding CLI
 - `sloop hooks` wires each tool's own **status** hooks for authoritative `sloop ps` state
   (Claude, Gemini & Cursor auto-install; others print-and-paste). The reserved callback is
   `sloop hooks emit <state>`, keeping the namespace clear for the v0.2.0 workflow-hook library.
-- `sloop skills new` / `add` — reusable skills shared across every tool. `.sloop/skills.lock`
+- `sloop skills new` / `add`: reusable skills shared across every tool. `.sloop/skills.lock`
   records imported skills + source so `sloop skills update` re-fetches reproducibly.
 
 ### Cross-platform & DX

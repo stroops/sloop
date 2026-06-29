@@ -1,10 +1,10 @@
-# Sloop — Hands-on Usage (dogfooding guide)
+# Sloop: Hands-on Usage (dogfooding guide)
 
 A practical, example-driven walkthrough. For the "what & why", see `README.md`.
 
 > **Requirements:** Go 1.26 to build. A **tmux-compatible multiplexer** for the orchestration
 > features (`run --split`, `ps`, `send`, `attach`): **tmux** on macOS/Linux, or **[psmux]**
-> (native, tmux-CLI-compatible) on Windows — no WSL needed. sloop auto-detects `tmux` then `psmux`;
+> (native, tmux-CLI-compatible) on Windows, no WSL needed. sloop auto-detects `tmux` then `psmux`;
 > override with `SLOOP_MUX=<binary>`. Plain `sloop run` works without any multiplexer (single tool).
 > The AI tool binaries you target (`claude`, `cursor`/`agent`, `codex`, `copilot`, `gemini`, `agy`)
 > must be installed for sloop to launch them.
@@ -43,7 +43,7 @@ sloop init
 
 This creates:
 ```
-AGENTS.md            # canonical context — YOU write this (the source of truth)
+AGENTS.md            # canonical context: YOU write this (the source of truth)
 .sloop/
   config.yaml        # version, enabled tools + default tool (auto-detected)
   skills/            # reusable *.md skills
@@ -51,33 +51,33 @@ AGENTS.md            # canonical context — YOU write this (the source of truth
   .gitignore
 ```
 
-On a real terminal `sloop init` is **interactive** — it shows the tools it detected and asks whether to
+On a real terminal `sloop init` is **interactive**: it shows the tools it detected and asks whether to
 pre-fill `AGENTS.md` from your codebase, create the standard provider folders, and install status
 hooks, so a newcomer is set up in a few keystrokes. Piped/CI or `--auto`/`-y`/`--no-input` skip the
 prompts and keep the scriptable behavior (flags only).
 
-`init` also **delivers context for every detected tool** right away — it writes the pointer files
+`init` also **delivers context for every detected tool** right away: it writes the pointer files
 (`CLAUDE.md`, `GEMINI.md`, …) and links `.sloop/skills`, so the workspace is usable immediately
 (no separate `sloop sync` needed first). It prints a per-tool summary of what it created. The personal
 `vault/` is gitignored; `config.yaml` and `skills/` are committed (shared with your team).
 
 Add `--scaffold` (`-S`) to also create each enabled tool's **standard folders** (e.g. `.claude/skills`,
-`.claude/agents`, `.cursor/rules`, `.codex/skills`) — driven by the adapter manifests, so you start
+`.claude/agents`, `.cursor/rules`, `.codex/skills`), driven by the adapter manifests, so you start
 from the provider's expected layout:
 
 ```sh
 sloop init --scaffold
 ```
 
-Or let sloop pre-fill `AGENTS.md` from the existing codebase (language, build/test/lint commands —
-a `Makefile` target wins — project layout, and a README seed) instead of an empty starter:
+Or let sloop pre-fill `AGENTS.md` from the existing codebase (language, build/test/lint commands, where a
+`Makefile` target wins, project layout, and a README seed) instead of an empty starter:
 
 ```sh
 sloop init --scan
 ```
 
 Either way, then edit `AGENTS.md` with the rest of your guidance (overview, conventions). Commit
-`AGENTS.md` and `.sloop/` to git — they're shared with your team. `--scan` is heuristic and offline
+`AGENTS.md` and `.sloop/` to git; they're shared with your team. `--scan` is heuristic and offline
 (no LLM, no API key); it never overwrites an existing `AGENTS.md`.
 
 ---
@@ -101,14 +101,13 @@ sloop run -w my-service claude       # target a registered workspace from anywhe
 (`agent`→cursor), or a model alias (`opus`→its home CLI). Flags are explicit: `-p/--provider` the CLI,
 `-m/--model` the model, `-e/--effort` (`low|medium|high`), `-t/--task` an initial task (launches an
 interactive session already working on it, so it shows up in `sloop ps`). sloop **forwards the model
-string as-is and never validates it** — the CLI accepts or rejects it; selection is the CLI's own step, sloop just makes
+string as-is and never validates it**: the CLI accepts or rejects it; selection is the CLI's own step, sloop just makes
 it a one-liner. If a CLI has no model/effort knob, `-m`/`-e` errors clearly (run it and pick inside, or
 pass flags after `--`). `-m <Tab>` completes the known aliases. Which knobs each CLI exposes lives in
-its adapter manifest — see [run.md](../design/run.md) and [ADAPTERS.md](../reference/ADAPTERS.md).
+its adapter manifest; see [run.md](../design/run.md) and [ADAPTERS.md](../reference/ADAPTERS.md).
 
 What `run` does: ensures `AGENTS.md`, writes pointer files (e.g. `CLAUDE.md` → `AGENTS.md`),
-symlinks `.sloop/skills` into the tool's skills dir, records the session, then launches —
-inside a tmux session named `<workspace>__<tool>` when tmux is present.
+symlinks `.sloop/skills` into the tool's skills dir, records the session, then launches (inside a tmux session named `<workspace>__<tool>` when tmux is present).
 
 **Status bar:** each sloop session shows its own live status in the tmux bar, e.g.
 `⚓ myrepo claude ◆ waiting` (the status word is colored: yellow waiting · cyan working · green idle),
@@ -126,7 +125,7 @@ Great for running two agents on the same code and comparing, or a coder + a revi
 
 ### A second agent, or a second account (named instances & profiles)
 
-`sloop run claude` a second time just re-attaches the existing `<repo>__claude` — by design, so it
+`sloop run claude` a second time just re-attaches the existing `<repo>__claude`, by design, so it
 means "jump back into my claude." To get a **distinct** second agent of the same tool, name it:
 
 ```sh
@@ -139,19 +138,27 @@ Named instances show up in `sloop ps` as `claude·review` / `claude·2`, so two 
 never ambiguous.
 
 For a **different account** of the same provider, sloop launches the real binary (not your shell, so a
-`claude-sec` alias won't apply) and injects the env that selects the account. One-off:
+`claude-work` alias won't apply) and injects the env that selects the account. The friendly way is a
+**profile** keyed to that account's config dir (global, works from any repo), called with `@`:
 
 ```sh
-sloop run claude --name sec --env CLAUDE_CONFIG_DIR=~/.claude-sec
+sloop profile add work --config-dir ~/.claude-work   # claude inferred; maps to CLAUDE_CONFIG_DIR
+sloop profile ls                                      # name · tool · env keys
+sloop run @work                                       # launch claude under ~/.claude-work, session <repo>__claude__work
+sloop profile rm work                                 # remove it
 ```
 
-Reusing it daily? Save a **profile** once (global, works from any repo) and call it with `@`:
+`--config-dir` is claude-specific sugar (the only account model mapped so far): sloop infers the tool,
+translates the path to `CLAUDE_CONFIG_DIR`, offers to **create the dir** if missing, and offers to
+**symlink your tooling** (plugins, agents, commands, skills, CLAUDE.md) from `~/.claude` so both
+accounts share it. It can optionally share conversation history (off by default) for cross-account
+resume, and your login (`.credentials.json`) is never shared.
+
+Prefer the raw env, a non-claude tool, or a one-off without saving? Use `--env` (with `--tool`) directly:
 
 ```sh
-sloop profile add sec --tool claude --env CLAUDE_CONFIG_DIR=~/.claude-sec
-sloop profile ls            # name · tool · env keys
-sloop run @sec              # launches claude under ~/.claude-sec, session <repo>__claude__sec
-sloop profile rm sec        # remove it
+sloop run claude --name work --env CLAUDE_CONFIG_DIR=~/.claude-work          # one-off, no profile
+sloop profile add work --tool claude --env CLAUDE_CONFIG_DIR=~/.claude-work  # explicit equivalent of above
 ```
 
 The profile name becomes the instance suffix (override with `--name`). Env values expand `~` and
@@ -170,7 +177,7 @@ sloop ps
 ```
 
 ```
-⚓ AI fleet — 2 running, 1 waiting on you
+⚓ AI fleet · 2 running, 1 waiting on you
 
   1   webapp           claude    ◆ waiting on you · active 3m ago
       └ │ Waiting for your approval to edit main.go
@@ -180,15 +187,15 @@ sloop ps
 jump: sloop ps <#>   ·   send: sloop send <#> "msg"
 ```
 
-- Each session is classified from **its own terminal** (non-invasive — sloop never
+- Each session is classified from **its own terminal** (non-invasive: sloop never
   reads the provider): `◆ waiting on you` (blocked on an approval/question), `▸ working`,
   `○ idle`, or `● attached`. **Sessions waiting on you float to the top** so you see who
   needs you first. Install the Claude hooks (below) to make this status **authoritative**
   instead of a heuristic.
 - The `└` line is the session's last terminal output (the glance).
-- sloop **reads what each waiting agent is asking** (from its own pane — no LLM, no API) and shows the
+- sloop **reads what each waiting agent is asking** (from its own pane, no LLM, no API) and shows the
   question + answer keys, e.g. `Apply changes? · answer: [y]es [n]o` or `[1]Yes [2]No`.
-- On a real terminal, `sloop ps` is a **control center** — `↑/↓` (or `j/k`) to move, then act on the
+- On a real terminal, `sloop ps` is a **control center**: `↑/↓` (or `j/k`) to move, then act on the
   highlighted session in place: press its **answer key** (`y`/`n` or `1`/`2`…) to reply, `Enter` jumps,
   `s` sends a free-text reply, `x` kills (with a confirm), `q`/`Esc` quits. Piped/CI prints the plain
   listing. Colors honor `NO_COLOR`/`--no-color`.
@@ -221,8 +228,8 @@ sloop hooks install     # merges into .claude/settings.local.json (idempotent, n
 sloop hooks print       # or print the JSON snippet to add by hand
 ```
 
-This registers three of Claude's documented hooks — `UserPromptSubmit` → working,
-`Notification` → waiting on you, `Stop` → idle — each calling `sloop hooks emit <state>`, which
+This registers three of Claude's documented hooks: `UserPromptSubmit` → working,
+`Notification` → waiting on you, `Stop` → idle, each calling `sloop hooks emit <state>`, which
 records the session's status under `~/.sloop/state`. `sloop ps` then **prefers that marker**
 over the heuristic (falling back to the heuristic if no fresh marker exists). This stays
 within the provider's rules: Claude calls sloop through its **own** hook mechanism; sloop
@@ -249,13 +256,13 @@ is "drop one yaml". `sloop tools` shows the full capability matrix (context / sk
 ### Whole cross-repo board (`ps --all`)
 
 `sloop ps` lists what's live; `sloop ps --all` also lists registered workspaces that **aren't**
-running, with their repo path — the full picture of every project, not just the running ones:
+running, with their repo path: the full picture of every project, not just the running ones:
 
 ```sh
 sloop ps --all
 ```
 ```
-⚓ AI fleet — 1 running
+⚓ AI fleet · 1 running
   1   api          claude    ◆ waiting on you · active 2m ago
 
 Known workspaces (not running):
@@ -280,7 +287,7 @@ sloop send webapp__claude "use the opus model"  # by full session name
 sloop send webapp "run the tests"               # by workspace (if it has one session)
 ```
 
-`send` types the message into that session's pane and presses Enter — exactly as if you
+`send` types the message into that session's pane and presses Enter, exactly as if you
 typed it yourself (via `tmux send-keys`; the provider is never intercepted). Great for
 unblocking an agent across repos without losing your place.
 
@@ -300,7 +307,7 @@ sloop kill --all -y                    # clean up everything (global -y = assume
 
 ### Fleet HUD popup (tmux ≥ 3.2)
 
-Pop the whole cross-repo fleet over whatever you're doing — glance, answer, jump, and it closes back
+Pop the whole cross-repo fleet over whatever you're doing: glance, answer, jump, and it closes back
 to your work without losing your place:
 
 ```sh
@@ -325,7 +332,7 @@ sloop peek backend__claude   # overlay a specific session
 sloop peek setup             # bind <prefix> p to peek the waiting agent (prints the ~/.tmux.conf line)
 ```
 
-Answer the agent in the floating pane, close it, and you're exactly where you were — the agent keeps
+Answer the agent in the floating pane, close it, and you're exactly where you were; the agent keeps
 running (closing the overlay detaches, it never kills the session). Every sloop status bar also shows a
 fleet-wide **`⏳ N waiting`** badge so you know when an agent needs you without leaving your seat. Full
 design: [peek.md](../design/peek.md).
@@ -339,7 +346,7 @@ sloop sync               # (re)deliver for the default tool
 sloop sync claude        # a specific tool
 sloop sync --all         # every enabled tool
 sloop sync --repair      # if a file/dir you didn't create occupies a target,
-                         # move it aside (*.sloopbak-<ts>) and write sloop's — never deletes
+                         # move it aside (*.sloopbak-<ts>) and write sloop's; never deletes
 sloop status             # one-line delivery state
 ```
 
@@ -354,7 +361,7 @@ sloop status             # one-line delivery state
 ```
 
 Delivery is **create-if-missing**: sloop never overwrites a file you hand-authored (it warns).
-`AGENTS.md` is always yours — sync/repair never touch it.
+`AGENTS.md` is always yours; sync/repair never touch it.
 
 ---
 
@@ -369,13 +376,13 @@ sloop skills update                                          # re-fetch every im
 sloop skills update code-review                              # re-fetch just one
 ```
 
-Skills live in `.sloop/skills/*.md` and are **symlinked** into each tool's skills dir — write or
+Skills live in `.sloop/skills/*.md` and are **symlinked** into each tool's skills dir: write or
 import once, every tool sees the same set. `skills new`/`add` link them in automatically (`skill`
 and `sk` are aliases). If a tool isn't linked yet, run `sloop sync`.
 
 Imported skills are recorded in **`.sloop/skills.lock`** (name + source + content hash). Commit it so
 your team gets reproducible skills, and run `sloop skills update` (`up`) to re-fetch from the recorded
-sources — only changed files are rewritten and relinked. Locally authored (`skills new`) skills aren't
+sources; only changed files are rewritten and relinked. Locally authored (`skills new`) skills aren't
 locked, since they have no upstream source.
 
 ---
@@ -413,7 +420,7 @@ session name shown next to each `ps` number).
 
 ## 8. Hints (learn as you go)
 
-New to tmux/CLI? sloop occasionally prints one short `💡` tip after a command — what "detach" means,
+New to tmux/CLI? sloop occasionally prints one short `💡` tip after a command: what "detach" means,
 how `ps` works, that `hooks install` makes status precise. They're **contextual** (tied to the
 command), **throttled** (never more than one every few minutes, no repeats), and **offline** (ship
 with the binary, updated on new releases).
@@ -427,7 +434,7 @@ SLOOP_NO_HINTS=1 …     # one-off: silence tips for a single command
 
 Language is picked from `SLOOP_LANG` → the `lang` field in `~/.sloop/config.yaml` → `$LANG` → English.
 Add a language by adding its key to `internal/hints/hints.yaml`. (A future release may also pull an
-updated hint set from a registry / the global DB — embedded is the source for now.)
+updated hint set from a registry / the global DB; embedded is the source for now.)
 
 ---
 
@@ -462,7 +469,7 @@ question that decides whether the orchestration direction is worth doubling down
   Without one, the orchestration commands are unavailable but everything else (`init`, `sync`,
   `skills`, `hooks`, `tools`, `status`, the registry DB) works fine. The multiplexer backend lives in
   `internal/tmux` behind the `runner.Runner` seam. **Note:** the psmux path is wired but not yet
-  verified on a real Windows box — please report flag incompatibilities.
+  verified on a real Windows box; please report flag incompatibilities.
 - The `ps` glance is a heuristic by default; install each tool's hooks (`sloop hooks install`) to make
   status authoritative.
 - `sloop` launches tool binaries directly (no shell), so an adapter's `launch:` must be a plain
