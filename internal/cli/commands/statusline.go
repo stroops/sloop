@@ -360,7 +360,7 @@ func extractModel(text, pattern string) string {
 // the bar's own span), unlike client_width, which reports whichever client
 // happens to be calling. Width 0 (unknown) renders as wide.
 func paneInfo(session string) (dir string, width int) {
-	out, err := tmux.Output("display-message", "-p", "-t", tmux.Exact(session), "#{pane_current_path}\t#{window_width}")
+	out, err := tmux.Output("display-message", "-p", "-t", tmux.ExactPane(session), "#{pane_current_path}\t#{window_width}")
 	if err != nil {
 		return "", 0
 	}

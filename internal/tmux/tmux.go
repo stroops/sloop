@@ -94,6 +94,17 @@ func SessionName(workspace, tool string) string {
 // names exactly (parse_target in its cli.rs), so the prefix is safe there too.
 func Exact(session string) string { return "=" + session }
 
+// ExactPane is Exact for commands whose -t resolves a target-pane, not a
+// target-session (set-option, capture-pane, send-keys, split-window,
+// select-layout, display-message): a bare "=session" errors there ("no such
+// session"/"can't find pane") because target-pane parsing needs an explicit
+// window/pane part. The trailing ":" supplies an empty one, which resolves to
+// the session's active window/pane — the same target Exact's callers expect,
+// just in the grammar these commands require. Target-session-only commands
+// (attach, kill-session, rename-session, has-session, switch-client) keep
+// using the bare Exact form.
+func ExactPane(session string) string { return Exact(session) + ":" }
+
 // InstanceName is SessionName plus an optional instance suffix; instance=="" is
 // the default session (byte-identical to SessionName), so a second agent of the
 // same provider in one workspace gets a distinct `ws__tool__instance` name.
@@ -200,7 +211,7 @@ func Rename(old, name string) error {
 // SessionPath reports a session's active pane working directory (best-effort),
 // so an adopted session can be registered against its repo path.
 func SessionPath(session string) string {
-	out, err := Output("display-message", "-t", Exact(session), "-p", "#{pane_current_path}")
+	out, err := Output("display-message", "-t", ExactPane(session), "-p", "#{pane_current_path}")
 	if err != nil {
 		return ""
 	}

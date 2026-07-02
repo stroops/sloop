@@ -32,7 +32,7 @@ func BuildSwitchArgs(session string) []string {
 // This only ever reads your own terminal output, never the provider's API or
 // internals, so it stays within what any AI tool's terms allow.
 func BuildCaptureArgs(session string) []string {
-	return []string{"capture-pane", "-p", "-t", Exact(session)}
+	return []string{"capture-pane", "-p", "-t", ExactPane(session)}
 }
 
 // LastNonEmptyLine returns the last non-blank, trimmed line of captured pane

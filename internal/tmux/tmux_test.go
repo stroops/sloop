@@ -58,6 +58,19 @@ func TestExactTarget(t *testing.T) {
 	}
 }
 
+// TestExactPaneTarget guards against a real tmux quirk: commands that resolve
+// a target-pane (set-option, capture-pane, send-keys, split-window,
+// select-layout, display-message) reject a bare "=session" as "no such
+// session"/"can't find pane" — only "=session:" (an explicit, if empty,
+// window/pane suffix) resolves. Exact alone is for target-session-only
+// commands (attach, kill-session, rename-session, has-session, switch-client),
+// which accept the bare form.
+func TestExactPaneTarget(t *testing.T) {
+	if got := ExactPane("ws__claude"); got != "=ws__claude:" {
+		t.Fatalf("ExactPane = %q, want =ws__claude:", got)
+	}
+}
+
 func TestBuildTmuxAttachArgs(t *testing.T) {
 	args := BuildAttachArgs("backend__claude")
 	want := []string{"attach", "-t", "=backend__claude"}

@@ -12,11 +12,11 @@ func BuildSplitNew(session, dir, cmd string) []string {
 }
 
 func BuildSplitAdd(session, dir, cmd string) []string {
-	return []string{"split-window", "-t", Exact(session), "-c", dir, cmd}
+	return []string{"split-window", "-t", ExactPane(session), "-c", dir, cmd}
 }
 
 func BuildTiledLayout(session string) []string {
-	return []string{"select-layout", "-t", Exact(session), "tiled"}
+	return []string{"select-layout", "-t", ExactPane(session), "tiled"}
 }
 
 // HasSession reports whether a session with exactly this name is running.
