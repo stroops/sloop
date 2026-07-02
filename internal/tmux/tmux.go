@@ -86,24 +86,36 @@ func SessionName(workspace, tool string) string {
 	return sanitize(workspace) + "__" + sanitize(tool)
 }
 
-// Exact turns a session name into an exact-match tmux target ("=name"). A bare
-// `-t name` falls back to prefix matching when no session has that exact name,
-// so with only ws__claude__sec running, `-t ws__claude` silently resolves to it
-// (wrong attach/send/kill). Every `-t` that means one whole session by name
-// must go through this. psmux strips a leading "=" and always matches session
-// names exactly (parse_target in its cli.rs), so the prefix is safe there too.
-func Exact(session string) string { return "=" + session }
-
-// ExactPane is Exact for commands whose -t resolves a target-pane, not a
-// target-session (set-option, capture-pane, send-keys, split-window,
-// select-layout, display-message): a bare "=session" errors there ("no such
-// session"/"can't find pane") because target-pane parsing needs an explicit
-// window/pane part. The trailing ":" supplies an empty one, which resolves to
-// the session's active window/pane — the same target Exact's callers expect,
-// just in the grammar these commands require. Target-session-only commands
-// (attach, kill-session, rename-session, has-session, switch-client) keep
-// using the bare Exact form.
-func ExactPane(session string) string { return Exact(session) + ":" }
+// Exact turns a session name into an exact-match tmux target ("=name:"). A
+// bare `-t name` falls back to prefix matching when no session has that exact
+// name, so with only ws__claude__sec running, `-t ws__claude` silently
+// resolves to it (wrong attach/send/kill). Every `-t` that means one whole
+// session by name must go through this.
+//
+// The trailing ":" is load-bearing, not decorative: tmux's `-t` grammar comes
+// in two flavors depending on the command — target-session (attach,
+// switch-client, kill-session, rename-session, has-session) and target-pane
+// (capture-pane, send-keys, split-window, select-layout, set-option,
+// display-message). A bare "=name" only satisfies the target-session form;
+// every target-pane command rejects it outright ("no such session"/"can't
+// find pane"), and display-message fails silently, returning "" instead of an
+// error. Verified against real tmux (3.7): "=name:" — an explicit, empty
+// window/pane part, which resolves to the session's active window/pane, the
+// same thing a bare session target means — satisfies BOTH grammars, so one
+// helper covers every `-t` in this codebase; there is no second form to pick
+// wrong. (Confirmed one command at a time: attach, switch-client,
+// kill-session, rename-session, has-session, capture-pane, send-keys,
+// split-window, select-layout, set-option, display-message all resolve
+// identically with the trailing ":" as they did — or, for the target-pane
+// group, should have — without it.)
+//
+// psmux (the Windows backend) strips a leading "=" and matches session names
+// exactly (parse_target in its cli.rs) per the existing convention this
+// function follows; whether it also tolerates a trailing ":" the same way
+// tmux does is unverified — psmux itself is still an unshipped, parked
+// integration (see ROADMAP.md), so this isn't a regression, but it is the
+// first thing to check when psmux support is actually picked up.
+func Exact(session string) string { return "=" + session + ":" }
 
 // InstanceName is SessionName plus an optional instance suffix; instance=="" is
 // the default session (byte-identical to SessionName), so a second agent of the
@@ -211,7 +223,7 @@ func Rename(old, name string) error {
 // SessionPath reports a session's active pane working directory (best-effort),
 // so an adopted session can be registered against its repo path.
 func SessionPath(session string) string {
-	out, err := Output("display-message", "-t", ExactPane(session), "-p", "#{pane_current_path}")
+	out, err := Output("display-message", "-t", Exact(session), "-p", "#{pane_current_path}")
 	if err != nil {
 		return ""
 	}

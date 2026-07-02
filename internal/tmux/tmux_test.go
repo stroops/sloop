@@ -49,31 +49,27 @@ func TestBuildNewDetachedArgs(t *testing.T) {
 	}
 }
 
-// Exact guards against tmux's prefix matching: with only ws__claude__sec
-// running, a bare `-t ws__claude` resolves to it, so `sloop run claude` would
-// attach/send/kill the profile instance instead of the default session.
+// Exact guards against two things at once. (1) tmux's prefix matching: with
+// only ws__claude__sec running, a bare `-t ws__claude` resolves to it, so
+// `sloop run claude` would attach/send/kill the profile instance instead of
+// the default session — the leading "=" fixes that. (2) tmux's target-pane
+// commands (capture-pane, send-keys, split-window, select-layout, set-option,
+// display-message) reject a bare "=session" outright ("no such
+// session"/"can't find pane"), because target-pane parsing needs an explicit
+// window/pane part — the trailing ":" (an explicit, empty one) satisfies that
+// grammar too, while still resolving to the session's active window/pane for
+// target-session commands (attach, kill-session, rename-session, has-session,
+// switch-client). One form, verified against real tmux to work for every
+// command in this codebase.
 func TestExactTarget(t *testing.T) {
-	if got := Exact("ws__claude"); got != "=ws__claude" {
-		t.Fatalf("Exact = %q, want =ws__claude", got)
-	}
-}
-
-// TestExactPaneTarget guards against a real tmux quirk: commands that resolve
-// a target-pane (set-option, capture-pane, send-keys, split-window,
-// select-layout, display-message) reject a bare "=session" as "no such
-// session"/"can't find pane" — only "=session:" (an explicit, if empty,
-// window/pane suffix) resolves. Exact alone is for target-session-only
-// commands (attach, kill-session, rename-session, has-session, switch-client),
-// which accept the bare form.
-func TestExactPaneTarget(t *testing.T) {
-	if got := ExactPane("ws__claude"); got != "=ws__claude:" {
-		t.Fatalf("ExactPane = %q, want =ws__claude:", got)
+	if got := Exact("ws__claude"); got != "=ws__claude:" {
+		t.Fatalf("Exact = %q, want =ws__claude:", got)
 	}
 }
 
 func TestBuildTmuxAttachArgs(t *testing.T) {
 	args := BuildAttachArgs("backend__claude")
-	want := []string{"attach", "-t", "=backend__claude"}
+	want := []string{"attach", "-t", "=backend__claude:"}
 	if !reflect.DeepEqual(args, want) {
 		t.Fatalf("want %v, got %v", want, args)
 	}
@@ -109,7 +105,7 @@ func TestResolveBin(t *testing.T) {
 
 func TestBuildKillArgs(t *testing.T) {
 	got := BuildKillArgs("web__claude")
-	want := []string{"kill-session", "-t", "=web__claude"}
+	want := []string{"kill-session", "-t", "=web__claude:"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

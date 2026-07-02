@@ -16,7 +16,7 @@ func TestShellSingleQuote(t *testing.T) {
 
 func TestBuildNestedAttachCmd(t *testing.T) {
 	got := BuildNestedAttachCmd("ws__claude")
-	want := "env -u TMUX -u TMUX_PANE " + Bin() + " attach -t '=ws__claude'"
+	want := "env -u TMUX -u TMUX_PANE " + Bin() + " attach -t '=ws__claude:'"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
