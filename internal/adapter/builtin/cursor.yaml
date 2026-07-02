@@ -19,6 +19,10 @@ hooks:
     # beforeShellExecution fires on every command, not only when blocked — would
     # mislabel; heuristic handles cursor's approval prompts, so waiting is unset.
     idle: {event: stop}
+# No statusline block: Cursor CLI has no user-configurable statusline command
+# to feed from (surveyed 2026-07-02). Model/context enrichment would need a
+# provider mechanism first — do not fake one (provider-respecting). Model info
+# currently comes from heuristics.model (footer regex) below.
 # Cursor's footer shows the model display name on its own line right above
 # the `~/dir · branch` line (e.g. `  Composer 2.5 Fast`); the dir line is the
 # anchor that keeps this from matching prose.

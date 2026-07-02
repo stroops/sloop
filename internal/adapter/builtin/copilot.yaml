@@ -16,3 +16,7 @@ hooks:
     working: {event: userPromptSubmitted}
     waiting: {event: notification, matcher: permission_prompt}
     idle: {event: agentStop}
+# No statusline block: GitHub Copilot CLI has no user-configurable statusline
+# command to feed from (surveyed 2026-07-02). Model/context enrichment would
+# need a provider mechanism first — do not fake one (provider-respecting).
+# Note: hooks support progress messages for hook output, not Copilot state.
