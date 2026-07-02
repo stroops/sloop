@@ -13,6 +13,6 @@ hooks:
   docs: https://docs.github.com/en/copilot/reference/hooks-reference
   notes: bash/powershell keys per OS
   events:
-    working: userPromptSubmit
-    waiting: ""
-    idle: sessionEnd
+    working: {event: userPromptSubmitted}
+    waiting: {event: notification, matcher: permission_prompt}
+    idle: {event: agentStop}

@@ -15,9 +15,10 @@ hooks:
   docs: https://cursor.com/docs/hooks
   notes: hooks.json {version,hooks}; no clean "blocked on user" event, so waiting is left to the pane heuristic
   events:
-    working: beforeSubmitPrompt
-    waiting: ""   # beforeShellExecution fires on every command, not only when blocked — would mislabel; heuristic handles cursor's approval prompts
-    idle: stop
+    working: {event: beforeSubmitPrompt}
+    # beforeShellExecution fires on every command, not only when blocked — would
+    # mislabel; heuristic handles cursor's approval prompts, so waiting is unset.
+    idle: {event: stop}
 # Cursor's footer shows the model display name on its own line right above
 # the `~/dir · branch` line (e.g. `  Composer 2.5 Fast`); the dir line is the
 # anchor that keeps this from matching prose.

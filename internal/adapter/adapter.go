@@ -24,12 +24,21 @@ type SkillsSpec struct {
 	Target string `yaml:"target"` // dir to link .sloop/skills into; empty = none
 }
 
-// HookEvents maps each sloop status to the tool's own lifecycle event name.
-// An empty event means the tool has no signal for that state.
+// EventSpec locates one provider event: its name plus an optional matcher
+// discriminating within it (e.g. copilot's notification types). Workflow
+// hooks (v0.2.0) will reuse this type; fields with no consumer yet
+// (cadence, decision) stay out until that build — see docs/design/hooks.md.
+type EventSpec struct {
+	Event   string `yaml:"event"`
+	Matcher string `yaml:"matcher"`
+}
+
+// HookEvents maps each sloop status to the tool's own lifecycle event.
+// A zero EventSpec means the tool has no signal for that state.
 type HookEvents struct {
-	Working string `yaml:"working"` // tool started working
-	Waiting string `yaml:"waiting"` // tool is blocked on the user
-	Idle    string `yaml:"idle"`    // tool finished the turn
+	Working EventSpec `yaml:"working"` // tool started working
+	Waiting EventSpec `yaml:"waiting"` // tool is blocked on the user
+	Idle    EventSpec `yaml:"idle"`    // tool finished the turn
 }
 
 // HooksSpec captures how a tool exposes lifecycle hooks for precise status. It

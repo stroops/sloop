@@ -12,9 +12,9 @@ hooks:
   install: settings-json
   docs: https://geminicli.com/docs/hooks/reference/
   events:
-    working: BeforeAgent
-    waiting: Notification
-    idle: AfterAgent
+    working: {event: BeforeAgent}
+    waiting: {event: Notification}
+    idle: {event: AfterAgent}
 run:
   vendor: google
   default_for: [google]

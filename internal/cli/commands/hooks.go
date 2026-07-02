@@ -30,9 +30,9 @@ func hookCommandFor(state string) string { return appName + " hooks emit " + sta
 // map the installers and printers use, skipping states the tool can't signal.
 func eventCommands(h adapter.HooksSpec) map[string]string {
 	m := map[string]string{}
-	add := func(event, state string) {
-		if event != "" {
-			m[event] = hookCommandFor(state)
+	add := func(e adapter.EventSpec, state string) {
+		if e.Event != "" {
+			m[e.Event] = hookCommandFor(state)
 		}
 	}
 	add(h.Events.Working, "working")
@@ -386,9 +386,9 @@ var hooksPrintCmd = &cobra.Command{
 			return nil
 		}
 		cmd.Printf("# %s hooks → call these from %s\n", tool, m.Hooks.Config)
-		cmd.Printf("  working : on %-22s → run: %s\n", orDash(m.Hooks.Events.Working), hookCommandFor("working"))
-		cmd.Printf("  waiting : on %-22s → run: %s\n", orDash(m.Hooks.Events.Waiting), hookCommandFor("waiting"))
-		cmd.Printf("  idle    : on %-22s → run: %s\n", orDash(m.Hooks.Events.Idle), hookCommandFor("idle"))
+		cmd.Printf("  working : on %-22s → run: %s\n", orDash(m.Hooks.Events.Working.Event), hookCommandFor("working"))
+		cmd.Printf("  waiting : on %-22s → run: %s\n", orDash(m.Hooks.Events.Waiting.Event), hookCommandFor("waiting"))
+		cmd.Printf("  idle    : on %-22s → run: %s\n", orDash(m.Hooks.Events.Idle.Event), hookCommandFor("idle"))
 		if m.Hooks.Notes != "" {
 			cmd.Printf("  note    : %s\n", m.Hooks.Notes)
 		}

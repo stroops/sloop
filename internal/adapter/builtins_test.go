@@ -51,3 +51,18 @@ func TestBuiltinManifests(t *testing.T) {
 		}
 	}
 }
+
+func TestBuiltinEventSpecs(t *testing.T) {
+	ms, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	claude := ms["claude"]
+	if claude.Hooks.Events.Working.Event != "UserPromptSubmit" {
+		t.Fatalf("claude working = %+v", claude.Hooks.Events.Working)
+	}
+	cursor := ms["cursor"]
+	if cursor.Hooks.Events.Waiting.Event != "" {
+		t.Fatalf("cursor waiting should stay unset, got %+v", cursor.Hooks.Events.Waiting)
+	}
+}

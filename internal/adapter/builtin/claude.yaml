@@ -15,9 +15,9 @@ hooks:
   install: settings-json
   docs: https://docs.claude.com/en/docs/claude-code/hooks
   events:
-    working: UserPromptSubmit
-    waiting: Notification
-    idle: Stop
+    working: {event: UserPromptSubmit}
+    waiting: {event: Notification}
+    idle: {event: Stop}
 # Claude pipes a JSON payload to the statusLine command on every render; sloop
 # registers a feed there to learn the model + context usage (chaining to any
 # statusline command the user already had).
