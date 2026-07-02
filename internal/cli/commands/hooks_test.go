@@ -2,8 +2,10 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stroops/sloop/internal/adapter"
@@ -144,10 +146,10 @@ func TestInstallCursorHooks(t *testing.T) {
 }
 
 func TestHookInstallerDispatch(t *testing.T) {
-	if hookInstaller("settings-json") == nil || hookInstaller("cursor-json") == nil || hookInstaller("copilot-json") == nil {
+	if hookInstaller("settings-json") == nil || hookInstaller("cursor-json") == nil || hookInstaller("copilot-json") == nil || hookInstaller("codex-toml") == nil {
 		t.Fatal("known strategies must have an installer")
 	}
-	if hookInstaller("") != nil || hookInstaller("codex-toml") != nil {
+	if hookInstaller("") != nil {
 		t.Fatal("unknown/manual strategies must have no installer")
 	}
 }
@@ -226,4 +228,52 @@ func TestInstallCopilotHooksIdempotent(t *testing.T) {
 	if err != nil || changed {
 		t.Fatalf("second install must be a no-op: changed=%v err=%v", changed, err)
 	}
+}
+
+func TestInstallCodexHooks(t *testing.T) {
+	h := adapter.HooksSpec{}
+	t.Run("empty file gets notify", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		os.WriteFile(path, []byte("model = \"gpt-5.5\"\n\n[profiles.fast]\nmodel = \"gpt-5.5-mini\"\n"), 0o644)
+		changed, err := installCodexHooks(path, h)
+		if err != nil || !changed {
+			t.Fatalf("changed=%v err=%v", changed, err)
+		}
+		b, _ := os.ReadFile(path)
+		s := string(b)
+		if !strings.HasPrefix(s, "notify = [\"sloop\", \"hooks\", \"notify\", \"codex\"]\n") {
+			t.Fatalf("notify not prepended:\n%s", s)
+		}
+		if !strings.Contains(s, "[profiles.fast]") {
+			t.Fatal("existing content lost")
+		}
+		if changed, err := installCodexHooks(path, h); err != nil || changed {
+			t.Fatalf("second run must no-op: changed=%v err=%v", changed, err)
+		}
+	})
+	t.Run("missing file created", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		if changed, err := installCodexHooks(path, h); err != nil || !changed {
+			t.Fatalf("changed=%v err=%v", changed, err)
+		}
+	})
+	t.Run("occupied slot untouched", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		orig := "notify = [\"terminal-notifier\"]\n"
+		os.WriteFile(path, []byte(orig), 0o644)
+		changed, err := installCodexHooks(path, h)
+		if !errors.Is(err, errNotifyOccupied) || changed {
+			t.Fatalf("want errNotifyOccupied, got changed=%v err=%v", changed, err)
+		}
+		if b, _ := os.ReadFile(path); string(b) != orig {
+			t.Fatal("occupied config was modified")
+		}
+	})
+	t.Run("unparseable file untouched", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		os.WriteFile(path, []byte("not = = toml"), 0o644)
+		if _, err := installCodexHooks(path, h); err == nil {
+			t.Fatal("want parse error")
+		}
+	})
 }

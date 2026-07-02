@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -209,6 +210,8 @@ func hookInstaller(strategy string) func(path string, h adapter.HooksSpec) (bool
 		}
 	case "copilot-json":
 		return installCopilotHooks
+	case "codex-toml":
+		return installCodexHooks
 	default:
 		return nil
 	}
@@ -355,6 +358,10 @@ var hooksInstallCmd = &cobra.Command{
 			return err
 		}
 		changed, err := install(path, m.Hooks)
+		if errors.Is(err, errNotifyOccupied) {
+			cmd.Println(codexChainHint(path))
+			return nil
+		}
 		if err != nil {
 			return err
 		}
