@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/stroops/sloop/internal/runner"
 )
 
 func TestTmuxSessionNameSanitizes(t *testing.T) {
@@ -51,17 +49,31 @@ func TestBuildNewDetachedArgs(t *testing.T) {
 	}
 }
 
-func TestBuildTmuxNewArgs(t *testing.T) {
-	args := BuildNewArgs("backend__claude", runner.Spec{Dir: "/tmp/backend", Command: "claude", Args: []string{"--resume"}})
-	want := []string{"new-session", "-A", "-s", "backend__claude", "-c", "/tmp/backend", "claude", "--resume"}
-	if !reflect.DeepEqual(args, want) {
-		t.Fatalf("want %v, got %v", want, args)
+// Exact guards against tmux's prefix matching: with only ws__claude__sec
+// running, a bare `-t ws__claude` resolves to it, so `sloop run claude` would
+// attach/send/kill the profile instance instead of the default session.
+func TestExactTarget(t *testing.T) {
+	if got := Exact("ws__claude"); got != "=ws__claude" {
+		t.Fatalf("Exact = %q, want =ws__claude", got)
+	}
+}
+
+// TestExactPaneTarget guards against a real tmux quirk: commands that resolve
+// a target-pane (set-option, capture-pane, send-keys, split-window,
+// select-layout, display-message) reject a bare "=session" as "no such
+// session"/"can't find pane" — only "=session:" (an explicit, if empty,
+// window/pane suffix) resolves. Exact alone is for target-session-only
+// commands (attach, kill-session, rename-session, has-session, switch-client),
+// which accept the bare form.
+func TestExactPaneTarget(t *testing.T) {
+	if got := ExactPane("ws__claude"); got != "=ws__claude:" {
+		t.Fatalf("ExactPane = %q, want =ws__claude:", got)
 	}
 }
 
 func TestBuildTmuxAttachArgs(t *testing.T) {
 	args := BuildAttachArgs("backend__claude")
-	want := []string{"attach", "-t", "backend__claude"}
+	want := []string{"attach", "-t", "=backend__claude"}
 	if !reflect.DeepEqual(args, want) {
 		t.Fatalf("want %v, got %v", want, args)
 	}
@@ -97,7 +109,7 @@ func TestResolveBin(t *testing.T) {
 
 func TestBuildKillArgs(t *testing.T) {
 	got := BuildKillArgs("web__claude")
-	want := []string{"kill-session", "-t", "web__claude"}
+	want := []string{"kill-session", "-t", "=web__claude"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

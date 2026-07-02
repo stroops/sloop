@@ -12,9 +12,12 @@ hooks:
   install: settings-json
   docs: https://geminicli.com/docs/hooks/reference/
   events:
-    working: BeforeAgent
-    waiting: Notification
-    idle: AfterAgent
+    working: {event: BeforeAgent}
+    waiting: {event: Notification}
+    idle: {event: AfterAgent}
+# No statusline block: Gemini CLI has no user-configurable statusline command
+# to feed from (surveyed 2026-07-02). Model/context enrichment would need a
+# provider mechanism first — do not fake one (provider-respecting).
 run:
   vendor: google
   default_for: [google]

@@ -32,8 +32,7 @@ contribution starts from a clear contract. For the shipped detail of each releas
 - Dogfood `sloop ps` across repos: does the cross-repo view triage "which agent needs me" better than
   single-project tools and raw tmux?
 - **Skills:** lockfile (`.sloop/skills.lock`) + `skills update` for reproducible team skills. *(shipped)*
-- **Hooks (status):** auto-installers per provider: claude, gemini, cursor done; copilot/codex need a
-  matcher-aware model (see the hooks doc).
+- **Hooks (status):** auto-installers per provider: claude, gemini, cursor, copilot, codex done. *(shipped)*
 - **`sloop restore`** _(shipped)_: relaunch the recent agents that aren't currently running, each in a
   detached session, so the whole fleet comes back after a reboot / tmux restart. Picks the most recent
   session per (workspace, tool) from the registry, skips any already live, and with `--resume` passes

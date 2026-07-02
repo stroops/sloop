@@ -198,10 +198,10 @@ func TestStatuslineSetup(t *testing.T) {
 	if out := sloop(t, bin, home, "statusline", sess); !strings.Contains(out, "⚓ "+prefix+"sl claude") {
 		t.Fatalf("statusline output: %q", out)
 	}
-	// setup points the session's status-right back at sloop.
+	// setup points the session's status-right back at sloop's right-side render.
 	sloop(t, bin, home, "statusline", "setup", sess)
 	got, _ := exec.Command("tmux", "show-options", "-t", sess, "status-right").Output()
-	if !strings.Contains(string(got), "statusline "+sess) {
+	if !strings.Contains(string(got), "statusline right "+sess) {
 		t.Fatalf("status-right not set: %q", got)
 	}
 }

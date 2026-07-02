@@ -3,6 +3,67 @@
 All notable changes to Sloop are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v0.1.3 - 2026-07-02
+
+Every builtin AI CLI now reports precise fleet status, the status bar gained
+model/context/rate-limit awareness, and `sloop new` launches an agent without
+stealing your terminal.
+
+### Copilot and Codex auto-install status hooks
+- `sloop hooks install` now wires up **all five** hook-capable tools —
+  claude, gemini, cursor, copilot, and codex — instead of stopping at
+  `print+paste` for the last two.
+- Copilot: sloop owns a dedicated `~/.copilot/hooks/sloop.json` (Copilot
+  loads every `*.json` file in that directory), so install/uninstall never
+  touches a hand-written hook file.
+- Codex: sloop claims its single `notify` slot in `~/.codex/config.toml`
+  only when it's free; if something else already runs there, `hooks install`
+  prints copy-paste chaining instructions instead of overwriting it. A new
+  hidden `sloop hooks notify <tool>` command routes Codex's one-program
+  payload to the same status marker `hooks emit` already writes.
+- The manifest's per-state event mapping (`hooks.events.*`) generalized from
+  a plain string to `{event, matcher}`, so a tool's event can be
+  discriminated by a sub-type (Copilot's `notification` fires for several —
+  only `permission_prompt` means "waiting").
+- Surveyed gemini-cli, Cursor CLI, and Copilot CLI for a native statusline
+  mechanism (separate from hooks): none of the three expose one today, so
+  that gap is now a documented, dated fact in each manifest rather than an
+  open question.
+
+### Status bar: model, context %, rate limit — without repeating a tool's own footer
+- `sloop statusline install <tool>` (offered automatically by `sloop init`)
+  registers a sloop feed on Claude/Antigravity's own statusline mechanism,
+  chaining to any command you already had, and enriches the fleet marker
+  with what the tool reports on every render.
+- The tmux bar and `sloop ps` show model, context-window usage (as a
+  block-character bar), and git branch at a glance — moved to the left
+  side, since tmux truncates the right side first on a narrow terminal.
+- New: 5-hour rate-limit usage, sourced from each provider's own convention
+  — something no custom statusline script commonly surfaces, so it's always
+  shown.
+- Once a tool's own footer already reports model/context/branch (a feed is
+  wired), the tmux bar stops repeating them and narrows to what only sloop
+  knows (status, identity, rate limit); tools with no feed (codex/cursor)
+  keep the full picture.
+- One marker read and one pane capture now serve a whole render (previously
+  up to three round trips); `~/.sloop/state` no longer grows forever —
+  `sloop kill` removes a session's marker immediately, and `sloop ps` prunes
+  stale ones after 24h.
+
+### `sloop new` — launch an agent without attaching
+- `new` is `run` minus the attach: same targets/flags/context sync, but your
+  terminal stays free (`-a` attaches anyway, `-N` forces a fresh instance).
+  `run` and `new` share one launch path so the two commands can't drift.
+- Fixed a tmux target-matching bug: with `ws__claude__sec` running, a bare
+  `-t ws__claude` could silently resolve to it instead of failing, so
+  attach/send/kill risked hitting the wrong agent. Whole-session targets now
+  always match exactly.
+
+### Also
+- Second-account profiles (`config_dir_env`, e.g. `CLAUDE_CONFIG_DIR`) are
+  now respected everywhere a hook or statusline config path is resolved, not
+  just the default account dir.
+
 ## v0.1.2 - 2026-06-30
 
 A home base when you type `sloop` with nothing after it, plus first-class updates.

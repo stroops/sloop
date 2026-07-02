@@ -6,17 +6,17 @@ import (
 )
 
 func TestShellSingleQuote(t *testing.T) {
-	if got := shellSingleQuote("ws__claude"); got != "'ws__claude'" {
+	if got := ShellQuote("ws__claude"); got != "'ws__claude'" {
 		t.Fatalf("plain: got %q", got)
 	}
-	if got := shellSingleQuote("a'b"); got != `'a'\''b'` {
+	if got := ShellQuote("a'b"); got != `'a'\''b'` {
 		t.Fatalf("embedded quote: got %q", got)
 	}
 }
 
 func TestBuildNestedAttachCmd(t *testing.T) {
 	got := BuildNestedAttachCmd("ws__claude")
-	want := "env -u TMUX -u TMUX_PANE " + Bin() + " attach -t 'ws__claude'"
+	want := "env -u TMUX -u TMUX_PANE " + Bin() + " attach -t '=ws__claude'"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}

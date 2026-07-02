@@ -12,6 +12,7 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
+	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/hints"
 	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/session"
@@ -157,11 +158,12 @@ func buildRunArgs(m adapter.Manifest, model, effort, task string, passthrough []
 	return append(args, passthrough...), nil
 }
 
-// RunRun resolves the target + model/effort/task flags, syncs context, then
-// launches the CLI with the right flags in a managed session. env is injected
-// into the launched process (e.g. a second account's CLAUDE_CONFIG_DIR), and
-// instance records which named instance this session is.
-func RunRun(startDir, target, provider, model, effort, task string, passthrough []string, env map[string]string, instance string, r runner.Runner) error {
+// resolveAndLaunch resolves the target + model/effort/task flags against the
+// workspace, syncs context, then launches the CLI in a managed session — the
+// one-shot form (the tests' seam). `run`/`new`/`ls` resolve earlier themselves
+// (the session must be named before a runner is picked) and call
+// launchResolved directly, so nothing is loaded twice.
+func resolveAndLaunch(startDir, target, provider, model, effort, task string, passthrough []string, env map[string]string, instance string, r runner.Runner) error {
 	ws, err := workspace.Resolve(startDir)
 	if err != nil {
 		return err
@@ -178,7 +180,13 @@ func RunRun(startDir, target, provider, model, effort, task string, passthrough 
 	if err != nil {
 		return err
 	}
-	m := manifests[plan.toolKey]
+	return launchResolved(startDir, ws, manifests[plan.toolKey], plan, task, passthrough, env, instance, r)
+}
+
+// launchResolved syncs context and launches an already-resolved plan in ws.
+// env is injected into the launched process (e.g. a second account's
+// CLAUDE_CONFIG_DIR), and instance records which named instance this session is.
+func launchResolved(startDir string, ws *workspace.Workspace, m adapter.Manifest, plan launchPlan, task string, passthrough []string, env map[string]string, instance string, r runner.Runner) error {
 	args, err := buildRunArgs(m, plan.model, plan.effort, task, passthrough)
 	if err != nil {
 		return err
@@ -197,10 +205,17 @@ func RunRun(startDir, target, provider, model, effort, task string, passthrough 
 
 	launchErr := r.Launch(runner.Spec{Dir: ws.Root, Command: m.Launch, Args: args, Env: env})
 
-	if store != nil && sessID > 0 {
+	// A runner that left a detached session running returns as soon as it is
+	// created; the agent is still going, so its history row must stay open.
+	if store != nil && sessID > 0 && !launchIsDetached(r) {
 		_ = store.EndSession(sessID, time.Now())
 	}
 	return launchErr
+}
+
+func launchIsDetached(r runner.Runner) bool {
+	d, ok := r.(runner.Detacher)
+	return ok && d.Detached()
 }
 
 func recordSessionBestEffort(ws *workspace.Workspace, tool, profileName string) (int64, *session.Store) {
@@ -283,17 +298,163 @@ func RunSplit(startDir string, tools []string) error {
 	return tmux.LaunchSplit(session, ws.Root, cmds)
 }
 
+// launchFlags is the flag surface `run` and `new` share; each command binds
+// its own instance via addLaunchFlags so the two can never drift apart.
+type launchFlags struct {
+	workspace string
+	provider  string
+	model     string
+	effort    string
+	task      string
+	name      string
+	env       []string
+	fresh     bool // --new: take the next free instance slot instead of reusing the session
+}
+
 var (
-	runWorkspace string
-	runSplit     bool
-	runProvider  string
-	runModel     string
-	runEffort    string
-	runTask      string
-	runName      string
-	runEnv       []string
-	runNew       bool
+	runFlags launchFlags
+	runSplit bool
 )
+
+// addLaunchFlags registers the shared launch flags (and their completions)
+// on a command, bound to f.
+func addLaunchFlags(c *cobra.Command, f *launchFlags) {
+	c.Flags().StringVarP(&f.workspace, "workspace", "w", "", "target a registered workspace by name")
+	c.Flags().StringVarP(&f.provider, "provider", "p", "", "AI CLI to launch (overrides the positional target)")
+	c.Flags().StringVarP(&f.model, "model", "m", "", "model to pass to the CLI (forwarded as-is, not validated)")
+	c.Flags().StringVarP(&f.effort, "effort", "e", "", "reasoning effort: low|medium|high (if the CLI supports it)")
+	c.Flags().StringVarP(&f.task, "task", "t", "", "hand the agent an initial task; the session starts already working on it")
+	c.Flags().StringVarP(&f.name, "name", "n", "", "name this instance so a second agent of the same tool gets its own session")
+	c.Flags().StringArrayVar(&f.env, "env", nil, "extra env for the launched tool, KEY=VAL (e.g. a second account's CLAUDE_CONFIG_DIR); repeatable")
+	c.Flags().BoolVarP(&f.fresh, "new", "N", false, "start a fresh instance (next free slot) instead of reusing the existing session")
+	c.ValidArgsFunction = completeTools
+	_ = c.RegisterFlagCompletionFunc("workspace", completeWorkspaces)
+	_ = c.RegisterFlagCompletionFunc("provider", completeTools)
+	_ = c.RegisterFlagCompletionFunc("model", completeModels)
+}
+
+// splitDashArgs splits cobra args at `--`: tool/profile targets before it,
+// passthrough for the launched tool after it.
+func splitDashArgs(cmd *cobra.Command, args []string) (positional, passthrough []string) {
+	if d := cmd.ArgsLenAtDash(); d >= 0 {
+		return args[:d], args[d:]
+	}
+	return args, nil
+}
+
+// maxOneTarget rejects more than one tool/profile token before `--`; hint
+// names the command's escape hatch for multiple, if it has one.
+func maxOneTarget(cmd *cobra.Command, args []string, hint string) error {
+	n := len(args)
+	if d := cmd.ArgsLenAtDash(); d >= 0 {
+		n = d // only the args before -- count as tool/profile targets
+	}
+	if n > 1 {
+		return fmt.Errorf("accepts at most 1 tool/profile argument before --%s", hint)
+	}
+	return nil
+}
+
+// launchSettings is launchFlags plus the one thing the commands disagree on:
+// whether the launch attaches.
+type launchSettings struct {
+	launchFlags
+	detached bool // create the session without attaching (`sloop new`)
+}
+
+// executeLaunch is the shared body of `sloop run` and `sloop new`: resolve the
+// target + flags into a tool/session, then launch it attached or detached.
+func executeLaunch(cmd *cobra.Command, positional, passthrough []string, set launchSettings) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	startDir, err := resolveStartDir(cwd, set.workspace)
+	if err != nil {
+		return err
+	}
+	ws, err := workspace.Resolve(startDir)
+	if err != nil {
+		return err
+	}
+	proj, err := config.LoadProject(ws.SloopDir())
+	if err != nil {
+		return err
+	}
+	if set.detached && !tmux.Available() {
+		return fmt.Errorf("sloop new requires tmux (the detached session lives in tmux); plain `sloop run` works without it")
+	}
+	target := ""
+	if len(positional) == 1 {
+		target = positional[0]
+	}
+	// Resolve the plan up front so the session is named by the real tool key
+	// (e.g. `run agent`/`run opus` both land in the canonical cursor/claude
+	// session), not the raw token.
+	manifests, err := adapter.Load()
+	if err != nil {
+		return err
+	}
+	// Interpret @profile / tool@instance and fold in --name/--env, then plan
+	// against the resolved tool token. Profiles live in the global config, only
+	// loaded when the target actually names one.
+	var profiles map[string]config.Profile
+	if strings.Contains(target, "@") {
+		glob, err := config.LoadGlobal()
+		if err != nil {
+			return err
+		}
+		profiles = glob.Profiles
+	}
+	res, err := resolveInstance(target, set.name, set.env, profiles, manifests)
+	if err != nil {
+		return err
+	}
+	// When running via a profile, confirm which tool + env are active so the
+	// user can verify the right account/config is being used.
+	if strings.HasPrefix(target, "@") && len(res.env) > 0 {
+		envKeys := make([]string, 0, len(res.env))
+		for k := range res.env {
+			envKeys = append(envKeys, k)
+		}
+		sort.Strings(envKeys)
+		cmd.Printf("profile %q: %s  env: %s\n", res.instance, res.target, strings.Join(envKeys, ", "))
+	}
+	plan, err := planLaunch(res.target, set.provider, set.model, set.effort, proj.DefaultTool, manifests)
+	if err != nil {
+		return err
+	}
+	// --new spins a fresh instance (next free slot) instead of re-attaching;
+	// it's a no-op once a name/instance already makes the session distinct.
+	if set.fresh && res.instance == "" {
+		res.instance = nextFreeInstance(ws.Name, plan.toolKey, tmux.ParseSessions(tmuxList()))
+	}
+	sessName := tmux.InstanceName(ws.Name, plan.toolKey, res.instance)
+	// `new` without --new is "ensure this session exists, stay outside": when
+	// it's already running there is nothing to create or sync (--new always
+	// lands on a free slot, so the check would be a wasted subprocess).
+	if set.detached && !set.fresh && tmux.HasSession(sessName) {
+		cmd.Println(tmux.AlreadyRunningMsg(sessName))
+		return nil
+	}
+	// Record the requested model so the status bar can show it even for
+	// tools with no statusline feed; a feed later overwrites it with the
+	// provider's own display name. Best-effort, never blocks the launch.
+	if plan.model != "" {
+		_ = fleetstate.WriteInfo(sessName, plan.model, 0)
+	}
+	var r runner.Runner
+	if set.detached {
+		r = &tmux.DetachedRunner{Session: sessName, Out: cmd.OutOrStdout()}
+	} else {
+		r = selectRunnerInstance(ws.Name, plan.toolKey, res.instance)
+	}
+	if err := launchResolved(startDir, ws, manifests[plan.toolKey], plan, set.task, passthrough, res.env, res.instance, r); err != nil {
+		return err
+	}
+	hints.Show(cmd.OutOrStdout(), "run")
+	return nil
+}
 
 var runCmd = &cobra.Command{
 	Use:     "run [tool | @profile | tool@instance] [-- <args>]",
@@ -312,40 +473,32 @@ account with a saved profile:
 Profiles live in ~/.sloop/config.yaml; manage them with ` + "`sloop profile`" + `.
 Use --env KEY=VAL for a one-off account/env without saving a profile.`,
 	Args: func(cmd *cobra.Command, args []string) error {
-		n := len(args)
-		if d := cmd.ArgsLenAtDash(); d >= 0 {
-			n = d // only the args before -- count as tool/profile targets
+		if runSplit {
+			return nil // each positional is one pane
 		}
-		if !runSplit && n > 1 {
-			return fmt.Errorf("accepts at most 1 tool/profile argument before -- (use --split for multiple)")
-		}
-		return nil
+		return maxOneTarget(cmd, args, " (use --split for multiple)")
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		startDir, err := resolveStartDir(cwd, runWorkspace)
-		if err != nil {
-			return err
-		}
-		// Split "<tool> -- <args>": everything after -- is passed through to the tool.
-		positional, passthrough := args, []string(nil)
-		if d := cmd.ArgsLenAtDash(); d >= 0 {
-			positional, passthrough = args[:d], args[d:]
-		}
-		ws, err := workspace.Resolve(startDir)
-		if err != nil {
-			return err
-		}
-		proj, err := config.LoadProject(ws.SloopDir())
-		if err != nil {
-			return err
-		}
+		positional, passthrough := splitDashArgs(cmd, args)
 		if runSplit {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			startDir, err := resolveStartDir(cwd, runFlags.workspace)
+			if err != nil {
+				return err
+			}
 			tools := positional
 			if len(tools) == 0 {
+				ws, err := workspace.Resolve(startDir)
+				if err != nil {
+					return err
+				}
+				proj, err := config.LoadProject(ws.SloopDir())
+				if err != nil {
+					return err
+				}
 				tools = []string{proj.DefaultTool}
 			}
 			if err := RunSplit(startDir, tools); err != nil {
@@ -354,68 +507,12 @@ Use --env KEY=VAL for a one-off account/env without saving a profile.`,
 			hints.Show(cmd.OutOrStdout(), "run")
 			return nil
 		}
-		target := ""
-		if len(positional) == 1 {
-			target = positional[0]
-		}
-		// Resolve the plan up front so the session is named by the real tool key
-		// (e.g. `run agent`/`run opus` both land in the canonical cursor/claude
-		// session), not the raw token.
-		manifests, err := adapter.Load()
-		if err != nil {
-			return err
-		}
-		// Interpret @profile / tool@instance and fold in --name/--env, then plan
-		// against the resolved tool token.
-		glob, err := config.LoadGlobal()
-		if err != nil {
-			return err
-		}
-		res, err := resolveInstance(target, runName, runEnv, glob.Profiles, manifests)
-		if err != nil {
-			return err
-		}
-		// When running via a profile, confirm which tool + env are active so the
-		// user can verify the right account/config is being used.
-		if strings.HasPrefix(target, "@") && len(res.env) > 0 {
-			envKeys := make([]string, 0, len(res.env))
-			for k := range res.env {
-				envKeys = append(envKeys, k)
-			}
-			sort.Strings(envKeys)
-			cmd.Printf("profile %q: %s  env: %s\n", res.instance, res.target, strings.Join(envKeys, ", "))
-		}
-		plan, err := planLaunch(res.target, runProvider, runModel, runEffort, proj.DefaultTool, manifests)
-		if err != nil {
-			return err
-		}
-		// --new spins a fresh instance (next free slot) instead of re-attaching;
-		// it's a no-op once a name/instance already makes the session distinct.
-		if runNew && res.instance == "" {
-			res.instance = nextFreeInstance(ws.Name, plan.toolKey, tmux.ParseSessions(tmuxList()))
-		}
-		r := selectRunnerInstance(ws.Name, plan.toolKey, res.instance)
-		if err := RunRun(startDir, res.target, runProvider, runModel, runEffort, runTask, passthrough, res.env, res.instance, r); err != nil {
-			return err
-		}
-		hints.Show(cmd.OutOrStdout(), "run")
-		return nil
+		return executeLaunch(cmd, positional, passthrough, launchSettings{launchFlags: runFlags})
 	},
 }
 
 func RegisterRun(cmd *cobra.Command) {
-	runCmd.Flags().StringVarP(&runWorkspace, "workspace", "w", "", "target a registered workspace by name")
+	addLaunchFlags(runCmd, &runFlags)
 	runCmd.Flags().BoolVar(&runSplit, "split", false, "launch multiple tools side-by-side as tmux panes")
-	runCmd.Flags().StringVarP(&runProvider, "provider", "p", "", "AI CLI to launch (overrides the positional target)")
-	runCmd.Flags().StringVarP(&runModel, "model", "m", "", "model to pass to the CLI (forwarded as-is, not validated)")
-	runCmd.Flags().StringVarP(&runEffort, "effort", "e", "", "reasoning effort: low|medium|high (if the CLI supports it)")
-	runCmd.Flags().StringVarP(&runTask, "task", "t", "", "hand the agent an initial task; launches an interactive session already working on it")
-	runCmd.Flags().StringVarP(&runName, "name", "n", "", "name this instance so a second agent of the same tool gets its own session")
-	runCmd.Flags().StringArrayVar(&runEnv, "env", nil, "extra env for the launched tool, KEY=VAL (e.g. a second account's CLAUDE_CONFIG_DIR); repeatable")
-	runCmd.Flags().BoolVarP(&runNew, "new", "N", false, "start a fresh instance (next free slot) instead of re-attaching the existing session")
-	runCmd.ValidArgsFunction = completeTools
-	_ = runCmd.RegisterFlagCompletionFunc("workspace", completeWorkspaces)
-	_ = runCmd.RegisterFlagCompletionFunc("provider", completeTools)
-	_ = runCmd.RegisterFlagCompletionFunc("model", completeModels)
 	cmd.AddCommand(runCmd)
 }

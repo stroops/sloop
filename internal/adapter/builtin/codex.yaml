@@ -11,13 +11,17 @@ scaffold:
   - .codex/skills
 hooks:
   config: ~/.codex/config.toml
-  install: ""
+  install: codex-toml
   docs: https://developers.openai.com/codex/config-advanced
-  notes: one notify program for all events; external notify reliably fires turn-complete (idle)
+  notes: one notify program for all events; only agent-turn-complete fires today, so hooks give idle and the pane heuristic keeps covering waiting/working
   events:
-    working: ""
-    waiting: approval-requested
-    idle: agent-turn-complete
+    waiting: {event: approval-requested}
+    idle: {event: agent-turn-complete}
+# Codex's live footer reads `  gpt-5.5 medium · ~/dir` (model, optional
+# reasoning effort, then the cwd) and updates on /model, unlike the intro
+# header. Capture the model token off that footer.
+heuristics:
+  model: '(?m)^ {2}(\S+)(?: (?:minimal|low|medium|high|xhigh))? · [~/]'
 run:
   vendor: openai
   default_for: [openai]

@@ -28,8 +28,8 @@ func TestBuiltinManifests(t *testing.T) {
 		"claude":  {"claude", "pointer", ".claude/skills", "settings-json"},
 		"gemini":  {"gemini", "pointer", "", "settings-json"},
 		"cursor":  {"agent", "native", "", "cursor-json"},
-		"codex":   {"codex", "native", "", ""},
-		"copilot": {"copilot", "native", "", ""},
+		"codex":   {"codex", "native", "", "codex-toml"},
+		"copilot": {"copilot", "native", "", "copilot-json"},
 		"agy":     {"agy", "native", "", ""},
 	}
 	for key, exp := range want {
@@ -49,5 +49,24 @@ func TestBuiltinManifests(t *testing.T) {
 		if got.Hooks.Install != exp.install {
 			t.Errorf("%s hooks install = %q, want %q", key, got.Hooks.Install, exp.install)
 		}
+	}
+}
+
+func TestBuiltinEventSpecs(t *testing.T) {
+	ms, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	claude := ms["claude"]
+	if claude.Hooks.Events.Working.Event != "UserPromptSubmit" {
+		t.Fatalf("claude working = %+v", claude.Hooks.Events.Working)
+	}
+	cursor := ms["cursor"]
+	if cursor.Hooks.Events.Waiting.Event != "" {
+		t.Fatalf("cursor waiting should stay unset, got %+v", cursor.Hooks.Events.Waiting)
+	}
+	copilot := ms["copilot"]
+	if copilot.Hooks.Install != "copilot-json" || copilot.Hooks.Events.Waiting.Matcher != "permission_prompt" {
+		t.Fatalf("copilot hooks = %+v", copilot.Hooks)
 	}
 }

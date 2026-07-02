@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,9 +32,9 @@ func hookCommandFor(state string) string { return appName + " hooks emit " + sta
 // map the installers and printers use, skipping states the tool can't signal.
 func eventCommands(h adapter.HooksSpec) map[string]string {
 	m := map[string]string{}
-	add := func(event, state string) {
-		if event != "" {
-			m[event] = hookCommandFor(state)
+	add := func(e adapter.EventSpec, state string) {
+		if e.Event != "" {
+			m[e.Event] = hookCommandFor(state)
 		}
 	}
 	add(h.Events.Working, "working")
@@ -97,20 +99,28 @@ func hasCommandHook(eventVal any, cmd string) bool {
 	return false
 }
 
-// installSettingsHooks merges events into the JSON settings file at path,
-// creating it if needed. Returns whether the file changed.
-func installSettingsHooks(path string, events map[string]string) (bool, error) {
+// ensureParentDir creates path's parent directory, for installers writing a
+// config file that may not exist yet.
+func ensureParentDir(path string) error {
+	return os.MkdirAll(filepath.Dir(path), 0o755)
+}
+
+// updateJSONFile reads the JSON object at path (an empty object when the file
+// is missing), lets mutate rewrite it, and writes the result back only when
+// mutate reports a change. Every install strategy (hooks and statusline
+// alike) shares this read→mutate→write skeleton, so it's expressed once here.
+func updateJSONFile(path string, mutate func(doc map[string]any) (map[string]any, bool)) (bool, error) {
 	doc := map[string]any{}
 	if b, err := os.ReadFile(path); err == nil {
 		if err := json.Unmarshal(b, &doc); err != nil {
 			return false, fmt.Errorf("%s is not valid JSON: %w", path, err)
 		}
 	}
-	merged, changed := mergeSettingsHooks(doc, events)
+	merged, changed := mutate(doc)
 	if !changed {
 		return false, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := ensureParentDir(path); err != nil {
 		return false, err
 	}
 	out, err := json.MarshalIndent(merged, "", "  ")
@@ -118,6 +128,22 @@ func installSettingsHooks(path string, events map[string]string) (bool, error) {
 		return false, err
 	}
 	return true, os.WriteFile(path, append(out, '\n'), 0o644)
+}
+
+// jsonEqual compares two JSON documents structurally (both re-marshaled, so
+// map ordering doesn't matter).
+func jsonEqual(a, b map[string]any) bool {
+	ab, err1 := json.Marshal(a)
+	bb, err2 := json.Marshal(b)
+	return err1 == nil && err2 == nil && bytes.Equal(ab, bb)
+}
+
+// installSettingsHooks merges events into the JSON settings file at path,
+// creating it if needed. Returns whether the file changed.
+func installSettingsHooks(path string, events map[string]string) (bool, error) {
+	return updateJSONFile(path, func(doc map[string]any) (map[string]any, bool) {
+		return mergeSettingsHooks(doc, events)
+	})
 }
 
 // mergeCursorHooks adds event→command hooks to a .cursor/hooks.json document.
@@ -171,34 +197,27 @@ func hasCursorCommand(eventVal any, cmd string) bool {
 // installCursorHooks merges events into the .cursor/hooks.json file at path,
 // creating it if needed. Returns whether the file changed.
 func installCursorHooks(path string, events map[string]string) (bool, error) {
-	doc := map[string]any{}
-	if b, err := os.ReadFile(path); err == nil {
-		if err := json.Unmarshal(b, &doc); err != nil {
-			return false, fmt.Errorf("%s is not valid JSON: %w", path, err)
-		}
-	}
-	merged, changed := mergeCursorHooks(doc, events)
-	if !changed {
-		return false, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return false, err
-	}
-	out, err := json.MarshalIndent(merged, "", "  ")
-	if err != nil {
-		return false, err
-	}
-	return true, os.WriteFile(path, append(out, '\n'), 0o644)
+	return updateJSONFile(path, func(doc map[string]any) (map[string]any, bool) {
+		return mergeCursorHooks(doc, events)
+	})
 }
 
 // hookInstaller returns the writer for a manifest's install strategy, or nil if
 // the strategy has no safe auto-writer yet (then `hooks print` shows the wiring).
-func hookInstaller(strategy string) func(path string, events map[string]string) (bool, error) {
+func hookInstaller(strategy string) func(path string, h adapter.HooksSpec) (bool, error) {
 	switch strategy {
 	case "settings-json":
-		return installSettingsHooks
+		return func(path string, h adapter.HooksSpec) (bool, error) {
+			return installSettingsHooks(path, eventCommands(h))
+		}
 	case "cursor-json":
-		return installCursorHooks
+		return func(path string, h adapter.HooksSpec) (bool, error) {
+			return installCursorHooks(path, eventCommands(h))
+		}
+	case "copilot-json":
+		return installCopilotHooks
+	case "codex-toml":
+		return installCodexHooks
 	default:
 		return nil
 	}
@@ -208,16 +227,34 @@ func hookInstaller(strategy string) func(path string, events map[string]string) 
 // its config file (read-only; reuses the same idempotency check as install).
 // Only meaningful for auto-install strategies; false when the config is absent.
 func hooksInstalledFor(root string, m adapter.Manifest) bool {
-	events := eventCommands(m.Hooks)
-	if len(events) == 0 {
-		return false
-	}
-	path, err := resolveHookConfigPath(root, m.Hooks.Config)
+	path, err := resolveHookConfigPath(root, m.Account, m.Hooks.Config)
 	if err != nil {
 		return false
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
+		return false
+	}
+	switch m.Hooks.Install {
+	case "copilot-json":
+		var doc map[string]any
+		return json.Unmarshal(b, &doc) == nil && jsonEqual(doc, copilotHooksDoc(m.Hooks))
+	case "codex-toml":
+		return codexNotifyInstalled(b)
+	case "settings-json":
+		return allEventsInstalled(b, m.Hooks, hasCommandHook)
+	case "cursor-json":
+		return allEventsInstalled(b, m.Hooks, hasCursorCommand)
+	}
+	return false
+}
+
+// allEventsInstalled reports whether every event a manifest can signal
+// already has sloop's command hook present, per the given group-matching
+// check (hasCommandHook for settings-json, hasCursorCommand for cursor-json).
+func allEventsInstalled(b []byte, h adapter.HooksSpec, has func(eventVal any, cmd string) bool) bool {
+	events := eventCommands(h)
+	if len(events) == 0 {
 		return false
 	}
 	var doc map[string]any
@@ -226,16 +263,7 @@ func hooksInstalledFor(root string, m adapter.Manifest) bool {
 	}
 	hooks, _ := doc["hooks"].(map[string]any)
 	for ev, cmd := range events {
-		switch m.Hooks.Install {
-		case "settings-json":
-			if !hasCommandHook(hooks[ev], cmd) {
-				return false
-			}
-		case "cursor-json":
-			if !hasCursorCommand(hooks[ev], cmd) {
-				return false
-			}
-		default:
+		if !has(hooks[ev], cmd) {
 			return false
 		}
 	}
@@ -244,8 +272,18 @@ func hooksInstalledFor(root string, m adapter.Manifest) bool {
 
 // resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
 // expands to the home dir, absolute paths pass through, and a repo-relative path
-// is joined to the workspace root.
-func resolveHookConfigPath(root, cfg string) (string, error) {
+// is joined to the workspace root. When the tool declares account.config_dir_env
+// and it's set in the environment (a second-account profile is active), the
+// config's default_dir prefix (e.g. ~/.claude) is swapped for that account's
+// dir, so install targets the active account's config file, not the default one.
+func resolveHookConfigPath(root string, acct adapter.AccountSpec, cfg string) (string, error) {
+	if acct.ConfigDirEnv != "" && acct.DefaultDir != "" {
+		if dir := os.Getenv(acct.ConfigDirEnv); dir != "" {
+			if rest, ok := strings.CutPrefix(cfg, acct.DefaultDir); ok {
+				return filepath.Join(expandEnvValue(dir), rest), nil
+			}
+		}
+	}
 	if strings.HasPrefix(cfg, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -330,11 +368,15 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		path, err := resolveHookConfigPath(ws.Root, m.Hooks.Config)
+		path, err := resolveHookConfigPath(ws.Root, m.Account, m.Hooks.Config)
 		if err != nil {
 			return err
 		}
-		changed, err := install(path, eventCommands(m.Hooks))
+		changed, err := install(path, m.Hooks)
+		if errors.Is(err, errNotifyOccupied) {
+			cmd.Println(codexChainHint(path))
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -363,6 +405,18 @@ var hooksPrintCmd = &cobra.Command{
 			return err
 		}
 		switch m.Hooks.Install {
+		case "copilot-json":
+			out, err := json.MarshalIndent(copilotHooksDoc(m.Hooks), "", "  ")
+			if err != nil {
+				return err
+			}
+			cmd.Printf("# %s · sloop owns this whole file: %s\n%s\n", tool, m.Hooks.Config, string(out))
+			return nil
+		case "codex-toml":
+			cmd.Printf("# %s · add to %s (top-level, before any [table]):\n", tool, m.Hooks.Config)
+			cmd.Printf("notify = [\"%s\"]\n", strings.Join(notifyCommand("codex"), "\", \""))
+			cmd.Printf("# if notify is already set, chain instead:\n%s\n", codexChainHint(m.Hooks.Config))
+			return nil
 		case "settings-json":
 			doc, _ := mergeSettingsHooks(nil, eventCommands(m.Hooks))
 			out, err := json.MarshalIndent(doc, "", "  ")
@@ -381,9 +435,9 @@ var hooksPrintCmd = &cobra.Command{
 			return nil
 		}
 		cmd.Printf("# %s hooks → call these from %s\n", tool, m.Hooks.Config)
-		cmd.Printf("  working : on %-22s → run: %s\n", orDash(m.Hooks.Events.Working), hookCommandFor("working"))
-		cmd.Printf("  waiting : on %-22s → run: %s\n", orDash(m.Hooks.Events.Waiting), hookCommandFor("waiting"))
-		cmd.Printf("  idle    : on %-22s → run: %s\n", orDash(m.Hooks.Events.Idle), hookCommandFor("idle"))
+		cmd.Printf("  working : on %-22s → run: %s\n", orDash(m.Hooks.Events.Working.Event), hookCommandFor("working"))
+		cmd.Printf("  waiting : on %-22s → run: %s\n", orDash(m.Hooks.Events.Waiting.Event), hookCommandFor("waiting"))
+		cmd.Printf("  idle    : on %-22s → run: %s\n", orDash(m.Hooks.Events.Idle.Event), hookCommandFor("idle"))
 		if m.Hooks.Notes != "" {
 			cmd.Printf("  note    : %s\n", m.Hooks.Notes)
 		}
@@ -428,5 +482,6 @@ func RegisterHooks(cmd *cobra.Command) {
 	hooksCmd.AddCommand(hooksPrintCmd)
 	hooksCmd.AddCommand(hooksListCmd)
 	hooksCmd.AddCommand(hooksEmitCmd)
+	hooksCmd.AddCommand(hooksNotifyCmd)
 	cmd.AddCommand(hooksCmd)
 }

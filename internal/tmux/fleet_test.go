@@ -24,7 +24,7 @@ func TestParseSessionsSkipsMalformed(t *testing.T) {
 
 func TestBuildTmuxSwitchArgs(t *testing.T) {
 	got := BuildSwitchArgs("ws__claude")
-	if len(got) != 3 || got[0] != "switch-client" || got[2] != "ws__claude" {
+	if len(got) != 3 || got[0] != "switch-client" || got[2] != "=ws__claude" {
 		t.Fatalf("got %v", got)
 	}
 }
