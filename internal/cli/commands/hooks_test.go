@@ -296,3 +296,28 @@ func TestNotifyStateFor(t *testing.T) {
 		}
 	}
 }
+
+func TestHooksInstalledForNewStrategies(t *testing.T) {
+	ms, err := adapter.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, tool := range []string{"copilot", "codex"} {
+		m := ms[tool]
+		if hooksInstalledFor(home, m) {
+			t.Fatalf("%s: reported installed before install", tool)
+		}
+		path, err := resolveHookConfigPath(home, m.Account, m.Hooks.Config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := hookInstaller(m.Hooks.Install)(path, m.Hooks); err != nil {
+			t.Fatal(err)
+		}
+		if !hooksInstalledFor(home, m) {
+			t.Fatalf("%s: not detected after install", tool)
+		}
+	}
+}

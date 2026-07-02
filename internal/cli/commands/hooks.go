@@ -221,10 +221,6 @@ func hookInstaller(strategy string) func(path string, h adapter.HooksSpec) (bool
 // its config file (read-only; reuses the same idempotency check as install).
 // Only meaningful for auto-install strategies; false when the config is absent.
 func hooksInstalledFor(root string, m adapter.Manifest) bool {
-	events := eventCommands(m.Hooks)
-	if len(events) == 0 {
-		return false
-	}
 	path, err := resolveHookConfigPath(root, m.Account, m.Hooks.Config)
 	if err != nil {
 		return false
@@ -233,26 +229,33 @@ func hooksInstalledFor(root string, m adapter.Manifest) bool {
 	if err != nil {
 		return false
 	}
-	var doc map[string]any
-	if json.Unmarshal(b, &doc) != nil {
-		return false
-	}
-	hooks, _ := doc["hooks"].(map[string]any)
-	for ev, cmd := range events {
-		switch m.Hooks.Install {
-		case "settings-json":
-			if !hasCommandHook(hooks[ev], cmd) {
-				return false
-			}
-		case "cursor-json":
-			if !hasCursorCommand(hooks[ev], cmd) {
-				return false
-			}
-		default:
+	switch m.Hooks.Install {
+	case "copilot-json":
+		var doc map[string]any
+		return json.Unmarshal(b, &doc) == nil && jsonEqual(doc, copilotHooksDoc(m.Hooks))
+	case "codex-toml":
+		return codexNotifyInstalled(b)
+	case "settings-json", "cursor-json":
+		events := eventCommands(m.Hooks)
+		if len(events) == 0 {
 			return false
 		}
+		var doc map[string]any
+		if json.Unmarshal(b, &doc) != nil {
+			return false
+		}
+		hooks, _ := doc["hooks"].(map[string]any)
+		for ev, cmd := range events {
+			if m.Hooks.Install == "settings-json" && !hasCommandHook(hooks[ev], cmd) {
+				return false
+			}
+			if m.Hooks.Install == "cursor-json" && !hasCursorCommand(hooks[ev], cmd) {
+				return false
+			}
+		}
+		return true
 	}
-	return true
+	return false
 }
 
 // resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
@@ -390,6 +393,18 @@ var hooksPrintCmd = &cobra.Command{
 			return err
 		}
 		switch m.Hooks.Install {
+		case "copilot-json":
+			out, err := json.MarshalIndent(copilotHooksDoc(m.Hooks), "", "  ")
+			if err != nil {
+				return err
+			}
+			cmd.Printf("# %s · sloop owns this whole file: %s\n%s\n", tool, m.Hooks.Config, string(out))
+			return nil
+		case "codex-toml":
+			cmd.Printf("# %s · add to %s (top-level, before any [table]):\n", tool, m.Hooks.Config)
+			cmd.Printf("notify = [\"%s\"]\n", strings.Join(notifyCommand("codex"), "\", \""))
+			cmd.Printf("# if notify is already set, chain instead:\n%s\n", codexChainHint(m.Hooks.Config))
+			return nil
 		case "settings-json":
 			doc, _ := mergeSettingsHooks(nil, eventCommands(m.Hooks))
 			out, err := json.MarshalIndent(doc, "", "  ")

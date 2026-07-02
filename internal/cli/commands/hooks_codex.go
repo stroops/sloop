@@ -93,3 +93,14 @@ func codexChainHint(path string) string {
 		"  exec <your current notify program> \"$1\"",
 	}, "\n")
 }
+
+// codexNotifyInstalled reports whether the given TOML bytes contain sloop's
+// notify command. Used by hooksInstalledFor to keep TOML parsing in this file.
+func codexNotifyInstalled(b []byte) bool {
+	var doc map[string]any
+	if toml.Unmarshal(b, &doc) != nil {
+		return false
+	}
+	cmd, ok := doc["notify"].([]any)
+	return ok && notifyEqual(cmd, notifyCommand("codex"))
+}
