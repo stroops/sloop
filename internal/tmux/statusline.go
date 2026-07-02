@@ -43,7 +43,7 @@ func SetStatusLine(session string) {
 		exe = "sloop"
 	}
 	set := func(opt, val string) {
-		_ = Run("set-option", "-t", session, opt, val)
+		_ = Run("set-option", "-t", Exact(session), opt, val)
 	}
 	// A quiet dark bar instead of tmux's default green: colour234 (near-black)
 	// with dim grey text, so the colored status glyphs are what draws the eye.

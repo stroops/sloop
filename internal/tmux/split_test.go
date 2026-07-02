@@ -15,7 +15,7 @@ func TestBuildTmuxSplitNew(t *testing.T) {
 
 func TestBuildTmuxSplitAdd(t *testing.T) {
 	got := strings.Join(BuildSplitAdd("ws__claude_cursor", "/repo", "cursor"), " ")
-	want := "split-window -t ws__claude_cursor -c /repo cursor"
+	want := "split-window -t =ws__claude_cursor -c /repo cursor"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
@@ -23,7 +23,7 @@ func TestBuildTmuxSplitAdd(t *testing.T) {
 
 func TestBuildTmuxTiledLayout(t *testing.T) {
 	got := strings.Join(BuildTiledLayout("ws__x"), " ")
-	if got != "select-layout -t ws__x tiled" {
+	if got != "select-layout -t =ws__x tiled" {
 		t.Fatalf("got %q", got)
 	}
 }

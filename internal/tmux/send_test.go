@@ -7,7 +7,7 @@ import (
 
 func TestBuildTmuxSendTextArgs(t *testing.T) {
 	got := BuildSendTextArgs("web__claude", "run the tests")
-	want := []string{"send-keys", "-t", "web__claude", "-l", "--", "run the tests"}
+	want := []string{"send-keys", "-t", "=web__claude", "-l", "--", "run the tests"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -20,7 +20,7 @@ func TestBuildTmuxSendTextArgs(t *testing.T) {
 
 func TestBuildTmuxSendEnterArgs(t *testing.T) {
 	got := BuildSendEnterArgs("web__claude")
-	want := []string{"send-keys", "-t", "web__claude", "Enter"}
+	want := []string{"send-keys", "-t", "=web__claude", "Enter"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

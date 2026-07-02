@@ -12,15 +12,16 @@ func BuildSplitNew(session, dir, cmd string) []string {
 }
 
 func BuildSplitAdd(session, dir, cmd string) []string {
-	return []string{"split-window", "-t", session, "-c", dir, cmd}
+	return []string{"split-window", "-t", Exact(session), "-c", dir, cmd}
 }
 
 func BuildTiledLayout(session string) []string {
-	return []string{"select-layout", "-t", session, "tiled"}
+	return []string{"select-layout", "-t", Exact(session), "tiled"}
 }
 
-func hasSession(session string) bool {
-	return Run("has-session", "-t", session) == nil
+// HasSession reports whether a session with exactly this name is running.
+func HasSession(session string) bool {
+	return Run("has-session", "-t", Exact(session)) == nil
 }
 
 // LaunchSplit creates (idempotently) a tmux session with one pane per command,
@@ -30,7 +31,7 @@ func LaunchSplit(session, dir string, cmds []string) error {
 	if len(cmds) == 0 {
 		return nil
 	}
-	if !hasSession(session) {
+	if !HasSession(session) {
 		if err := Run(BuildSplitNew(session, dir, cmds[0])...); err != nil {
 			return err
 		}

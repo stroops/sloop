@@ -12,7 +12,7 @@ type fakeRunner struct{ got runner.Spec }
 
 func (f *fakeRunner) Launch(s runner.Spec) error { f.got = s; return nil }
 
-func TestRunRunSyncsAndLaunches(t *testing.T) {
+func TestResolveAndLaunchSyncsAndLaunches(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	// Two tools → canonical workspace, so the CLAUDE.md pointer is delivered.
@@ -21,8 +21,8 @@ func TestRunRunSyncsAndLaunches(t *testing.T) {
 	}
 
 	fr := &fakeRunner{}
-	if err := RunRun(dir, "claude", "", "", "", "", nil, nil, "", fr); err != nil {
-		t.Fatalf("RunRun: %v", err)
+	if err := resolveAndLaunch(dir, "claude", "", "", "", "", nil, nil, "", fr); err != nil {
+		t.Fatalf("resolveAndLaunch: %v", err)
 	}
 
 	// Launched claude at the workspace root.
@@ -40,7 +40,7 @@ func TestRunRunSyncsAndLaunches(t *testing.T) {
 	}
 }
 
-func TestRunRunPassesThroughArgs(t *testing.T) {
+func TestResolveAndLaunchPassesThroughArgs(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	if _, err := RunInit(dir, nil, false); err != nil {
@@ -48,15 +48,15 @@ func TestRunRunPassesThroughArgs(t *testing.T) {
 	}
 
 	fr := &fakeRunner{}
-	if err := RunRun(dir, "claude", "", "", "", "", []string{"--foo", "bar"}, nil, "", fr); err != nil {
-		t.Fatalf("RunRun: %v", err)
+	if err := resolveAndLaunch(dir, "claude", "", "", "", "", []string{"--foo", "bar"}, nil, "", fr); err != nil {
+		t.Fatalf("resolveAndLaunch: %v", err)
 	}
 	if len(fr.got.Args) != 2 || fr.got.Args[0] != "--foo" || fr.got.Args[1] != "bar" {
 		t.Fatalf("want passthrough args [--foo bar], got %v", fr.got.Args)
 	}
 }
 
-func TestRunRunInjectsEnv(t *testing.T) {
+func TestResolveAndLaunchInjectsEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	if _, err := RunInit(dir, nil, false); err != nil {
@@ -64,8 +64,8 @@ func TestRunRunInjectsEnv(t *testing.T) {
 	}
 	fr := &fakeRunner{}
 	env := map[string]string{"CLAUDE_CONFIG_DIR": "/x"}
-	if err := RunRun(dir, "claude", "", "", "", "", nil, env, "sec", fr); err != nil {
-		t.Fatalf("RunRun: %v", err)
+	if err := resolveAndLaunch(dir, "claude", "", "", "", "", nil, env, "sec", fr); err != nil {
+		t.Fatalf("resolveAndLaunch: %v", err)
 	}
 	if fr.got.Env["CLAUDE_CONFIG_DIR"] != "/x" {
 		t.Fatalf("env not passed to Spec: %v", fr.got.Env)

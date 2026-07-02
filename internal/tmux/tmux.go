@@ -3,6 +3,7 @@ package tmux
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -85,6 +86,14 @@ func SessionName(workspace, tool string) string {
 	return sanitize(workspace) + "__" + sanitize(tool)
 }
 
+// Exact turns a session name into an exact-match tmux target ("=name"). A bare
+// `-t name` falls back to prefix matching when no session has that exact name,
+// so with only ws__claude__sec running, `-t ws__claude` silently resolves to it
+// (wrong attach/send/kill). Every `-t` that means one whole session by name
+// must go through this. psmux strips a leading "=" and always matches session
+// names exactly (parse_target in its cli.rs), so the prefix is safe there too.
+func Exact(session string) string { return "=" + session }
+
 // InstanceName is SessionName plus an optional instance suffix; instance=="" is
 // the default session (byte-identical to SessionName), so a second agent of the
 // same provider in one workspace gets a distinct `ws__tool__instance` name.
@@ -165,19 +174,12 @@ func sanitize(s string) string {
 	return b.String()
 }
 
-// BuildNewArgs builds `tmux new-session -A -s <session> -c <dir> <command> <args...>`.
-// -A attaches if the session already exists, otherwise creates it.
-func BuildNewArgs(session string, s runner.Spec) []string {
-	args := []string{"new-session", "-A", "-s", session, "-c", s.Dir, s.Command}
-	return append(args, s.Args...)
-}
-
 func BuildAttachArgs(session string) []string {
-	return []string{"attach", "-t", session}
+	return []string{"attach", "-t", Exact(session)}
 }
 
 func BuildKillArgs(session string) []string {
-	return []string{"kill-session", "-t", session}
+	return []string{"kill-session", "-t", Exact(session)}
 }
 
 // Kill ends a session (the agent stops with it).
@@ -186,7 +188,7 @@ func Kill(session string) error {
 }
 
 func BuildRenameArgs(old, name string) []string {
-	return []string{"rename-session", "-t", old, name}
+	return []string{"rename-session", "-t", Exact(old), name}
 }
 
 // Rename renames a running session (used to adopt an external session into the
@@ -198,26 +200,70 @@ func Rename(old, name string) error {
 // SessionPath reports a session's active pane working directory (best-effort),
 // so an adopted session can be registered against its repo path.
 func SessionPath(session string) string {
-	out, err := Output("display-message", "-t", session, "-p", "#{pane_current_path}")
+	out, err := Output("display-message", "-t", Exact(session), "-p", "#{pane_current_path}")
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
 }
 
-// LaunchDetached creates a detached session running command+args in dir and
-// gives it sloop's per-session status bar, without attaching. Used by `sloop
-// restore` to bring several sessions back at once. No-op if it already exists.
-func LaunchDetached(session, dir, command string, args []string) error {
-	if hasSession(session) {
-		return nil
+// LaunchDetached creates a detached session running command+args in dir (with
+// extra env for the launched process) and gives it sloop's per-session status
+// bar, without attaching. It reports whether it created the session (false: it
+// already existed and nothing was done). The single create-detached path,
+// shared by DetachedRunner (`sloop new`) and `sloop restore`.
+func LaunchDetached(session, dir string, env map[string]string, command string, args []string) (bool, error) {
+	if HasSession(session) {
+		return false, nil
 	}
-	create := append([]string{"new-session", "-d", "-s", session, "-c", dir, command}, args...)
+	create := buildNewDetachedArgs(session, dir, env, command, args)
 	if err := Run(create...); err != nil {
-		return err
+		return false, err
 	}
 	SetStatusLine(session)
 	EnsureFleetKeys()
+	return true, nil
+}
+
+// AlreadyRunningMsg / CreatedDetachedMsg are the single source of the two
+// `sloop new` outcome lines, so the command layer and DetachedRunner can never
+// drift apart in wording.
+func AlreadyRunningMsg(session string) string {
+	return fmt.Sprintf("session %s is already running — attach: sloop attach %s", session, session)
+}
+
+func CreatedDetachedMsg(session string) string {
+	return fmt.Sprintf("created %s (detached) — attach: sloop attach %s", session, session)
+}
+
+// DetachedRunner creates the session without attaching (`sloop new`): the
+// agent starts in the background and the terminal stays free.
+type DetachedRunner struct {
+	Session string
+	Out     io.Writer // destination of the outcome line (nil = stdout)
+	created bool
+}
+
+// Detached reports whether Launch left a session running in the background:
+// true after it creates one (the session history row must stay open), false
+// when the session already existed and nothing was launched.
+func (r *DetachedRunner) Detached() bool { return r.created }
+
+func (r *DetachedRunner) Launch(s runner.Spec) error {
+	created, err := LaunchDetached(r.Session, s.Dir, s.Env, s.Command, s.Args)
+	if err != nil {
+		return err
+	}
+	r.created = created
+	out := r.Out
+	if out == nil {
+		out = os.Stdout
+	}
+	if created {
+		_, _ = fmt.Fprintln(out, CreatedDetachedMsg(r.Session))
+	} else {
+		_, _ = fmt.Fprintln(out, AlreadyRunningMsg(r.Session))
+	}
 	return nil
 }
 
@@ -230,13 +276,8 @@ func (r Runner) Launch(s runner.Spec) error {
 
 	// Create the session detached so we can give it sloop's own status bar
 	// before attaching; then attach (or switch if already inside tmux).
-	if !hasSession(r.Session) {
-		create := buildNewDetachedArgs(r.Session, s.Dir, s.Env, s.Command, s.Args)
-		if err := Run(create...); err != nil {
-			return err
-		}
-		SetStatusLine(r.Session)
-		EnsureFleetKeys()
+	if _, err := LaunchDetached(r.Session, s.Dir, s.Env, s.Command, s.Args); err != nil {
+		return err
 	}
 	args := BuildAttachArgs(r.Session)
 	if os.Getenv("TMUX") != "" {

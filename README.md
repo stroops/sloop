@@ -132,6 +132,7 @@ a terminal multiplexer so they keep running when you step away. Everything else 
 ```sh
 sloop run claude@review                              # a 2nd claude in the same repo → claude·review
 sloop run claude --new                               # auto-named next one → claude·2
+sloop new claude -N -t "fix the flaky CI test"       # same, but detached: spawn it and keep your terminal
 sloop profile add work --config-dir ~/.claude-work   # save a 2nd account once…
 sloop run @work                                      # …and launch under it from any repo
 ```
@@ -152,6 +153,7 @@ The handful you'll use most. Full reference, with every command and flag:
 |---|---|---|
 | `init` | - | Scaffold `AGENTS.md` + `.sloop/`, deliver pointers, register the workspace (`--scan` pre-fills from the codebase). |
 | `run [tool]` | `r` | Sync context, then launch a tool. `tool@instance` / `--new` for a 2nd agent; `@profile` for another account; `--split` for side-by-side. |
+| `new [tool]` | - | `run` without the attach: spawn the agent in the background and keep your terminal (`-a` attaches, `-N` forces a fresh instance). |
 | `ps [#]` | - | The cross-repo fleet. `<#>` jumps; `-f` live-monitors and alerts when an agent needs you. |
 | `ls` | - | Registered workspaces (running or not) with their live agents. |
 | `peek [agent]` | `pk` | Overlay a waiting agent in a floating popup, answer it, drop back, without leaving your current screen (tmux ≥ 3.2). |

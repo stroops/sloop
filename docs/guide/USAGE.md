@@ -114,6 +114,23 @@ symlinks `.sloop/skills` into the tool's skills dir, records the session, then l
 refreshed every 2s. It's set **per session** so it never touches your global tmux config. Adopted
 sessions get it too; add it to any session with `sloop statusline setup`.
 
+### Spawn without attaching (`sloop new`)
+
+`sloop new` is `run` without the attach — same targets, same flags, but the agent starts detached
+and your terminal stays free. sloop's `tmux new -d`.
+
+```sh
+sloop new claude                 # spawn claude in the background (or report "already running")
+sloop new claude -a              # ...and attach (identical to sloop run claude)
+sloop new claude -N              # always a fresh instance: claude·2, claude·3, …
+sloop new claude -t "fix CI"     # spawn it already working on a task, keep your shell
+sloop new codex && sloop new claude   # stack a fleet from one prompt, then watch `sloop ps`
+```
+
+Rule of thumb: `run` = "put me in front of this agent"; `new` = "make sure this agent exists,
+I'll check in via `sloop ps` / `sloop attach`". `new` never re-attaches: an existing session is
+left alone. Requires tmux (a detached session has to live somewhere).
+
 ### Side-by-side panes (the orchestration win)
 
 ```sh
