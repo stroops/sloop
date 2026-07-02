@@ -277,3 +277,22 @@ func TestInstallCodexHooks(t *testing.T) {
 		}
 	})
 }
+
+func TestNotifyStateFor(t *testing.T) {
+	h := adapter.HooksSpec{Events: adapter.HookEvents{
+		Waiting: adapter.EventSpec{Event: "approval-requested"},
+		Idle:    adapter.EventSpec{Event: "agent-turn-complete"},
+	}}
+	cases := []struct{ payload, want string }{
+		{`{"type":"agent-turn-complete","last-assistant-message":"hi"}`, "idle"},
+		{`{"type":"approval-requested"}`, "waiting"},
+		{`{"type":"something-new"}`, ""}, // unknown type → no state, no error
+		{`not json`, ""},                 // malformed → no state, no error
+		{``, ""},
+	}
+	for _, c := range cases {
+		if got := notifyStateFor(h, []byte(c.payload)); got != c.want {
+			t.Fatalf("payload %q: got %q want %q", c.payload, got, c.want)
+		}
+	}
+}

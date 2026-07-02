@@ -455,5 +455,6 @@ func RegisterHooks(cmd *cobra.Command) {
 	hooksCmd.AddCommand(hooksPrintCmd)
 	hooksCmd.AddCommand(hooksListCmd)
 	hooksCmd.AddCommand(hooksEmitCmd)
+	hooksCmd.AddCommand(hooksNotifyCmd)
 	cmd.AddCommand(hooksCmd)
 }
