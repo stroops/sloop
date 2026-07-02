@@ -40,7 +40,7 @@ func TestPrimaryFirst(t *testing.T) {
 func TestHooksNeeded(t *testing.T) {
 	root := t.TempDir()
 	manifests := map[string]adapter.Manifest{
-		"claude": {Hooks: adapter.HooksSpec{Install: "settings-json", Config: ".claude/settings.local.json", Events: adapter.HookEvents{Idle: "Stop"}}},
+		"claude": {Hooks: adapter.HooksSpec{Install: "settings-json", Config: ".claude/settings.local.json", Events: adapter.HookEvents{Idle: adapter.EventSpec{Event: "Stop"}}}},
 		"codex":  {Hooks: adapter.HooksSpec{Install: ""}}, // manual install → never "needed"
 	}
 	if !hooksNeeded(root, []string{"claude"}, manifests) {

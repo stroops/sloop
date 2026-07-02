@@ -33,7 +33,7 @@ func TestReadinessChecklist(t *testing.T) {
 		"claude": {
 			Name:    "Claude Code",
 			Context: adapter.ContextSpec{Mode: "pointer", File: "CLAUDE.md"},
-			Hooks:   adapter.HooksSpec{Install: "settings-json", Config: ".claude/settings.local.json", Events: adapter.HookEvents{Idle: "Stop"}},
+			Hooks:   adapter.HooksSpec{Install: "settings-json", Config: ".claude/settings.local.json", Events: adapter.HookEvents{Idle: adapter.EventSpec{Event: "Stop"}}},
 		},
 		"cursor": {Name: "Cursor CLI", Context: adapter.ContextSpec{Mode: "native"}},
 	}
