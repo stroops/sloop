@@ -327,3 +327,84 @@ func TestHooksInstalledForNewStrategies(t *testing.T) {
 		}
 	}
 }
+
+// TestEventCommands covers the manifest→installer translation directly: the
+// installer tests above hand-build their event maps, so a regression here
+// (wrong state mapping, an empty event leaking in) would otherwise slip past.
+func TestEventCommands(t *testing.T) {
+	cases := []struct {
+		name string
+		h    adapter.HooksSpec
+		want map[string]string
+	}{
+		{
+			name: "all three states",
+			h: adapter.HooksSpec{Events: adapter.HookEvents{
+				Working: adapter.EventSpec{Event: "UserPromptSubmit"},
+				Waiting: adapter.EventSpec{Event: "Notification"},
+				Idle:    adapter.EventSpec{Event: "Stop"},
+			}},
+			want: map[string]string{
+				"UserPromptSubmit": "sloop hooks emit working",
+				"Notification":     "sloop hooks emit waiting",
+				"Stop":             "sloop hooks emit idle",
+			},
+		},
+		{
+			name: "empty events skipped",
+			h: adapter.HooksSpec{Events: adapter.HookEvents{
+				Working: adapter.EventSpec{Event: "beforeSubmitPrompt"},
+				Idle:    adapter.EventSpec{Event: "stop"},
+			}},
+			want: map[string]string{
+				"beforeSubmitPrompt": "sloop hooks emit working",
+				"stop":               "sloop hooks emit idle",
+			},
+		},
+		{name: "no events at all", h: adapter.HooksSpec{}, want: map[string]string{}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := eventCommands(c.h)
+			if len(got) != len(c.want) {
+				t.Fatalf("got %v, want %v", got, c.want)
+			}
+			for ev, cmd := range c.want {
+				if got[ev] != cmd {
+					t.Fatalf("event %s: got %q, want %q", ev, got[ev], cmd)
+				}
+			}
+		})
+	}
+}
+
+// TestAllEventsInstalled covers the settings-json installed-detection arm the
+// copilot/codex round-trip test can't reach (those strategies bypass
+// eventCommands/allEventsInstalled entirely).
+func TestAllEventsInstalled(t *testing.T) {
+	h := adapter.HooksSpec{Events: adapter.HookEvents{
+		Working: adapter.EventSpec{Event: "UserPromptSubmit"},
+		Idle:    adapter.EventSpec{Event: "Stop"},
+	}}
+	doc, _ := mergeSettingsHooks(nil, eventCommands(h))
+	full, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !allEventsInstalled(full, h, hasCommandHook) {
+		t.Fatal("fully installed config not detected")
+	}
+	partial, _ := mergeSettingsHooks(nil, map[string]string{
+		"UserPromptSubmit": hookCommandFor("working"),
+	})
+	pb, _ := json.Marshal(partial)
+	if allEventsInstalled(pb, h, hasCommandHook) {
+		t.Fatal("partial install (Stop missing) reported as installed")
+	}
+	if allEventsInstalled([]byte("not json"), h, hasCommandHook) {
+		t.Fatal("invalid JSON reported as installed")
+	}
+	if allEventsInstalled(full, adapter.HooksSpec{}, hasCommandHook) {
+		t.Fatal("manifest with no events must never report installed")
+	}
+}
