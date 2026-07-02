@@ -73,6 +73,10 @@ func TestInstallStatuslineForEnabled(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("PATH", t.TempDir())
+	// Isolate from a real second-account override in the ambient environment
+	// (e.g. this test suite running inside a CLAUDE_CONFIG_DIR-set session),
+	// which would redirect installs away from the sandboxed HOME above.
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
 
 	if _, err := RunInit(dir, []string{"claude"}, false); err != nil {
 		t.Fatalf("RunInit: %v", err)

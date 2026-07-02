@@ -48,6 +48,11 @@ func TestRenderStatusline(t *testing.T) {
 // narrow terminal.
 func TestRenderStatuslineLeftCarriesIdentityAndAmbientInfo(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
+	// Isolate from a real second-account override in the ambient environment
+	// (e.g. this test suite running inside a CLAUDE_CONFIG_DIR-set session),
+	// which would redirect the statusline-installed check to that real
+	// account dir instead of the sandboxed HOME above.
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	session := "myrepo__claude"
 
 	if err := fleetstate.WriteInfo(session, "Opus", 45); err != nil {
