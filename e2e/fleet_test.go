@@ -24,6 +24,34 @@ import (
 // prefix namespaces every tmux session this run creates.
 var prefix = fmt.Sprintf("e2e%d_", os.Getpid())
 
+// TestMain points every tmux client in this package — the test's own calls and
+// the sloop binary under test (child processes inherit the env) — at a private
+// server via TMUX_TMPDIR. Session names were already namespaced, but key
+// bindings and global user options are server-wide: run against the default
+// server, the suite would read the developer's real bindings (making
+// EnsureFleetKeys assertions machine-dependent) and leak sloop bindings that
+// point at deleted temp binaries. TMUX must be unset or the clients would
+// follow its socket path back to the developer's server.
+func TestMain(m *testing.M) {
+	cleanup := func() {}
+	if _, err := exec.LookPath("tmux"); err == nil {
+		dir, err := os.MkdirTemp("", "sloop-e2e-tmux-*")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "e2e: tmux tmpdir:", err)
+			os.Exit(1)
+		}
+		os.Setenv("TMUX_TMPDIR", dir)
+		os.Unsetenv("TMUX")
+		cleanup = func() {
+			_ = exec.Command("tmux", "kill-server").Run()
+			_ = os.RemoveAll(dir)
+		}
+	}
+	code := m.Run()
+	cleanup()
+	os.Exit(code)
+}
+
 func requireTmux(t *testing.T) {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux not installed")
