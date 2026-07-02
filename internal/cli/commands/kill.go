@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stroops/sloop/internal/adapter"
+	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/tmux"
 )
 
@@ -87,6 +88,9 @@ func RunKill(w io.Writer, in io.Reader, targets []string, all, waiting, yes bool
 		if err := killFunc(v.Name); err != nil {
 			return killed, err
 		}
+		// The session is gone, so its status marker is garbage — clear it now
+		// rather than waiting for the age-based prune.
+		fleetstate.Remove(v.Name)
 		killed = append(killed, v.Name)
 	}
 	return killed, nil

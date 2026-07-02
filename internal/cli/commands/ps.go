@@ -179,9 +179,11 @@ func enrichGlances(rows []FleetRow, manifests map[string]adapter.Manifest) []Fle
 		go func(i int) {
 			defer wg.Done()
 
-			marker, hasMarker := fleetstate.Read(rows[i].Name)
+			// One marker read serves status, model, and context for the row.
+			marker := fleetstate.Load(rows[i].Name)
+			_, hasMarker := marker.StatusFresh()
 			rows[i].Display = displayTool(rows[i].Tool, manifests)
-			rows[i].Model, rows[i].CtxPct = fleetstate.Info(rows[i].Name)
+			rows[i].Model, rows[i].CtxPct = marker.DisplayInfo()
 
 			ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 			defer cancel()
@@ -469,6 +471,15 @@ func runPsAll(w io.Writer, rows []FleetRow, paths map[string]string, ext []tmux.
 	return nil
 }
 
+// sessionNames flattens parsed tmux sessions to their names.
+func sessionNames(sessions []tmux.Session) []string {
+	names := make([]string, len(sessions))
+	for i, s := range sessions {
+		names[i] = s.Name
+	}
+	return names
+}
+
 var psCmd = &cobra.Command{
 	Use:   "ps [#]",
 	Short: "List running AI sessions (the fleet); `sloop ps <#>` jumps to one",
@@ -476,6 +487,9 @@ var psCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manifests, _ := adapter.Load()
 		parsed := tmux.ParseSessions(tmuxList())
+		// Housekeeping while we already hold the live session list: drop status
+		// markers whose session is long gone, so ~/.sloop/state stays small.
+		fleetstate.Prune(sessionNames(parsed))
 		rows := fleetRows(parsed, manifests)
 		if len(args) == 1 {
 			n, err := strconv.Atoi(args[0])

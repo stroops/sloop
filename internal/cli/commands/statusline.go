@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -89,16 +90,40 @@ func tmuxStatusLabel(s tmux.AgentStatus) string {
 	}
 }
 
-// sessionStatus resolves a session's agent status: a fresh hook marker wins,
-// else the live pane-text heuristic.
-func sessionStatus(session string, manifests map[string]adapter.Manifest, tool string) tmux.AgentStatus {
-	if m, ok := fleetstate.Read(session); ok {
-		return stateToStatus(m.Status)
+// capturePane returns a lazy, memoized reader of a session's visible pane
+// text, so the consumers within one render (status heuristic, model heuristic)
+// share a single capture-pane subprocess — or skip it entirely when a fresh
+// marker answers first.
+func capturePane(session string) func() string {
+	var text string
+	var done bool
+	return func() string {
+		if !done {
+			done = true
+			if out, err := tmux.Output(tmux.BuildCaptureArgs(session)...); err == nil {
+				text = string(out)
+			}
+		}
+		return text
 	}
-	if out, err := tmux.Output(tmux.BuildCaptureArgs(session)...); err == nil {
-		return tmux.ClassifyStatus(string(out), manifests[tool])
+}
+
+// sessionStatusFrom resolves an agent status from an already-loaded marker: a
+// fresh hook-written status wins, else the pane-text heuristic (capture is
+// only invoked on that fallback).
+func sessionStatusFrom(marker fleetstate.State, capture func() string, m adapter.Manifest) tmux.AgentStatus {
+	if status, ok := marker.StatusFresh(); ok {
+		return stateToStatus(status)
+	}
+	if text := capture(); text != "" {
+		return tmux.ClassifyStatus(text, m)
 	}
 	return tmux.StatusUnknown
+}
+
+// sessionStatus is the one-shot form for callers with no marker in hand.
+func sessionStatus(session string, manifests map[string]adapter.Manifest, tool string) tmux.AgentStatus {
+	return sessionStatusFrom(fleetstate.Load(session), capturePane(session), manifests[tool])
 }
 
 // renderStatusline builds the legacy one-line status bar text (identity +
@@ -136,16 +161,21 @@ func renderStatuslineLeft(session string) string {
 	if instance != "" {
 		label = tool + "·" + instance // distinguish a second agent of the same tool
 	}
-	st := sessionStatus(session, manifests, tool)
+	// One marker read and at most one pane capture serve the whole render.
+	marker := fleetstate.Load(session)
+	capture := capturePane(session)
+	st := sessionStatusFrom(marker, capture, manifests[tool])
 
 	dir, _ := paneInfo(session)
-	model, ctxPct := fleetstate.Info(session)
+	model, ctxPct := marker.DisplayInfo()
 	// Tools with no statusline feed can still show the model live via a pane
 	// heuristic (manifest heuristics.model); the marker keeps the last match so
 	// a redraw that briefly hides the footer doesn't blank the segment.
-	if m := paneModel(session, manifests[tool].Heuristics.Model); m != "" && m != model {
-		model = m
-		_ = fleetstate.WriteInfo(session, m, 0)
+	if pattern := manifests[tool].Heuristics.Model; pattern != "" {
+		if m := extractModel(capture(), pattern); m != "" && m != model {
+			model = m
+			_ = fleetstate.WriteInfo(session, m, 0)
+		}
 	}
 
 	segs := []string{tmuxStatusLabel(st) + renderFleetBadge(session), ws + "·" + label}
@@ -153,7 +183,7 @@ func renderStatuslineLeft(session string) string {
 	// sloop-only info: nothing else on screen ever shows it (a tool's own
 	// footer, custom or sloop's freebie, has no rate-limit field), so it's
 	// unconditional either way.
-	segs = append(segs, sloopOnlySegments(session)...)
+	segs = append(segs, sloopOnlySegments(marker)...)
 
 	// hasOwnFooter: a wired statusline feed means the tool's own footer
 	// already reports model/context/branch (its own script, or sloop's
@@ -172,8 +202,8 @@ func renderStatuslineLeft(session string) string {
 // sloopOnlySegments is ambient info nothing else on screen ever shows —
 // currently just rate-limit usage — so it renders regardless of whether the
 // tool has its own footer.
-func sloopOnlySegments(session string) []string {
-	if rlPct, rlReset := fleetstate.RateLimit(session); rlPct > 0 {
+func sloopOnlySegments(marker fleetstate.State) []string {
+	if rlPct, rlReset := marker.DisplayRateLimit(); rlPct > 0 {
 		return []string{rateLimitSegment(rlPct, rlReset)}
 	}
 	return nil
@@ -309,23 +339,10 @@ func rotatingHint(hints []string, now time.Time) string {
 	return hints[int(now.Unix()/hintSlotSeconds)%len(hints)]
 }
 
-// paneModel extracts the current model from a session's visible pane text
-// using the manifest's heuristics.model pattern; "" when the tool has no
-// pattern or nothing matches. The last match wins: a TUI's live footer sits at
-// the bottom, below any stale intro header that may also name a model.
-func paneModel(session, pattern string) string {
-	if pattern == "" {
-		return ""
-	}
-	out, err := tmux.Output(tmux.BuildCaptureArgs(session)...)
-	if err != nil {
-		return ""
-	}
-	return extractModel(string(out), pattern)
-}
-
-// extractModel is the pure matcher behind paneModel: last capture-group-1
-// match of pattern in text, "" on no match or a bad pattern.
+// extractModel extracts the current model from pane text using a manifest's
+// heuristics.model pattern: last capture-group-1 match wins (a TUI's live
+// footer sits at the bottom, below any stale intro header that may also name
+// a model); "" on no match or a bad pattern.
 func extractModel(text, pattern string) string {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -348,7 +365,7 @@ func paneInfo(session string) (dir string, width int) {
 		return "", 0
 	}
 	path, w, _ := strings.Cut(strings.TrimSpace(string(out)), "\t")
-	fmt.Sscanf(w, "%d", &width)
+	width, _ = strconv.Atoi(w)
 	if width == 0 {
 		width = 1 << 16 // unknown → don't drop segments
 	}

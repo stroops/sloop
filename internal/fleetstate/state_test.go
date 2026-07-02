@@ -1,6 +1,8 @@
 package fleetstate
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -71,7 +73,7 @@ func TestInfoStalePctIsHidden(t *testing.T) {
 	if err := WriteInfo("web__claude", "opus", 80); err != nil {
 		t.Fatal(err)
 	}
-	s := load("web__claude")
+	s := Load("web__claude")
 	s.InfoAt = time.Now().Add(-TTL - time.Minute)
 	if err := save("web__claude", s); err != nil {
 		t.Fatal(err)
@@ -121,7 +123,7 @@ func TestRateLimitStaleIsHidden(t *testing.T) {
 	if err := WriteRateLimit("web__claude", 24, "45m"); err != nil {
 		t.Fatal(err)
 	}
-	s := load("web__claude")
+	s := Load("web__claude")
 	s.InfoAt = time.Now().Add(-TTL - time.Minute)
 	if err := save("web__claude", s); err != nil {
 		t.Fatal(err)
@@ -137,5 +139,50 @@ func TestFilenameSanitizes(t *testing.T) {
 	}
 	if got := filename("a/b c"); got != "a_b_c.json" {
 		t.Fatalf("filename = %q", got)
+	}
+}
+
+func TestRemoveDeletesMarker(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if err := Write("web__claude", "waiting"); err != nil {
+		t.Fatal(err)
+	}
+	Remove("web__claude")
+	if _, ok := Read("web__claude"); ok {
+		t.Fatal("marker should be gone after Remove")
+	}
+}
+
+// Prune deletes only markers that are both dead (session not live) and old
+// (past pruneAge); live sessions and young markers survive.
+func TestPruneKeepsLiveAndYoungMarkers(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	for _, s := range []string{"live__claude", "dead_old__claude", "dead_young__claude"} {
+		if err := Write(s, "idle"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir, err := Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-pruneAge - time.Hour)
+	for _, s := range []string{"live__claude", "dead_old__claude"} {
+		if err := os.Chtimes(filepath.Join(dir, filename(s)), old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if n := Prune([]string{"live__claude"}); n != 1 {
+		t.Fatalf("Prune removed %d markers, want 1", n)
+	}
+	if s := Load("dead_old__claude"); s.Status != "" {
+		t.Fatal("old dead marker should be pruned")
+	}
+	if s := Load("live__claude"); s.Status != "idle" {
+		t.Fatal("live marker must survive even when old")
+	}
+	if s := Load("dead_young__claude"); s.Status != "idle" {
+		t.Fatal("young dead marker must survive the grace period")
 	}
 }

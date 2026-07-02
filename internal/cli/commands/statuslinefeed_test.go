@@ -270,12 +270,6 @@ func TestFeedSkipsRedundantWrites(t *testing.T) {
 	}
 }
 
-func TestShellQuote(t *testing.T) {
-	if got := shellQuote(`echo 'hi'`); got != `'echo '\''hi'\'''` {
-		t.Fatalf("got %s", got)
-	}
-}
-
 // The built-in claude/agy manifests must declare a working statusline spec —
 // this is what `sloop statusline install` relies on.
 func TestBuiltinStatuslineSpecs(t *testing.T) {
@@ -296,5 +290,45 @@ func TestBuiltinStatuslineSpecs(t *testing.T) {
 	}
 	if a.Payload.RateLimitRemainingFrac == "" || a.Payload.RateLimitResetsIn == "" {
 		t.Fatalf("agy rate-limit mapping incomplete: %+v", a.Payload)
+	}
+}
+
+// A live-but-idle session must not lose its context% display: even with an
+// unchanged payload, the feed call itself is the provider's heartbeat and
+// refreshes InfoAt once the marker nears the display TTL.
+func TestFeedHeartbeatRefreshesStaleInfo(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("SLOOP_SESSION", "ws__claude")
+
+	payload := []byte(`{
+		"model": {"display_name": "Opus"},
+		"context_window": {
+			"context_window_size": 100,
+			"current_usage": {"input_tokens": 30}
+		}
+	}`)
+	feed := func() {
+		cmd := &cobra.Command{}
+		cmd.SetIn(bytes.NewReader(payload))
+		cmd.SetOut(io.Discard)
+		if err := statuslineFeedCmd.RunE(cmd, []string{"claude"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	feed()
+	// Backdate the marker past the TTL, as if the session idled for a while.
+	s := fleetstate.Load("ws__claude")
+	s.InfoAt = time.Now().Add(-fleetstate.TTL - time.Minute)
+	if err := fleetstate.Update("ws__claude", func(cur *fleetstate.State) { *cur = s }); err != nil {
+		t.Fatal(err)
+	}
+	if _, pct := fleetstate.Info("ws__claude"); pct != 0 {
+		t.Fatalf("stale pct should be hidden before the next feed, got %d", pct)
+	}
+
+	feed() // unchanged payload, but the marker is stale → heartbeat write
+	if _, pct := fleetstate.Info("ws__claude"); pct != 30 {
+		t.Fatalf("heartbeat must restore ctx%% for a live session, got %d", pct)
 	}
 }

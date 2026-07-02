@@ -16,6 +16,7 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/fleetstate"
+	"github.com/stroops/sloop/internal/tmux"
 	"github.com/stroops/sloop/internal/workspace"
 )
 
@@ -203,21 +204,35 @@ var statuslineFeedCmd = &cobra.Command{
 		if m, err := manifestForTool(args[0]); err == nil && doc != nil {
 			// The tool calls this on every statusline render — often many times a
 			// minute with an unchanged payload — so only touch the marker file
-			// when it actually has new information to record.
+			// when it has new information to record, or when the marker is about
+			// to cross the display TTL: this feed call *is* the provider's own
+			// heartbeat, and refreshing InfoAt here keeps a live-but-idle
+			// session's context% and rate-limit on the bar. One combined write.
 			if session := currentSession(); session != "" {
-				curModel, curPct := fleetstate.Info(session)
+				cur := fleetstate.Load(session)
 				model, pct := extractStatusInfo(doc, m.StatusLine.Payload)
-				if (model != "" && model != curModel) || (pct > 0 && pct != curPct) {
-					_ = fleetstate.WriteInfo(session, model, pct)
-				}
-				curRLPct, curReset := fleetstate.RateLimit(session)
-				if rlPct, reset := extractRateLimit(doc, m.StatusLine.Payload); rlPct > 0 && (rlPct != curRLPct || reset != curReset) {
-					_ = fleetstate.WriteRateLimit(session, rlPct, reset)
-				}
-				if st := extractStatusState(doc, m.StatusLine); st != "" {
-					if cur, fresh := fleetstate.Read(session); !fresh || st != cur.Status {
-						_ = fleetstate.Write(session, st)
-					}
+				rlPct, reset := extractRateLimit(doc, m.StatusLine.Payload)
+				st := extractStatusState(doc, m.StatusLine)
+
+				heartbeat := time.Since(cur.InfoAt) > fleetstate.TTL/3 && (model != "" || pct > 0 || rlPct > 0)
+				curModel, curPct := cur.DisplayInfo()
+				newInfo := (model != "" && model != curModel) || (pct > 0 && pct != curPct)
+				curRLPct, curReset := cur.DisplayRateLimit()
+				newRL := rlPct > 0 && (rlPct != curRLPct || reset != curReset)
+				_, fresh := cur.StatusFresh()
+				newStatus := st != "" && (!fresh || st != cur.Status)
+
+				if newInfo || newRL || newStatus || heartbeat {
+					_ = fleetstate.Update(session, func(s *fleetstate.State) {
+						now := time.Now()
+						s.SetInfo(model, pct)
+						s.SetRateLimit(rlPct, reset)
+						s.InfoAt = now
+						if newStatus {
+							s.Status = st
+							s.UpdatedAt = now
+						}
+					})
 				}
 			}
 			if feedChain == "" {
@@ -236,11 +251,6 @@ var statuslineFeedCmd = &cobra.Command{
 	},
 }
 
-// shellQuote wraps s in single quotes for safe embedding in a sh -c command.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
 // mergeStatuslineFeed points a settings.json statusLine at feedCmd, chaining
 // to any command already there so it isn't lost. Returns the doc, the command
 // now installed (existing or new), and whether the doc changed. Idempotent: a
@@ -253,7 +263,7 @@ func mergeStatuslineFeed(doc map[string]any, feedCmd string) (out map[string]any
 	}
 	installed = feedCmd
 	if strings.TrimSpace(existing) != "" {
-		installed += " --chain " + shellQuote(existing)
+		installed += " --chain " + tmux.ShellQuote(existing)
 	}
 	if sl == nil {
 		sl = map[string]any{}
