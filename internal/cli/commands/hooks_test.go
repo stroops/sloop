@@ -234,7 +234,9 @@ func TestInstallCodexHooks(t *testing.T) {
 	h := adapter.HooksSpec{}
 	t.Run("empty file gets notify", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.toml")
-		os.WriteFile(path, []byte("model = \"gpt-5.5\"\n\n[profiles.fast]\nmodel = \"gpt-5.5-mini\"\n"), 0o644)
+		if err := os.WriteFile(path, []byte("model = \"gpt-5.5\"\n\n[profiles.fast]\nmodel = \"gpt-5.5-mini\"\n"), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
 		changed, err := installCodexHooks(path, h)
 		if err != nil || !changed {
 			t.Fatalf("changed=%v err=%v", changed, err)
@@ -260,7 +262,9 @@ func TestInstallCodexHooks(t *testing.T) {
 	t.Run("occupied slot untouched", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		orig := "notify = [\"terminal-notifier\"]\n"
-		os.WriteFile(path, []byte(orig), 0o644)
+		if err := os.WriteFile(path, []byte(orig), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
 		changed, err := installCodexHooks(path, h)
 		if !errors.Is(err, errNotifyOccupied) || changed {
 			t.Fatalf("want errNotifyOccupied, got changed=%v err=%v", changed, err)
@@ -271,7 +275,9 @@ func TestInstallCodexHooks(t *testing.T) {
 	})
 	t.Run("unparseable file untouched", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.toml")
-		os.WriteFile(path, []byte("not = = toml"), 0o644)
+		if err := os.WriteFile(path, []byte("not = = toml"), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
 		if _, err := installCodexHooks(path, h); err == nil {
 			t.Fatal("want parse error")
 		}
