@@ -43,6 +43,7 @@ const hintSlotSeconds = 20
 type statusIcons struct {
 	Waiting, Working, Idle string
 	Model, Ctx, Branch     string
+	RateLimit              string
 }
 
 // iconsUnicode is the default: plain Unicode that renders in any terminal,
@@ -50,6 +51,7 @@ type statusIcons struct {
 var iconsUnicode = statusIcons{
 	Waiting: "◆", Working: "▸", Idle: "○",
 	Model: "✧", Ctx: "▤", Branch: "⎇",
+	RateLimit: "⏳",
 }
 
 // iconsNerd is the opt-in set for terminals with a patched Nerd Font
@@ -57,6 +59,7 @@ var iconsUnicode = statusIcons{
 var iconsNerd = statusIcons{
 	Waiting: "󰔟", Working: "", Idle: "",
 	Model: "", Ctx: "󱍏", Branch: "",
+	RateLimit: "",
 }
 
 // activeIcons picks the glyph set: SLOOP_NERD_FONTS=1 (or true/yes/on) opts
@@ -116,8 +119,9 @@ func renderStatusline(session string) string {
 }
 
 // renderStatuslineLeft is the primary side: `⚓ ◆ waiting │ ws·tool │ model │
-// ctx 45% │ ⎇ branch` — status, identity, and every ambient field worth
-// knowing at a glance, in one place. It lives on the left because tmux
+// ctx 45% │ ⎇ branch │ ⏳ 24% (45m)` — status, identity, and (when nothing
+// else on screen already shows them) model/context/branch, plus rate-limit
+// usage, which nothing else ever shows. It lives on the left because tmux
 // truncates status-right first on a narrow terminal, and this is the content
 // that must survive that. The window list tmux would normally draw in the
 // middle is hidden (see tmux.SetStatusLine), so this and the hint on the
@@ -145,6 +149,40 @@ func renderStatuslineLeft(session string) string {
 	}
 
 	segs := []string{tmuxStatusLabel(st) + renderFleetBadge(session), ws + "·" + label}
+
+	// sloop-only info: nothing else on screen ever shows it (a tool's own
+	// footer, custom or sloop's freebie, has no rate-limit field), so it's
+	// unconditional either way.
+	segs = append(segs, sloopOnlySegments(session)...)
+
+	// hasOwnFooter: a wired statusline feed means the tool's own footer
+	// already reports model/context/branch (its own script, or sloop's
+	// freebie line if it had none — see statuslineFeedCmd). Two clean
+	// directions from here: a footer already covers it → don't repeat it;
+	// no footer (codex/cursor, driven by the heuristics.model pane-scan
+	// instead, never have one) → the tmux bar is the only place to see it,
+	// so show the full picture.
+	if !statuslineInstalledFor(dir, tool, manifests[tool]) {
+		segs = append(segs, fullAmbientSegments(dir, model, ctxPct)...)
+	}
+
+	return " ⚓ " + joinWith(statusSep, segs...) + " "
+}
+
+// sloopOnlySegments is ambient info nothing else on screen ever shows —
+// currently just rate-limit usage — so it renders regardless of whether the
+// tool has its own footer.
+func sloopOnlySegments(session string) []string {
+	if rlPct, rlReset := fleetstate.RateLimit(session); rlPct > 0 {
+		return []string{rateLimitSegment(rlPct, rlReset)}
+	}
+	return nil
+}
+
+// fullAmbientSegments is model/context/branch — shown only when the tool has
+// no footer of its own to cover them (see renderStatuslineLeft).
+func fullAmbientSegments(dir, model string, ctxPct int) []string {
+	var segs []string
 	if model != "" {
 		segs = append(segs, "#[fg=colour140]"+activeIcons().Model+" "+model+"#[default]")
 	}
@@ -154,7 +192,7 @@ func renderStatuslineLeft(session string) string {
 	if branch := gitBranch(dir); branch != "" {
 		segs = append(segs, "#[fg=colour110]"+activeIcons().Branch+" "+branch+"#[default]")
 	}
-	return " ⚓ " + joinWith(statusSep, segs...) + " "
+	return segs
 }
 
 // renderStatuslineRight is the least-important side: a single rotating hint,
@@ -227,6 +265,29 @@ func contextSegment(pct int) string {
 	return fmt.Sprintf("#[fg=%s]%s %s %d%%#[default]", color, activeIcons().Ctx, contextBar(pct), pct)
 }
 
+// rateLimitSegment renders "⏳ 24% (45m)" for the tmux bar, colored by
+// urgency like context% (same thresholds — both are "usage%, higher is more
+// urgent"). "" when unknown. This is new information no custom statusline
+// script commonly surfaces, so it shows regardless of whether a feed is
+// installed — unlike model/context/branch, it's never a duplicate.
+func rateLimitSegment(pct int, resetIn string) string {
+	if pct <= 0 {
+		return ""
+	}
+	color := "colour245"
+	switch classifyCtxPct(pct) {
+	case ctxCrit:
+		color = "red"
+	case ctxWarn:
+		color = "yellow"
+	}
+	label := fmt.Sprintf("%s %d%%", activeIcons().RateLimit, pct)
+	if resetIn != "" {
+		label += " (" + resetIn + ")"
+	}
+	return fmt.Sprintf("#[fg=%s]%s#[default]", color, label)
+}
+
 // statusHints is the rotating hint list, built from this server's live
 // bindings so every hint names a key that actually works here.
 func statusHints() []string {
@@ -282,7 +343,7 @@ func extractModel(text, pattern string) string {
 // the bar's own span), unlike client_width, which reports whichever client
 // happens to be calling. Width 0 (unknown) renders as wide.
 func paneInfo(session string) (dir string, width int) {
-	out, err := tmux.Output("display-message", "-p", "-t", session, "#{pane_current_path}\t#{window_width}")
+	out, err := tmux.Output("display-message", "-p", "-t", tmux.Exact(session), "#{pane_current_path}\t#{window_width}")
 	if err != nil {
 		return "", 0
 	}

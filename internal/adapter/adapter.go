@@ -46,7 +46,12 @@ type HooksSpec struct {
 // StatusLinePayload maps sloop's display fields to dotted paths inside the
 // JSON payload a tool pipes to its statusline command. Context usage comes
 // either as a ready percentage (ContextPct) or as token paths to sum
-// (ContextUsed) against a window size (ContextSize) — whichever the tool sends.
+// (ContextUsed) against a window size (ContextSize) — whichever the tool
+// sends. Rate-limit usage is similarly two conventions: a ready "used"
+// percentage (RateLimitUsedPct) or a "remaining" fraction to invert
+// (RateLimitRemainingFrac); its reset is either an absolute epoch-seconds
+// timestamp (RateLimitResetsAt) or a relative seconds-until-reset
+// (RateLimitResetsIn) — a tool sends exactly one of each pair.
 type StatusLinePayload struct {
 	Model       string   `yaml:"model"`        // e.g. model.display_name
 	Cwd         string   `yaml:"cwd"`          // working directory of the session
@@ -54,6 +59,14 @@ type StatusLinePayload struct {
 	ContextUsed []string `yaml:"context_used"` // token counts to sum
 	ContextSize string   `yaml:"context_size"` // window size the sum is divided by
 	State       string   `yaml:"state"`        // tool's own agent state, if present
+
+	// Rate-limit usage: something no custom statusline script typically shows,
+	// so sloop surfaces it as new information rather than repeating the tool's
+	// own footer. Absent (all "") on tools that report none.
+	RateLimitUsedPct       string `yaml:"rate_limit_used_pct"`       // 0–100, e.g. Claude's rate_limits.five_hour.used_percentage
+	RateLimitRemainingFrac string `yaml:"rate_limit_remaining_frac"` // 0–1, e.g. agy's quota.gemini-5h.remaining_fraction
+	RateLimitResetsAt      string `yaml:"rate_limit_resets_at"`      // unix epoch seconds, e.g. Claude's rate_limits.five_hour.resets_at
+	RateLimitResetsIn      string `yaml:"rate_limit_resets_in"`      // seconds from now, e.g. agy's quota.gemini-5h.reset_in_seconds
 }
 
 // StatusLineSpec captures how a tool's built-in statusline mechanism works, so

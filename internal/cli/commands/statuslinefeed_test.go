@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -78,6 +79,52 @@ func TestExtractStatusInfoAgyShape(t *testing.T) {
 	}
 	if st := extractStatusState(doc, spec); st != "working" {
 		t.Fatalf("state = %q, want working", st)
+	}
+}
+
+// Claude-shaped rate limit: a ready used% plus an absolute reset timestamp.
+func TestExtractRateLimitClaudeShape(t *testing.T) {
+	resetAt := time.Now().Add(45*time.Minute + 30*time.Second).Unix() // clear of the 45m floor boundary
+	doc := decode(t, fmt.Sprintf(`{"rate_limits":{"five_hour":{"used_percentage":23.5,"resets_at":%d}}}`, resetAt))
+	p := adapter.StatusLinePayload{
+		RateLimitUsedPct:  "rate_limits.five_hour.used_percentage",
+		RateLimitResetsAt: "rate_limits.five_hour.resets_at",
+	}
+	pct, reset := extractRateLimit(doc, p)
+	if pct != 24 { // rounds 23.5 → 24
+		t.Fatalf("pct = %d, want 24", pct)
+	}
+	if reset != "45m" {
+		t.Fatalf("reset = %q, want 45m", reset)
+	}
+}
+
+// agy-shaped rate limit: a remaining fraction to invert plus a relative
+// seconds-until-reset.
+func TestExtractRateLimitAgyShape(t *testing.T) {
+	doc := decode(t, `{"quota":{"gemini-5h":{"remaining_fraction":0.7,"reset_in_seconds":1800}}}`)
+	p := adapter.StatusLinePayload{
+		RateLimitRemainingFrac: "quota.gemini-5h.remaining_fraction",
+		RateLimitResetsIn:      "quota.gemini-5h.reset_in_seconds",
+	}
+	pct, reset := extractRateLimit(doc, p)
+	if pct != 30 { // 1 - 0.7 = 0.3 remaining used → 30% used
+		t.Fatalf("pct = %d, want 30", pct)
+	}
+	if reset != "30m" {
+		t.Fatalf("reset = %q, want 30m", reset)
+	}
+}
+
+// No mapping declared, or the mapped fields are absent from the payload —
+// both must degrade to (0, ""), never an error.
+func TestExtractRateLimitMissing(t *testing.T) {
+	if pct, reset := extractRateLimit(decode(t, `{}`), adapter.StatusLinePayload{}); pct != 0 || reset != "" {
+		t.Fatalf("no mapping = (%d, %q)", pct, reset)
+	}
+	p := adapter.StatusLinePayload{RateLimitUsedPct: "rate_limits.five_hour.used_percentage"}
+	if pct, reset := extractRateLimit(decode(t, `{"something":"else"}`), p); pct != 0 || reset != "" {
+		t.Fatalf("field absent from payload = (%d, %q)", pct, reset)
 	}
 }
 
@@ -240,8 +287,14 @@ func TestBuiltinStatuslineSpecs(t *testing.T) {
 	if c.Install != "settings-json" || c.Payload.Model == "" || len(c.Payload.ContextUsed) == 0 || c.Payload.ContextSize == "" {
 		t.Fatalf("claude statusline spec incomplete: %+v", c)
 	}
+	if c.Payload.RateLimitUsedPct == "" || c.Payload.RateLimitResetsAt == "" {
+		t.Fatalf("claude rate-limit mapping incomplete: %+v", c.Payload)
+	}
 	a := ms["agy"].StatusLine
 	if a.Install != "settings-json" || a.Payload.ContextPct == "" || a.Payload.State == "" || len(a.States) == 0 {
 		t.Fatalf("agy statusline spec incomplete: %+v", a)
+	}
+	if a.Payload.RateLimitRemainingFrac == "" || a.Payload.RateLimitResetsIn == "" {
+		t.Fatalf("agy rate-limit mapping incomplete: %+v", a.Payload)
 	}
 }

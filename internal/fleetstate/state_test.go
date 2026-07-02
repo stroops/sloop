@@ -85,6 +85,52 @@ func TestInfoStalePctIsHidden(t *testing.T) {
 	}
 }
 
+// Rate limit is written independently of status/model/context, same as info.
+func TestWriteAndReadRateLimit(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	if pct, reset := RateLimit("web__claude"); pct != 0 || reset != "" {
+		t.Fatalf("no marker yet: (%d, %q)", pct, reset)
+	}
+	if err := WriteRateLimit("web__claude", 24, "45m"); err != nil {
+		t.Fatalf("WriteRateLimit: %v", err)
+	}
+	if pct, reset := RateLimit("web__claude"); pct != 24 || reset != "45m" {
+		t.Fatalf("RateLimit = (%d, %q), want (24, 45m)", pct, reset)
+	}
+
+	// Coexists with status/model, none clobbering the others.
+	if err := Write("web__claude", "waiting"); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteInfo("web__claude", "opus", 42); err != nil {
+		t.Fatal(err)
+	}
+	pct, reset := RateLimit("web__claude")
+	if pct != 24 || reset != "45m" {
+		t.Fatalf("rate limit lost after status/info writes: (%d, %q)", pct, reset)
+	}
+	s, _ := Read("web__claude")
+	if s.Status != "waiting" || s.Model != "opus" || s.ContextPct != 42 {
+		t.Fatalf("status/info lost: %+v", s)
+	}
+}
+
+func TestRateLimitStaleIsHidden(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if err := WriteRateLimit("web__claude", 24, "45m"); err != nil {
+		t.Fatal(err)
+	}
+	s := load("web__claude")
+	s.InfoAt = time.Now().Add(-TTL - time.Minute)
+	if err := save("web__claude", s); err != nil {
+		t.Fatal(err)
+	}
+	if pct, reset := RateLimit("web__claude"); pct != 0 || reset != "" {
+		t.Fatalf("stale rate limit should be hidden, got (%d, %q)", pct, reset)
+	}
+}
+
 func TestFilenameSanitizes(t *testing.T) {
 	if got := filename("web__claude"); got != "web__claude.json" {
 		t.Fatalf("filename = %q", got)

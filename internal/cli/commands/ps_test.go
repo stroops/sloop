@@ -88,6 +88,25 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
+func TestHumanizeDuration(t *testing.T) {
+	cases := []struct {
+		d    time.Duration
+		want string
+	}{
+		{0, "now"},
+		{30 * time.Second, "now"},
+		{5 * time.Minute, "5m"},
+		{2 * time.Hour, "2h"},
+		{3 * 24 * time.Hour, "3d"},
+		{-time.Minute, "now"}, // already past (e.g. a rate limit reset that just happened)
+	}
+	for _, c := range cases {
+		if got := humanizeDuration(c.d); got != c.want {
+			t.Fatalf("humanizeDuration(%v) = %q, want %q", c.d, got, c.want)
+		}
+	}
+}
+
 func TestModelCtxPrefix(t *testing.T) {
 	if got := modelCtxPrefix(FleetRow{}); got != "" {
 		t.Fatalf("no model/ctx → empty, got %q", got)

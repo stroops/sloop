@@ -64,6 +64,43 @@ func TestRenderStatuslineLeftCarriesIdentityAndAmbientInfo(t *testing.T) {
 	}
 }
 
+// Once a tool's own footer already reports model/context/branch (a
+// statusline feed is wired in its settings), the tmux bar must not repeat
+// them — only status/identity/fleet-awareness, the things only sloop knows,
+// survive. Codex/cursor (no feed, driven by the heuristics.model pane-scan)
+// are unaffected and keep showing the fields; that's covered implicitly by
+// TestRenderStatuslineLeftCarriesIdentityAndAmbientInfo, which uses a HOME
+// with no settings.json at all.
+func TestRenderStatuslineLeftSuppressesDuplicatedFields(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	session := "myrepo__claude"
+
+	claudeDir := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	settings := `{"statusLine":{"type":"command","command":"sloop statusline feed claude"}}`
+	if err := os.WriteFile(filepath.Join(claudeDir, "settings.json"), []byte(settings), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := fleetstate.WriteInfo(session, "Opus", 45); err != nil {
+		t.Fatal(err)
+	}
+
+	left := renderStatuslineLeft(session)
+	for _, unwanted := range []string{"Opus", "45%"} {
+		if strings.Contains(left, unwanted) {
+			t.Fatalf("left = %q, must not repeat %q once a feed is wired", left, unwanted)
+		}
+	}
+	for _, want := range []string{"⚓", "myrepo·claude"} {
+		if !strings.Contains(left, want) {
+			t.Fatalf("left = %q, want it to still contain %q", left, want)
+		}
+	}
+}
+
 // The right side is just the rotating hint now — model/context/branch moved
 // to the left, so it must not repeat them.
 func TestRenderStatuslineRightIsHintOnly(t *testing.T) {
@@ -166,6 +203,25 @@ func TestActiveIcons(t *testing.T) {
 	t.Setenv("SLOOP_NERD_FONTS", "bogus")
 	if activeIcons() != iconsUnicode {
 		t.Fatal("unrecognized value → falls back to unicode icons")
+	}
+}
+
+func TestRateLimitSegment(t *testing.T) {
+	if got := rateLimitSegment(0, ""); got != "" {
+		t.Fatalf("unknown (pct<=0) → empty, got %q", got)
+	}
+	if got := rateLimitSegment(24, ""); !strings.Contains(got, "24%") || strings.Contains(got, "(") {
+		t.Fatalf("no reset → no parenthetical, got %q", got)
+	}
+	got := rateLimitSegment(24, "45m")
+	if !strings.Contains(got, "24%") || !strings.Contains(got, "(45m)") || !strings.Contains(got, "colour245") {
+		t.Fatalf("comfortable usage = %q", got)
+	}
+	if !strings.Contains(rateLimitSegment(75, "5m"), "yellow") {
+		t.Fatal("75% should warn")
+	}
+	if !strings.Contains(rateLimitSegment(95, "1m"), "red") {
+		t.Fatal("95% should alarm")
 	}
 }
 

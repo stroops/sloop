@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -100,6 +101,41 @@ func clampPct(n float64) int {
 	return int(math.Round(math.Min(100, math.Max(0, n))))
 }
 
+// extractRateLimit pulls 5h-rate-limit usage out of a statusline payload.
+// Tools report it as either a used% or a remaining fraction to invert
+// (whichever the manifest maps), and the reset as either an absolute
+// timestamp or a relative seconds-until — see StatusLinePayload. (0, "") when
+// the tool reports none, never an error: the feed must degrade, not fail.
+func extractRateLimit(doc map[string]any, p adapter.StatusLinePayload) (pct int, resetIn string) {
+	switch {
+	case p.RateLimitUsedPct != "":
+		n, ok := payloadNum(doc, p.RateLimitUsedPct)
+		if !ok {
+			return 0, ""
+		}
+		pct = clampPct(n)
+	case p.RateLimitRemainingFrac != "":
+		n, ok := payloadNum(doc, p.RateLimitRemainingFrac)
+		if !ok {
+			return 0, ""
+		}
+		pct = clampPct((1 - n) * 100)
+	default:
+		return 0, ""
+	}
+	switch {
+	case p.RateLimitResetsAt != "":
+		if n, ok := payloadNum(doc, p.RateLimitResetsAt); ok {
+			resetIn = humanizeDuration(time.Until(time.Unix(int64(n), 0)))
+		}
+	case p.RateLimitResetsIn != "":
+		if n, ok := payloadNum(doc, p.RateLimitResetsIn); ok {
+			resetIn = humanizeDuration(time.Duration(n) * time.Second)
+		}
+	}
+	return pct, resetIn
+}
+
 // extractStatusState maps the tool's own payload state (if declared) to a
 // sloop status via the manifest's states table; "" when unmapped.
 func extractStatusState(doc map[string]any, spec adapter.StatusLineSpec) string {
@@ -173,6 +209,10 @@ var statuslineFeedCmd = &cobra.Command{
 				model, pct := extractStatusInfo(doc, m.StatusLine.Payload)
 				if (model != "" && model != curModel) || (pct > 0 && pct != curPct) {
 					_ = fleetstate.WriteInfo(session, model, pct)
+				}
+				curRLPct, curReset := fleetstate.RateLimit(session)
+				if rlPct, reset := extractRateLimit(doc, m.StatusLine.Payload); rlPct > 0 && (rlPct != curRLPct || reset != curReset) {
+					_ = fleetstate.WriteRateLimit(session, rlPct, reset)
 				}
 				if st := extractStatusState(doc, m.StatusLine); st != "" {
 					if cur, fresh := fleetstate.Read(session); !fresh || st != cur.Status {

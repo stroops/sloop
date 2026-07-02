@@ -33,6 +33,12 @@ type State struct {
 	Model      string    `json:"model,omitempty"`
 	ContextPct int       `json:"context_pct,omitempty"`
 	InfoAt     time.Time `json:"info_at,omitzero"`
+
+	// RateLimitPct is 5h-rate-limit usage 0–100 (0 = unknown), from a
+	// provider's statusline feed — not launch-time info, so it has no other
+	// source. RateLimitReset is a short human duration ("45m", "" = unknown).
+	RateLimitPct   int    `json:"rate_limit_pct,omitempty"`
+	RateLimitReset string `json:"rate_limit_reset,omitempty"`
 }
 
 // Dir is the global marker directory (~/.sloop/state); markers are cross-repo,
@@ -114,6 +120,30 @@ func WriteInfo(session, model string, ctxPct int) error {
 	}
 	s.InfoAt = time.Now()
 	return save(session, s)
+}
+
+// WriteRateLimit records 5h-rate-limit usage for a session, independent of
+// status and the model/context info (its own InfoAt-style freshness reuses
+// InfoAt, since it's written by the same feed call). A non-positive pct
+// leaves the existing value in place.
+func WriteRateLimit(session string, pct int, resetIn string) error {
+	s := load(session)
+	if pct > 0 {
+		s.RateLimitPct = pct
+		s.RateLimitReset = resetIn
+	}
+	s.InfoAt = time.Now()
+	return save(session, s)
+}
+
+// RateLimit returns a session's 5h-rate-limit usage for display, zeroed once
+// the info is older than TTL (same staleness policy as Info's ContextPct).
+func RateLimit(session string) (pct int, resetIn string) {
+	s := load(session)
+	if time.Since(s.InfoAt) > TTL {
+		return 0, ""
+	}
+	return s.RateLimitPct, s.RateLimitReset
 }
 
 // Read returns a session's marker and whether a *fresh* status exists (within

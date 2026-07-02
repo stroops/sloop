@@ -789,8 +789,10 @@ func statusText(r FleetRow) string {
 }
 
 // shortSince is a compact relative time ("now", "3m", "2h", "5d").
-func shortSince(t time.Time) string {
-	d := time.Since(t)
+// humanizeDuration buckets a duration into "now"/"Xm"/"Xh"/"Xd" — the compact
+// form shared by shortSince (time since an event) and the tmux bar's rate-
+// limit reset countdown (time until one).
+func humanizeDuration(d time.Duration) string {
 	switch {
 	case d < time.Minute:
 		return "now"
@@ -801,6 +803,10 @@ func shortSince(t time.Time) string {
 	default:
 		return fmt.Sprintf("%dd", int(d.Hours())/24)
 	}
+}
+
+func shortSince(t time.Time) string {
+	return humanizeDuration(time.Since(t))
 }
 
 // columnWidths returns the workspace and tool column widths needed to keep the
