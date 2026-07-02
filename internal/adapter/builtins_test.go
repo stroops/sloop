@@ -29,7 +29,7 @@ func TestBuiltinManifests(t *testing.T) {
 		"gemini":  {"gemini", "pointer", "", "settings-json"},
 		"cursor":  {"agent", "native", "", "cursor-json"},
 		"codex":   {"codex", "native", "", ""},
-		"copilot": {"copilot", "native", "", ""},
+		"copilot": {"copilot", "native", "", "copilot-json"},
 		"agy":     {"agy", "native", "", ""},
 	}
 	for key, exp := range want {
@@ -64,5 +64,9 @@ func TestBuiltinEventSpecs(t *testing.T) {
 	cursor := ms["cursor"]
 	if cursor.Hooks.Events.Waiting.Event != "" {
 		t.Fatalf("cursor waiting should stay unset, got %+v", cursor.Hooks.Events.Waiting)
+	}
+	copilot := ms["copilot"]
+	if copilot.Hooks.Install != "copilot-json" || copilot.Hooks.Events.Waiting.Matcher != "permission_prompt" {
+		t.Fatalf("copilot hooks = %+v", copilot.Hooks)
 	}
 }

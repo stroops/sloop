@@ -144,7 +144,7 @@ func TestInstallCursorHooks(t *testing.T) {
 }
 
 func TestHookInstallerDispatch(t *testing.T) {
-	if hookInstaller("settings-json") == nil || hookInstaller("cursor-json") == nil {
+	if hookInstaller("settings-json") == nil || hookInstaller("cursor-json") == nil || hookInstaller("copilot-json") == nil {
 		t.Fatal("known strategies must have an installer")
 	}
 	if hookInstaller("") != nil || hookInstaller("codex-toml") != nil {
@@ -181,5 +181,49 @@ func TestResolveHookConfigPathConfigDirEnv(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	if p, _ := resolveHookConfigPath("/repo", acct, "~/.claude/settings.json"); p != filepath.Join(home, ".claude/settings.json") {
 		t.Fatalf("no env set = %q", p)
+	}
+}
+
+func TestCopilotHooksDoc(t *testing.T) {
+	h := adapter.HooksSpec{Events: adapter.HookEvents{
+		Working: adapter.EventSpec{Event: "userPromptSubmitted"},
+		Waiting: adapter.EventSpec{Event: "notification", Matcher: "permission_prompt"},
+		Idle:    adapter.EventSpec{Event: "agentStop"},
+	}}
+	doc := copilotHooksDoc(h)
+	if doc["version"] != 1 {
+		t.Fatalf("version = %v", doc["version"])
+	}
+	hooks := doc["hooks"].(map[string]any)
+	waiting := hooks["notification"].([]any)[0].(map[string]any)
+	if waiting["command"] != "sloop hooks emit waiting" || waiting["matcher"] != "permission_prompt" {
+		t.Fatalf("waiting entry = %v", waiting)
+	}
+	working := hooks["userPromptSubmitted"].([]any)[0].(map[string]any)
+	if _, has := working["matcher"]; has {
+		t.Fatal("matcher key must be absent when empty")
+	}
+}
+
+func TestInstallCopilotHooksIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hooks", "sloop.json")
+	h := adapter.HooksSpec{Events: adapter.HookEvents{
+		Working: adapter.EventSpec{Event: "userPromptSubmitted"},
+		Waiting: adapter.EventSpec{Event: "notification", Matcher: "permission_prompt"},
+		Idle:    adapter.EventSpec{Event: "agentStop"},
+	}}
+	changed, err := installCopilotHooks(path, h)
+	if err != nil || !changed {
+		t.Fatalf("first install: changed=%v err=%v", changed, err)
+	}
+	b, _ := os.ReadFile(path)
+	var doc map[string]any
+	if json.Unmarshal(b, &doc) != nil {
+		t.Fatal("wrote invalid JSON")
+	}
+	changed, err = installCopilotHooks(path, h)
+	if err != nil || changed {
+		t.Fatalf("second install must be a no-op: changed=%v err=%v", changed, err)
 	}
 }

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -122,6 +123,14 @@ func updateJSONFile(path string, mutate func(doc map[string]any) (map[string]any
 	return true, os.WriteFile(path, append(out, '\n'), 0o644)
 }
 
+// jsonEqual compares two JSON documents structurally (both re-marshaled, so
+// map ordering doesn't matter).
+func jsonEqual(a, b map[string]any) bool {
+	ab, err1 := json.Marshal(a)
+	bb, err2 := json.Marshal(b)
+	return err1 == nil && err2 == nil && bytes.Equal(ab, bb)
+}
+
 // installSettingsHooks merges events into the JSON settings file at path,
 // creating it if needed. Returns whether the file changed.
 func installSettingsHooks(path string, events map[string]string) (bool, error) {
@@ -188,12 +197,18 @@ func installCursorHooks(path string, events map[string]string) (bool, error) {
 
 // hookInstaller returns the writer for a manifest's install strategy, or nil if
 // the strategy has no safe auto-writer yet (then `hooks print` shows the wiring).
-func hookInstaller(strategy string) func(path string, events map[string]string) (bool, error) {
+func hookInstaller(strategy string) func(path string, h adapter.HooksSpec) (bool, error) {
 	switch strategy {
 	case "settings-json":
-		return installSettingsHooks
+		return func(path string, h adapter.HooksSpec) (bool, error) {
+			return installSettingsHooks(path, eventCommands(h))
+		}
 	case "cursor-json":
-		return installCursorHooks
+		return func(path string, h adapter.HooksSpec) (bool, error) {
+			return installCursorHooks(path, eventCommands(h))
+		}
+	case "copilot-json":
+		return installCopilotHooks
 	default:
 		return nil
 	}
@@ -339,7 +354,7 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		changed, err := install(path, eventCommands(m.Hooks))
+		changed, err := install(path, m.Hooks)
 		if err != nil {
 			return err
 		}
