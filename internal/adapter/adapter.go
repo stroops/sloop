@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -42,12 +43,47 @@ type HooksSpec struct {
 	Events  HookEvents `yaml:"events"`
 }
 
+// StatusLinePayload maps sloop's display fields to dotted paths inside the
+// JSON payload a tool pipes to its statusline command. Context usage comes
+// either as a ready percentage (ContextPct) or as token paths to sum
+// (ContextUsed) against a window size (ContextSize) — whichever the tool sends.
+type StatusLinePayload struct {
+	Model       string   `yaml:"model"`        // e.g. model.display_name
+	Cwd         string   `yaml:"cwd"`          // working directory of the session
+	ContextPct  string   `yaml:"context_pct"`  // 0–100 number, if the tool sends one
+	ContextUsed []string `yaml:"context_used"` // token counts to sum
+	ContextSize string   `yaml:"context_size"` // window size the sum is divided by
+	State       string   `yaml:"state"`        // tool's own agent state, if present
+}
+
+// StatusLineSpec captures how a tool's built-in statusline mechanism works, so
+// sloop can register a feed there (`sloop statusline feed <tool>`) and enrich
+// the fleet view with model/context info the tool itself reports. Like hooks,
+// this is provider-respecting: the tool invokes sloop through its own
+// documented mechanism.
+type StatusLineSpec struct {
+	Config  string            `yaml:"config"`  // settings file holding the statusLine key (~/…)
+	Install string            `yaml:"install"` // installer strategy: "settings-json" | "" (none)
+	Docs    string            `yaml:"docs"`
+	Payload StatusLinePayload `yaml:"payload"`
+	// States maps the tool's payload state values to sloop's waiting/working/idle,
+	// for tools whose statusline payload doubles as a status signal (e.g. agy,
+	// which has no lifecycle hooks). Unmapped values are ignored.
+	States map[string]string `yaml:"states"`
+}
+
 // HeuristicsSpec defines fallback text-matching rules to classify agent status
 // when native hooks aren't available. In the future, this could be extended
 // with LLM prompts for deeper "AI awareness" of the session state.
 type HeuristicsSpec struct {
 	Working []string `yaml:"working"`
 	Waiting []string `yaml:"waiting"`
+	// Model is a regexp (capture group 1 = model name) matched against the
+	// visible pane text, for tools whose TUI shows the current model but expose
+	// no statusline/hook to report it. Live but brittle by nature: when it
+	// stops matching (UI redraw, version change), the status bar falls back to
+	// the last known model.
+	Model string `yaml:"model"`
 }
 
 // RunSpec declares how `sloop run` launches a tool with an optional model and
@@ -89,6 +125,9 @@ type Manifest struct {
 	Hooks   HooksSpec   `yaml:"hooks"`
 	// Run declares model/effort launch knobs for `sloop run`.
 	Run RunSpec `yaml:"run"`
+	// StatusLine declares the tool's built-in statusline mechanism, feeding
+	// model/context info (and, for hook-less tools, status) into the fleet view.
+	StatusLine StatusLineSpec `yaml:"statusline"`
 	// Fallback text-parsing rules for status (paving the way for AI-driven awareness)
 	Heuristics HeuristicsSpec `yaml:"heuristics"`
 	// Scaffold lists the tool's standard project dirs that `sloop init --scaffold`
@@ -154,7 +193,9 @@ func LoadBuiltin() (map[string]Manifest, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
 			continue
 		}
-		b, err := fs.ReadFile(builtinFS, filepath.Join("builtin", e.Name()))
+		// embed.FS always uses forward-slash paths regardless of OS, so use
+		// path.Join (not filepath.Join, which would yield "builtin\name" on Windows).
+		b, err := fs.ReadFile(builtinFS, path.Join("builtin", e.Name()))
 		if err != nil {
 			return nil, err
 		}

@@ -11,3 +11,19 @@ skills:
 hooks:
   config: ""
   install: ""
+# agy has no lifecycle hooks, but its statusLine payload carries agent_state,
+# so the feed doubles as the status signal (states below) on top of the
+# model/context enrichment.
+statusline:
+  config: ~/.gemini/antigravity-cli/settings.json
+  install: settings-json
+  payload:
+    model: model.display_name
+    cwd: cwd
+    context_pct: context_window.used_percentage
+    state: agent_state
+  states:
+    idle: idle
+    thinking: working
+    working: working
+    tool_use: working

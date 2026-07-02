@@ -51,6 +51,50 @@ func TestHooksNeeded(t *testing.T) {
 	}
 }
 
+func TestStatuslineNeeded(t *testing.T) {
+	root := t.TempDir()
+	manifests := map[string]adapter.Manifest{
+		"claude": {StatusLine: adapter.StatusLineSpec{Install: "settings-json", Config: filepath.Join(root, "settings.json")}},
+		"codex":  {StatusLine: adapter.StatusLineSpec{Install: ""}}, // no statusline mechanism → never "needed"
+	}
+	if !statuslineNeeded(root, []string{"claude"}, manifests) {
+		t.Fatal("claude statusline feed not installed → needed")
+	}
+	if statuslineNeeded(root, []string{"codex"}, manifests) {
+		t.Fatal("no-statusline tool → not auto-needed")
+	}
+}
+
+// installStatuslineForEnabled is init's counterpart to installHooksForEnabled:
+// it should wire the statusline feed for every enabled settings-json tool
+// (model + context % in the status bar) and be idempotent on a second run.
+func TestInstallStatuslineForEnabled(t *testing.T) {
+	dir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+
+	if _, err := RunInit(dir, []string{"claude"}, false); err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+
+	log := installStatuslineForEnabled(dir)
+	if len(log) != 1 || !strings.Contains(log[0], "claude") {
+		t.Fatalf("installStatuslineForEnabled = %v", log)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatalf("settings.json not written: %v", err)
+	}
+	if !strings.Contains(string(b), "statusline feed claude") {
+		t.Fatalf("settings.json missing feed command: %s", b)
+	}
+
+	if log2 := installStatuslineForEnabled(dir); len(log2) != 0 {
+		t.Fatalf("second install must be a no-op, got %v", log2)
+	}
+}
+
 func TestRunInitScaffolds(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir()) // isolate the global DB

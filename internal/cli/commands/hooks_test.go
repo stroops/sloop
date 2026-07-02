@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stroops/sloop/internal/adapter"
 )
 
 // claudeEvents mirrors the claude manifest's event→command mapping.
@@ -151,11 +153,33 @@ func TestHookInstallerDispatch(t *testing.T) {
 }
 
 func TestResolveHookConfigPath(t *testing.T) {
-	if p, _ := resolveHookConfigPath("/repo", ".claude/settings.local.json"); p != "/repo/.claude/settings.local.json" {
+	if p, _ := resolveHookConfigPath("/repo", adapter.AccountSpec{}, ".claude/settings.local.json"); p != "/repo/.claude/settings.local.json" {
 		t.Fatalf("repo-relative = %q", p)
 	}
 	home, _ := os.UserHomeDir()
-	if p, _ := resolveHookConfigPath("/repo", "~/.codex/config.toml"); p != filepath.Join(home, ".codex/config.toml") {
+	if p, _ := resolveHookConfigPath("/repo", adapter.AccountSpec{}, "~/.codex/config.toml"); p != filepath.Join(home, ".codex/config.toml") {
 		t.Fatalf("home-relative = %q", p)
+	}
+}
+
+// TestResolveHookConfigPathConfigDirEnv proves a second-account profile
+// (CLAUDE_CONFIG_DIR-style env var set) redirects the config path to that
+// account's dir instead of the default one — the config_dir_env fix.
+func TestResolveHookConfigPathConfigDirEnv(t *testing.T) {
+	acct := adapter.AccountSpec{ConfigDirEnv: "CLAUDE_CONFIG_DIR", DefaultDir: "~/.claude"}
+	t.Setenv("CLAUDE_CONFIG_DIR", "/work/claude-work")
+	p, err := resolveHookConfigPath("/repo", acct, "~/.claude/settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "/work/claude-work/settings.json"; p != want {
+		t.Fatalf("config_dir_env override = %q, want %q", p, want)
+	}
+
+	// Unset: falls back to the default ~/ expansion.
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	home, _ := os.UserHomeDir()
+	if p, _ := resolveHookConfigPath("/repo", acct, "~/.claude/settings.json"); p != filepath.Join(home, ".claude/settings.json") {
+		t.Fatalf("no env set = %q", p)
 	}
 }

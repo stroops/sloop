@@ -12,6 +12,7 @@ import (
 
 	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/config"
+	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/hints"
 	"github.com/stroops/sloop/internal/runner"
 	"github.com/stroops/sloop/internal/session"
@@ -393,6 +394,12 @@ Use --env KEY=VAL for a one-off account/env without saving a profile.`,
 		// it's a no-op once a name/instance already makes the session distinct.
 		if runNew && res.instance == "" {
 			res.instance = nextFreeInstance(ws.Name, plan.toolKey, tmux.ParseSessions(tmuxList()))
+		}
+		// Record the requested model so the status bar can show it even for
+		// tools with no statusline feed; a feed later overwrites it with the
+		// provider's own display name. Best-effort, never blocks the launch.
+		if plan.model != "" {
+			_ = fleetstate.WriteInfo(tmux.InstanceName(ws.Name, plan.toolKey, res.instance), plan.model, 0)
 		}
 		r := selectRunnerInstance(ws.Name, plan.toolKey, res.instance)
 		if err := RunRun(startDir, res.target, runProvider, runModel, runEffort, runTask, passthrough, res.env, res.instance, r); err != nil {

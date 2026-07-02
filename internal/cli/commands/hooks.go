@@ -97,16 +97,18 @@ func hasCommandHook(eventVal any, cmd string) bool {
 	return false
 }
 
-// installSettingsHooks merges events into the JSON settings file at path,
-// creating it if needed. Returns whether the file changed.
-func installSettingsHooks(path string, events map[string]string) (bool, error) {
+// updateJSONFile reads the JSON object at path (an empty object when the file
+// is missing), lets mutate rewrite it, and writes the result back only when
+// mutate reports a change. Every install strategy (hooks and statusline
+// alike) shares this read→mutate→write skeleton, so it's expressed once here.
+func updateJSONFile(path string, mutate func(doc map[string]any) (map[string]any, bool)) (bool, error) {
 	doc := map[string]any{}
 	if b, err := os.ReadFile(path); err == nil {
 		if err := json.Unmarshal(b, &doc); err != nil {
 			return false, fmt.Errorf("%s is not valid JSON: %w", path, err)
 		}
 	}
-	merged, changed := mergeSettingsHooks(doc, events)
+	merged, changed := mutate(doc)
 	if !changed {
 		return false, nil
 	}
@@ -118,6 +120,14 @@ func installSettingsHooks(path string, events map[string]string) (bool, error) {
 		return false, err
 	}
 	return true, os.WriteFile(path, append(out, '\n'), 0o644)
+}
+
+// installSettingsHooks merges events into the JSON settings file at path,
+// creating it if needed. Returns whether the file changed.
+func installSettingsHooks(path string, events map[string]string) (bool, error) {
+	return updateJSONFile(path, func(doc map[string]any) (map[string]any, bool) {
+		return mergeSettingsHooks(doc, events)
+	})
 }
 
 // mergeCursorHooks adds event→command hooks to a .cursor/hooks.json document.
@@ -171,24 +181,9 @@ func hasCursorCommand(eventVal any, cmd string) bool {
 // installCursorHooks merges events into the .cursor/hooks.json file at path,
 // creating it if needed. Returns whether the file changed.
 func installCursorHooks(path string, events map[string]string) (bool, error) {
-	doc := map[string]any{}
-	if b, err := os.ReadFile(path); err == nil {
-		if err := json.Unmarshal(b, &doc); err != nil {
-			return false, fmt.Errorf("%s is not valid JSON: %w", path, err)
-		}
-	}
-	merged, changed := mergeCursorHooks(doc, events)
-	if !changed {
-		return false, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return false, err
-	}
-	out, err := json.MarshalIndent(merged, "", "  ")
-	if err != nil {
-		return false, err
-	}
-	return true, os.WriteFile(path, append(out, '\n'), 0o644)
+	return updateJSONFile(path, func(doc map[string]any) (map[string]any, bool) {
+		return mergeCursorHooks(doc, events)
+	})
 }
 
 // hookInstaller returns the writer for a manifest's install strategy, or nil if
@@ -212,7 +207,7 @@ func hooksInstalledFor(root string, m adapter.Manifest) bool {
 	if len(events) == 0 {
 		return false
 	}
-	path, err := resolveHookConfigPath(root, m.Hooks.Config)
+	path, err := resolveHookConfigPath(root, m.Account, m.Hooks.Config)
 	if err != nil {
 		return false
 	}
@@ -244,8 +239,18 @@ func hooksInstalledFor(root string, m adapter.Manifest) bool {
 
 // resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
 // expands to the home dir, absolute paths pass through, and a repo-relative path
-// is joined to the workspace root.
-func resolveHookConfigPath(root, cfg string) (string, error) {
+// is joined to the workspace root. When the tool declares account.config_dir_env
+// and it's set in the environment (a second-account profile is active), the
+// config's default_dir prefix (e.g. ~/.claude) is swapped for that account's
+// dir, so install targets the active account's config file, not the default one.
+func resolveHookConfigPath(root string, acct adapter.AccountSpec, cfg string) (string, error) {
+	if acct.ConfigDirEnv != "" && acct.DefaultDir != "" {
+		if dir := os.Getenv(acct.ConfigDirEnv); dir != "" {
+			if rest, ok := strings.CutPrefix(cfg, acct.DefaultDir); ok {
+				return filepath.Join(expandEnvValue(dir), rest), nil
+			}
+		}
+	}
 	if strings.HasPrefix(cfg, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -330,7 +335,7 @@ var hooksInstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		path, err := resolveHookConfigPath(ws.Root, m.Hooks.Config)
+		path, err := resolveHookConfigPath(ws.Root, m.Account, m.Hooks.Config)
 		if err != nil {
 			return err
 		}

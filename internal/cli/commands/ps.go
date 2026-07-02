@@ -40,6 +40,8 @@ type FleetRow struct {
 	Answers   []tmux.Answer    // parsed choices the agent offers (answer in one key)
 	Display   string           // provider display name (e.g. "Google Antigravity" for "agy")
 	Instance  string           // named instance suffix (e.g. "sec" / "2"); "" = the default session
+	Model     string           // model the session is running, from launch or a statusline feed
+	CtxPct    int              // context-window usage 0-100 (0 = unknown), from a statusline feed
 }
 
 // toolName is the row's provider display name, falling back to the tool key when
@@ -179,6 +181,7 @@ func enrichGlances(rows []FleetRow, manifests map[string]adapter.Manifest) []Fle
 
 			marker, hasMarker := fleetstate.Read(rows[i].Name)
 			rows[i].Display = displayTool(rows[i].Tool, manifests)
+			rows[i].Model, rows[i].CtxPct = fleetstate.Info(rows[i].Name)
 
 			ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
 			defer cancel()
@@ -272,19 +275,20 @@ func RunPs(w io.Writer, rows []FleetRow) error {
 			waiting++
 		}
 	}
-	header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
+	header := joinWithDot("⚓ AI fleet", fmt.Sprintf("%d running", len(rows)))
 	if waiting > 0 {
-		header += fmt.Sprintf(", %d waiting on you", waiting)
+		header = joinWithDot(header, fmt.Sprintf("%d waiting on you", waiting))
 	}
 	_, _ = fmt.Fprintf(w, "%s\n\n", header)
 	for i, r := range rows {
-		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-18s %s · %s\n",
-			i+1, r.Workspace, r.toolName(), stateLabel(r), humanizeSince(r.Activity))
+		_, _ = fmt.Fprintf(w, "  %-3d %-16s %-18s %s\n",
+			i+1, r.Workspace, r.toolName(), joinWithDot(stateLabel(r), humanizeSince(r.Activity)))
 		if b := bottomLine(r, maxWidth-8); b != "" {
 			_, _ = fmt.Fprintf(w, "      └ %s\n", b)
 		}
 	}
-	_, _ = fmt.Fprintf(w, "\njump: sloop ps <#>   ·   send: sloop send <#> \"msg\"   ·   %s\n", tmux.DetachLine())
+	footer := joinWithDot("jump: sloop ps <#>", `send: sloop send <#> "msg"`, tmux.DetachLine())
+	_, _ = fmt.Fprintf(w, "\n%s\n", footer)
 	return nil
 }
 
@@ -357,13 +361,12 @@ func pickFleetSession(title string) (string, error) {
 		opts[i] = line
 	}
 
-	legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
-		tui.Blue("attached") + " · " + tui.Green("idle")
+	legend := "  " + joinWithDot(tui.Yellow("waiting"), tui.Cyan("working"), tui.Blue("attached"), tui.Green("idle"))
 	cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS"))
 	tui.Clear()
 	idx, _, err := tui.Menu{
 		Prompt:    title + "\r\n" + legend + "\r\n\r\n" + cols,
-		Footer:    tui.Grey("  ↑/↓ move · ⏎ open · q quit"),
+		Footer:    tui.Grey("  " + joinWithDot("↑/↓ move", "⏎ open", "q quit")),
 		Options:   opts,
 		Highlight: tui.HighlightFirstCol,
 		TopPad:    true,
@@ -562,13 +565,13 @@ var psCmd = &cobra.Command{
 				options = append(options, line)
 			}
 
-			header := fmt.Sprintf("⚓ AI fleet · %d running", len(rows))
+			header := joinWithDot("⚓ AI fleet", fmt.Sprintf("%d running", len(rows)))
 			if waiting > 0 {
-				header += " · " + tui.Yellow(fmt.Sprintf("%d waiting on you", waiting))
+				header = joinWithDot(header, tui.Yellow(fmt.Sprintf("%d waiting on you", waiting)))
 			}
-			legend := "  " + tui.Yellow("waiting") + " · " + tui.Cyan("working") + " · " +
-				tui.Blue("attached") + " · " + tui.Green("idle") + tui.Grey(" · AGE = since last activity")
-			keys := tui.Grey("  ↑/↓ move · ⏎ attach · 1/y answer · s send · x kill · q/esc quit")
+			legend := "  " + joinWithDot(tui.Yellow("waiting"), tui.Cyan("working"), tui.Blue("attached"),
+				tui.Green("idle"), tui.Grey("AGE = since last activity"))
+			keys := tui.Grey("  " + joinWithDot("↑/↓ move", "⏎ attach", "1/y answer", "s send", "x kill", "q/esc quit"))
 			cols := tui.Grey(fmt.Sprintf("  %-*s %-*s %-16s %s", wsW, "WORKSPACE", toolW, "TOOL", "STATUS", "AGE"))
 			prompt := header
 			if b := update.Banner(version); b != "" {
@@ -640,29 +643,50 @@ func answerHint(answers []tmux.Answer) string {
 		}
 		parts = append(parts, "["+key+"]"+a.Label)
 	}
-	return strings.Join(parts, " ")
+	return joinWithSpace(parts...)
 }
 
-// bottomLine is the indented detail under a fleet row: the agent's question +
-// answer keys when waiting, else the last output glance.
+// modelCtxPrefix renders "Opus · ctx 45%" for the bottom line, "" when neither
+// is known (e.g. the tool has no statusline feed installed).
+func modelCtxPrefix(r FleetRow) string {
+	ctx := ""
+	if r.CtxPct > 0 {
+		ctx = fmt.Sprintf("ctx %d%%", r.CtxPct)
+	}
+	return joinWithDot(r.Model, ctx)
+}
+
+// bottomLine is the indented detail under a fleet row: model + context %
+// (when a statusline feed reports them), then the agent's question + answer
+// keys when waiting, else the last output glance.
 func bottomLine(r FleetRow, maxWidth int) string {
+	prefix := modelCtxPrefix(r)
+	restWidth := maxWidth
+	if prefix != "" {
+		restWidth -= len(prefix) + len(dotSep)
+		if restWidth < 10 {
+			restWidth = 10
+		}
+	}
+	return joinWithDot(prefix, bottomLineRest(r, restWidth))
+}
+
+// bottomLineRest is the glance/prompt part of the bottom line, after the
+// model/context prefix (if any).
+func bottomLineRest(r FleetRow, maxWidth int) string {
 	if r.Status == tmux.StatusWaiting && (r.Prompt != "" || len(r.Answers) > 0) {
+		answer := ""
+		if h := answerHint(r.Answers); h != "" {
+			answer = "answer: " + h
+		}
 		promptMax := maxWidth
-		h := answerHint(r.Answers)
-		if h != "" {
-			promptMax -= len("  ·  answer: ") + len(h)
+		if answer != "" {
+			promptMax -= len(dotSep) + len(answer)
 		}
 		if promptMax < 10 {
 			promptMax = 10
 		}
-		s := truncate(r.Prompt, promptMax)
-		if h != "" {
-			if s != "" {
-				s += "  ·  "
-			}
-			s += "answer: " + h
-		}
-		return s
+		return joinWithDot(truncate(r.Prompt, promptMax), answer)
 	}
 	return truncate(r.Glance, maxWidth)
 }
@@ -691,7 +715,7 @@ func sendAnswer(_ *cobra.Command, row FleetRow, a tmux.Answer) (string, error) {
 // killing `ps`, and an empty submit cancels too. Returns a notice line ("" when
 // cancelled) for the control center to show on its next redraw.
 func promptAndSend(_ *cobra.Command, row FleetRow) (string, error) {
-	msg, ok := tui.ReadLine(fmt.Sprintf("send to %s (Enter to send · Esc to cancel): ", row.Name))
+	msg, ok := tui.ReadLine(fmt.Sprintf("send to %s (%s): ", row.Name, joinWithDot("Enter to send", "Esc to cancel")))
 	if !ok || strings.TrimSpace(msg) == "" {
 		return "", nil
 	}
@@ -829,7 +853,7 @@ func runWatch(w io.Writer, interval time.Duration, waitingOnly, notify bool) err
 		} else {
 			_ = RunPs(w, shown)
 		}
-		_, _ = fmt.Fprintf(w, "\nwatching every %s · Ctrl-C to stop\n", interval)
+		_, _ = fmt.Fprintf(w, "\n%s\n", joinWithDot(fmt.Sprintf("watching every %s", interval), "Ctrl-C to stop"))
 
 		for _, name := range newlyWaiting(prev, rows) {
 			_, _ = fmt.Fprint(w, "\a") // bell

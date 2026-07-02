@@ -18,6 +18,21 @@ hooks:
     working: UserPromptSubmit
     waiting: Notification
     idle: Stop
+# Claude pipes a JSON payload to the statusLine command on every render; sloop
+# registers a feed there to learn the model + context usage (chaining to any
+# statusline command the user already had).
+statusline:
+  config: ~/.claude/settings.json
+  install: settings-json
+  docs: https://code.claude.com/docs/en/statusline
+  payload:
+    model: model.display_name
+    cwd: workspace.current_dir
+    context_used:
+      - context_window.current_usage.input_tokens
+      - context_window.current_usage.cache_creation_input_tokens
+      - context_window.current_usage.cache_read_input_tokens
+    context_size: context_window.context_window_size
 account:
   config_dir_env: CLAUDE_CONFIG_DIR   # `sloop profile add --config-dir` sets this
   default_dir: ~/.claude              # source to share tooling/history from

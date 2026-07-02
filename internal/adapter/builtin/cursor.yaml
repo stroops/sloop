@@ -18,6 +18,11 @@ hooks:
     working: beforeSubmitPrompt
     waiting: ""   # beforeShellExecution fires on every command, not only when blocked — would mislabel; heuristic handles cursor's approval prompts
     idle: stop
+# Cursor's footer shows the model display name on its own line right above
+# the `~/dir · branch` line (e.g. `  Composer 2.5 Fast`); the dir line is the
+# anchor that keeps this from matching prose.
+heuristics:
+  model: '(?m)^ {2}(\S[^·\n]*?) *\n {2}[~/]'
 run:
   model_flag: "--model"   # e.g. agent --model gpt-5 (Cursor is multi-vendor; no bare-model home)
   prompt: positional      # `agent "task"` seeds an interactive session (agent -p is print mode)

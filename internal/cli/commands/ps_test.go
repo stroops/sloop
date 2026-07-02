@@ -88,6 +88,48 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
+func TestModelCtxPrefix(t *testing.T) {
+	if got := modelCtxPrefix(FleetRow{}); got != "" {
+		t.Fatalf("no model/ctx → empty, got %q", got)
+	}
+	if got := modelCtxPrefix(FleetRow{Model: "Opus"}); got != "Opus" {
+		t.Fatalf("model only = %q", got)
+	}
+	if got := modelCtxPrefix(FleetRow{CtxPct: 45}); got != "ctx 45%" {
+		t.Fatalf("ctx only = %q", got)
+	}
+	if got := modelCtxPrefix(FleetRow{Model: "Opus", CtxPct: 45}); got != "Opus · ctx 45%" {
+		t.Fatalf("both = %q", got)
+	}
+}
+
+// The model/ctx prefix must lead the bottom line, with the glance/prompt
+// still present after it — this is what makes model+context visible in the
+// fleet view (sloop ps), not just the tmux status bar.
+func TestBottomLineCarriesModelAndCtx(t *testing.T) {
+	r := FleetRow{Model: "Opus", CtxPct: 45, Glance: "fixing the parser bug"}
+	got := bottomLine(r, 80)
+	if !strings.Contains(got, "Opus · ctx 45%") {
+		t.Fatalf("missing model/ctx prefix: %q", got)
+	}
+	if !strings.Contains(got, "fixing the parser bug") {
+		t.Fatalf("missing glance: %q", got)
+	}
+
+	// No model/ctx known → falls back to the plain glance, unchanged.
+	plain := FleetRow{Glance: "fixing the parser bug"}
+	if got := bottomLine(plain, 80); got != "fixing the parser bug" {
+		t.Fatalf("plain glance = %q", got)
+	}
+
+	// A waiting row's prompt still comes after the prefix.
+	waiting := FleetRow{Model: "Opus", CtxPct: 45, Status: tmux.StatusWaiting, Prompt: "Which approach?"}
+	got = bottomLine(waiting, 80)
+	if !strings.Contains(got, "Opus · ctx 45%") || !strings.Contains(got, "Which approach?") {
+		t.Fatalf("waiting bottom line = %q", got)
+	}
+}
+
 func TestJumpToFleetBounds(t *testing.T) {
 	if err := jumpToFleet(nil, 1); err == nil {
 		t.Fatal("expected error for empty fleet")

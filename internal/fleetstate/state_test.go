@@ -38,6 +38,53 @@ func TestReadStaleMarkerIsNotFresh(t *testing.T) {
 	}
 }
 
+// Status hooks and info feeds write independently; neither may clobber the
+// other's fields, or the bar would lose the model every time a hook fires.
+func TestWriteAndWriteInfoMerge(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	if err := WriteInfo("web__claude", "opus", 42); err != nil {
+		t.Fatalf("WriteInfo: %v", err)
+	}
+	if err := Write("web__claude", "waiting"); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	s, ok := Read("web__claude")
+	if !ok || s.Status != "waiting" {
+		t.Fatalf("status lost: %+v ok=%v", s, ok)
+	}
+	if s.Model != "opus" || s.ContextPct != 42 {
+		t.Fatalf("info lost after status write: %+v", s)
+	}
+
+	// A feed update that only knows the percentage keeps the launch-time model.
+	if err := WriteInfo("web__claude", "", 55); err != nil {
+		t.Fatal(err)
+	}
+	if model, pct := Info("web__claude"); model != "opus" || pct != 55 {
+		t.Fatalf("Info = %q %d, want opus 55", model, pct)
+	}
+}
+
+func TestInfoStalePctIsHidden(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if err := WriteInfo("web__claude", "opus", 80); err != nil {
+		t.Fatal(err)
+	}
+	s := load("web__claude")
+	s.InfoAt = time.Now().Add(-TTL - time.Minute)
+	if err := save("web__claude", s); err != nil {
+		t.Fatal(err)
+	}
+	model, pct := Info("web__claude")
+	if model != "opus" {
+		t.Fatalf("model should survive staleness, got %q", model)
+	}
+	if pct != 0 {
+		t.Fatalf("stale context pct should be hidden, got %d", pct)
+	}
+}
+
 func TestFilenameSanitizes(t *testing.T) {
 	if got := filename("web__claude"); got != "web__claude.json" {
 		t.Fatalf("filename = %q", got)

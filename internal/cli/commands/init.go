@@ -213,6 +213,18 @@ func hooksNeeded(root string, tools []string, manifests map[string]adapter.Manif
 	return false
 }
 
+// statuslineNeeded reports whether any enabled tool's statusline feed isn't
+// installed yet (model + context % in the status bar).
+func statuslineNeeded(root string, tools []string, manifests map[string]adapter.Manifest) bool {
+	for _, t := range tools {
+		m := manifests[t]
+		if m.StatusLine.Install == "settings-json" && !statuslineInstalledFor(root, t, m) {
+			return true
+		}
+	}
+	return false
+}
+
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Scaffold a .sloop workspace in the current directory",
@@ -236,6 +248,7 @@ var initCmd = &cobra.Command{
 
 		// Only ask about work that isn't already done.
 		wantHooks := false
+		wantStatusline := false
 		if r != nil {
 			if canonical && syncpkg.AgentsState(cwd) != "ok" {
 				initScan = ix.Ask("Pre-fill AGENTS.md from your codebase?", true, r, cmd.OutOrStdout())
@@ -245,6 +258,9 @@ var initCmd = &cobra.Command{
 			// available as the explicit `--scaffold` opt-in.
 			if hooksNeeded(cwd, tools, manifests) {
 				wantHooks = ix.Ask("Install status hooks for precise `sloop ps`?", true, r, cmd.OutOrStdout())
+			}
+			if statuslineNeeded(cwd, tools, manifests) {
+				wantStatusline = ix.Ask("Install statusline feed for model + context % in the status bar?", true, r, cmd.OutOrStdout())
 			}
 		}
 
@@ -258,6 +274,11 @@ var initCmd = &cobra.Command{
 		}
 		if wantHooks {
 			for _, l := range installHooksForEnabled(cwd) {
+				cmd.Printf("  %s\n", l)
+			}
+		}
+		if wantStatusline {
+			for _, l := range installStatuslineForEnabled(cwd) {
 				cmd.Printf("  %s\n", l)
 			}
 		}
@@ -307,12 +328,41 @@ func installHooksForEnabled(root string) []string {
 		if !ok || m.Hooks.Install != "settings-json" {
 			continue
 		}
-		path, err := resolveHookConfigPath(root, m.Hooks.Config)
+		path, err := resolveHookConfigPath(root, m.Account, m.Hooks.Config)
 		if err != nil {
 			continue
 		}
 		if changed, err := installSettingsHooks(path, eventCommands(m.Hooks)); err == nil && changed {
 			log = append(log, "hooks: installed for "+tool)
+		}
+	}
+	return log
+}
+
+// installStatuslineForEnabled installs the statusline feed for each enabled
+// settings-json tool (claude/agy), reusing the statusline installer.
+// Best-effort.
+func installStatuslineForEnabled(root string) []string {
+	var log []string
+	proj, err := config.LoadProject(filepath.Join(root, config.SloopDirName))
+	if err != nil {
+		return log
+	}
+	manifests, err := adapter.Load()
+	if err != nil {
+		return log
+	}
+	for _, tool := range proj.Tools {
+		m, ok := manifests[tool]
+		if !ok || m.StatusLine.Install != "settings-json" {
+			continue
+		}
+		path, err := resolveHookConfigPath(root, m.Account, m.StatusLine.Config)
+		if err != nil {
+			continue
+		}
+		if changed, _, err := installStatuslineFeed(path, appName+" statusline feed "+tool); err == nil && changed {
+			log = append(log, "statusline: installed for "+tool)
 		}
 	}
 	return log
