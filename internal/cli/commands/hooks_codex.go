@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -54,7 +53,7 @@ func installCodexHooks(path string, _ adapter.HooksSpec) (bool, error) {
 	}
 	// Build the notify line manually (toml.Marshal would use single quotes).
 	line := buildNotifyLine(want)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := ensureParentDir(path); err != nil {
 		return false, err
 	}
 	out := append(line, raw...)

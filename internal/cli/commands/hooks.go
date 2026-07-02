@@ -99,6 +99,12 @@ func hasCommandHook(eventVal any, cmd string) bool {
 	return false
 }
 
+// ensureParentDir creates path's parent directory, for installers writing a
+// config file that may not exist yet.
+func ensureParentDir(path string) error {
+	return os.MkdirAll(filepath.Dir(path), 0o755)
+}
+
 // updateJSONFile reads the JSON object at path (an empty object when the file
 // is missing), lets mutate rewrite it, and writes the result back only when
 // mutate reports a change. Every install strategy (hooks and statusline
@@ -114,7 +120,7 @@ func updateJSONFile(path string, mutate func(doc map[string]any) (map[string]any
 	if !changed {
 		return false, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := ensureParentDir(path); err != nil {
 		return false, err
 	}
 	out, err := json.MarshalIndent(merged, "", "  ")
@@ -235,27 +241,33 @@ func hooksInstalledFor(root string, m adapter.Manifest) bool {
 		return json.Unmarshal(b, &doc) == nil && jsonEqual(doc, copilotHooksDoc(m.Hooks))
 	case "codex-toml":
 		return codexNotifyInstalled(b)
-	case "settings-json", "cursor-json":
-		events := eventCommands(m.Hooks)
-		if len(events) == 0 {
-			return false
-		}
-		var doc map[string]any
-		if json.Unmarshal(b, &doc) != nil {
-			return false
-		}
-		hooks, _ := doc["hooks"].(map[string]any)
-		for ev, cmd := range events {
-			if m.Hooks.Install == "settings-json" && !hasCommandHook(hooks[ev], cmd) {
-				return false
-			}
-			if m.Hooks.Install == "cursor-json" && !hasCursorCommand(hooks[ev], cmd) {
-				return false
-			}
-		}
-		return true
+	case "settings-json":
+		return allEventsInstalled(b, m.Hooks, hasCommandHook)
+	case "cursor-json":
+		return allEventsInstalled(b, m.Hooks, hasCursorCommand)
 	}
 	return false
+}
+
+// allEventsInstalled reports whether every event a manifest can signal
+// already has sloop's command hook present, per the given group-matching
+// check (hasCommandHook for settings-json, hasCursorCommand for cursor-json).
+func allEventsInstalled(b []byte, h adapter.HooksSpec, has func(eventVal any, cmd string) bool) bool {
+	events := eventCommands(h)
+	if len(events) == 0 {
+		return false
+	}
+	var doc map[string]any
+	if json.Unmarshal(b, &doc) != nil {
+		return false
+	}
+	hooks, _ := doc["hooks"].(map[string]any)
+	for ev, cmd := range events {
+		if !has(hooks[ev], cmd) {
+			return false
+		}
+	}
+	return true
 }
 
 // resolveHookConfigPath turns a manifest config path into an absolute path: ~/…
