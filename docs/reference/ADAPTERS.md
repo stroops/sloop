@@ -89,6 +89,14 @@ The runtime view of all of this is **`sloop tools`** (capability matrix:
 
 ## Hook install strategies
 
+Each tool's manifest declares an install strategy; sloop auto-installs the hook config when possible,
+otherwise prints instructions. The manifest's `events` block maps sloop states (`waiting`, `working`,
+`idle`) to provider events using **`EventSpec`**: `{event: "ProviderEventName", matcher: "discriminator"}`.
+The `matcher` is the provider's native discriminator (e.g., Copilot's notification types
+`permission_prompt`/`agent_idle`, or Claude's tool-use name for post-edit hooks). For simple events
+with no sub-types, `matcher` is omitted. Reserved future fields: `cadence`, `decision`/`failClosed`
+(for v0.2.0 workflow hooks).
+
 - `settings-json`: merge `events → "sloop hooks emit <state>"` into a JSON settings file
   (`mergeSettingsHooks`/`installSettingsHooks`). Used by **claude** and **gemini** (identical nested
   `hooks[event] = [{hooks:[{type,command}]}]` shape). Written idempotently, never clobbering keys.
@@ -96,11 +104,16 @@ The runtime view of all of this is **`sloop tools`** (capability matrix:
   (`{version, hooks[event]=[{command}]}`; `mergeCursorHooks`/`installCursorHooks`). Used by **cursor**.
   Note: Cursor has no clean "blocked on user" event (`beforeShellExecution` fires on every command),
   so its manifest leaves `waiting: ""` and the pane heuristic covers waiting.
-- `""` (manual): no safe auto-writer yet; `sloop hooks print <tool>` shows the exact
-  event→command wiring and `sloop hooks list` marks it `print+paste`. **Copilot/Codex** are here:
-  Copilot uses a single `notification` event with matchers (`permission_prompt`/`agent_idle`/…) plus
-  per-OS `bash`/`powershell` keys; Codex is TOML with one `notify` program for all events (would need
-  payload routing). Both need a matcher-aware model before auto-install.
+- `copilot-json`: sloop owns the entire file `~/.copilot/hooks/sloop.json` (whole-file write;
+  `installCopilotHooks`). Used by **copilot**. Copilot loads all `*.json` in `~/.copilot/hooks/`, so
+  sloop gets a dedicated file rather than merging into a shared config.
+- `codex-toml`: claims codex's single `notify` slot in `~/.codex/config.toml` only when free; occupied
+  → prints chaining guidance (`installCodexHooks`). Used by **codex**. Codex has one `notify` program
+  for all events, so the installer writes `sloop hooks notify codex` (a hidden router that dispatches
+  to `emit <state>` based on the event payload).
+- `""` (manual): no safe auto-writer yet; `sloop hooks print <tool>` shows the exact event→command
+  wiring and `sloop hooks list` marks it `print+paste`. **agy** is the only current builtin that stays
+  manual (it has no hooks at all).
 
 Strategies dispatch through `hookInstaller(strategy)`: add a `case` there + an `install…Hooks`
 writer to teach a new config format.

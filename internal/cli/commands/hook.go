@@ -1,13 +1,16 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroops/sloop/internal/adapter"
 	"github.com/stroops/sloop/internal/fleetstate"
 	"github.com/stroops/sloop/internal/tmux"
 )
@@ -67,4 +70,52 @@ var hooksEmitCmd = &cobra.Command{
 	Hidden: true,
 	Args:   cobra.ExactArgs(1),
 	RunE:   hookRunE,
+}
+
+// notifyStateFor routes a provider notify payload to a sloop state by its
+// `type` field — the only field sloop reads (privacy: never the messages the
+// payload may carry). Unknown or malformed payloads yield "": a notify
+// program must never break the host tool, so there is no error path.
+func notifyStateFor(h adapter.HooksSpec, payload []byte) string {
+	var p struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(payload, &p) != nil || p.Type == "" {
+		return ""
+	}
+	switch p.Type {
+	case h.Events.Working.Event:
+		return "working"
+	case h.Events.Waiting.Event:
+		return "waiting"
+	case h.Events.Idle.Event:
+		return "idle"
+	}
+	return ""
+}
+
+// hooksNotifyCmd is the single-program variant of `hooks emit`, for tools
+// (codex) that pass every event to one notify command with a JSON payload
+// appended as the final argument.
+var hooksNotifyCmd = &cobra.Command{
+	Use:    "notify <tool> [payload-json]",
+	Short:  "Internal: route a tool's notify payload to a status marker",
+	Hidden: true,
+	Args:   cobra.RangeArgs(1, 2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 2 {
+			return nil // no payload → nothing to record, never an error
+		}
+		m, err := manifestForTool(args[0])
+		if err != nil {
+			slog.Debug("hooks notify: lookup failed", "err", err)
+			return nil
+		}
+		state := notifyStateFor(m.Hooks, []byte(args[1]))
+		if state == "" {
+			slog.Debug("hooks notify: no state for payload")
+			return nil
+		}
+		return RunHook(state)
+	},
 }

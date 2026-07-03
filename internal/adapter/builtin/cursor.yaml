@@ -15,9 +15,19 @@ hooks:
   docs: https://cursor.com/docs/hooks
   notes: hooks.json {version,hooks}; no clean "blocked on user" event, so waiting is left to the pane heuristic
   events:
-    working: beforeSubmitPrompt
-    waiting: ""   # beforeShellExecution fires on every command, not only when blocked — would mislabel; heuristic handles cursor's approval prompts
-    idle: stop
+    working: {event: beforeSubmitPrompt}
+    # beforeShellExecution fires on every command, not only when blocked — would
+    # mislabel; heuristic handles cursor's approval prompts, so waiting is unset.
+    idle: {event: stop}
+# No statusline block: Cursor CLI has no user-configurable statusline command
+# to feed from (surveyed 2026-07-02). Model/context enrichment would need a
+# provider mechanism first — do not fake one (provider-respecting). Model info
+# currently comes from heuristics.model (footer regex) below.
+# Cursor's footer shows the model display name on its own line right above
+# the `~/dir · branch` line (e.g. `  Composer 2.5 Fast`); the dir line is the
+# anchor that keeps this from matching prose.
+heuristics:
+  model: '(?m)^ {2}(\S[^·\n]*?) *\n {2}[~/]'
 run:
   model_flag: "--model"   # e.g. agent --model gpt-5 (Cursor is multi-vendor; no bare-model home)
   prompt: positional      # `agent "task"` seeds an interactive session (agent -p is print mode)

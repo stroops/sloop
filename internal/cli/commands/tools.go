@@ -65,7 +65,7 @@ func hooksLabel(m adapter.Manifest) string {
 	if hookInstaller(m.Hooks.Install) != nil {
 		return "auto"
 	}
-	if m.Hooks.Events.Working != "" || m.Hooks.Events.Waiting != "" || m.Hooks.Events.Idle != "" {
+	if m.Hooks.Events.Working.Event != "" || m.Hooks.Events.Waiting.Event != "" || m.Hooks.Events.Idle.Event != "" {
 		return "manual"
 	}
 	return "-"

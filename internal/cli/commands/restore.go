@@ -114,7 +114,7 @@ func RunRestore(w io.Writer, in io.Reader, resume, yes bool) error {
 		if resume && m.Run.ResumeFlag != "" {
 			args = append(args, m.Run.ResumeFlag)
 		}
-		if err := tmux.LaunchDetached(t.Session, t.Path, m.Launch, args); err != nil {
+		if _, err := tmux.LaunchDetached(t.Session, t.Path, nil, m.Launch, args); err != nil {
 			_, _ = fmt.Fprintf(w, "  ✗ %s: %v\n", t.Session, err)
 			continue
 		}

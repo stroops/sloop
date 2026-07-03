@@ -15,9 +15,28 @@ hooks:
   install: settings-json
   docs: https://docs.claude.com/en/docs/claude-code/hooks
   events:
-    working: UserPromptSubmit
-    waiting: Notification
-    idle: Stop
+    working: {event: UserPromptSubmit}
+    waiting: {event: Notification}
+    idle: {event: Stop}
+# Claude pipes a JSON payload to the statusLine command on every render; sloop
+# registers a feed there to learn the model + context usage (chaining to any
+# statusline command the user already had).
+statusline:
+  config: ~/.claude/settings.json
+  install: settings-json
+  docs: https://code.claude.com/docs/en/statusline
+  payload:
+    model: model.display_name
+    cwd: workspace.current_dir
+    context_used:
+      - context_window.current_usage.input_tokens
+      - context_window.current_usage.cache_creation_input_tokens
+      - context_window.current_usage.cache_read_input_tokens
+    context_size: context_window.context_window_size
+    # The 5h window, not the 7-day one: it's the one that actually bites
+    # mid-session. Something no custom statusline script commonly shows.
+    rate_limit_used_pct: rate_limits.five_hour.used_percentage
+    rate_limit_resets_at: rate_limits.five_hour.resets_at
 account:
   config_dir_env: CLAUDE_CONFIG_DIR   # `sloop profile add --config-dir` sets this
   default_dir: ~/.claude              # source to share tooling/history from

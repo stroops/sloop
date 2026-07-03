@@ -8,13 +8,13 @@ package tmux
 // -l flag sends the bytes verbatim (no key-name lookup) and -- ends option
 // parsing so a message starting with "-" is still treated as text.
 func BuildSendTextArgs(session, msg string) []string {
-	return []string{"send-keys", "-t", session, "-l", "--", msg}
+	return []string{"send-keys", "-t", Exact(session), "-l", "--", msg}
 }
 
 // BuildSendEnterArgs presses Enter in a session's active pane, submitting
 // whatever text precedes it.
 func BuildSendEnterArgs(session string) []string {
-	return []string{"send-keys", "-t", session, "Enter"}
+	return []string{"send-keys", "-t", Exact(session), "Enter"}
 }
 
 // LaunchSend types msg into the session and submits it with Enter.

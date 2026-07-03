@@ -19,6 +19,13 @@ type Runner interface {
 	Launch(Spec) error
 }
 
+// Detacher is implemented by runners whose Launch returns as soon as the
+// session is created rather than when it ends, so callers must not treat the
+// return as the session finishing (e.g. session history stays open).
+type Detacher interface {
+	Detached() bool
+}
+
 func BuildExecCmd(s Spec) *exec.Cmd {
 	cmd := exec.Command(s.Command, s.Args...)
 	cmd.Dir = s.Dir

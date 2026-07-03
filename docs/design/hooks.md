@@ -48,8 +48,8 @@ construction:
 A provider calls `sloop hooks emit <waiting|working|idle>` from its own lifecycle events; `emit`
 writes a short-lived marker under `~/.sloop/state` that `sloop ps` prefers over the screen heuristic
 (15-min TTL, so it never goes stale). Per-provider event→state mapping and the install strategy live
-in the adapter manifest. Auto-install today: **claude, gemini, cursor**; **copilot, codex** are
-`print+paste` pending a matcher-aware model (below). See [ADAPTERS.md](../reference/ADAPTERS.md).
+in the adapter manifest. Auto-install today: **claude, gemini, cursor, copilot, codex**. See
+[ADAPTERS.md](../reference/ADAPTERS.md).
 
 ### Privacy: status hooks never read your session
 
@@ -103,9 +103,9 @@ A hook installs at one of two levels, and the design must make this explicit:
 The same *logical* hook ("run formatter after an edit") maps to different events and schemas per tool:
 Claude `PostToolUse` with `matcher: "Write|Edit"`, Cursor `afterFileEdit`, Copilot `notification`
 with a matcher. A workflow-hook definition is therefore tool-agnostic and sloop **translates** it into
-each tool's config: exactly the adapter-manifest pattern, extended with **matchers/cadences**. (The
-status-hook schema has no matchers yet; copilot's status hook is the first real consumer that forces
-adding them, so the schema gets designed against a concrete need rather than guessed.)
+each tool's config: exactly the adapter-manifest pattern, extended with **matchers/cadences**. The
+EventSpec matcher now exists (status hooks use it today for copilot/codex); workflow hooks extend it
+with cadence when built.
 
 ### Trust model
 

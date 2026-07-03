@@ -14,9 +14,9 @@ const (
 	peekPopupH = "80%"
 )
 
-// shellSingleQuote wraps s in single quotes safe for /bin/sh, escaping any
+// ShellQuote wraps s in single quotes safe for /bin/sh, escaping any
 // embedded single quotes. Session names are simple, but never trust input.
-func shellSingleQuote(s string) string {
+func ShellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
@@ -26,13 +26,13 @@ func shellSingleQuote(s string) string {
 // clear TMUX/TMUX_PANE for just this command. Closing the popup kills this
 // client → it detaches → the agent session keeps running.
 func BuildNestedAttachCmd(session string) string {
-	return fmt.Sprintf("env -u TMUX -u TMUX_PANE %s attach -t %s", Bin(), shellSingleQuote(session))
+	return fmt.Sprintf("env -u TMUX -u TMUX_PANE %s attach -t %s", Bin(), ShellQuote(Exact(session)))
 }
 
 // NestedAttach attaches to session in the current TTY with TMUX cleared, used
 // when we are already inside a popup (the keybind path) so no second popup opens.
 func NestedAttach(session string) error {
-	cmd := exec.Command(Bin(), "attach", "-t", session)
+	cmd := exec.Command(Bin(), "attach", "-t", Exact(session))
 	cmd.Env = clearTmuxEnv(os.Environ())
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
