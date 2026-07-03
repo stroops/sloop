@@ -3,7 +3,7 @@
 All notable changes to Sloop are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## v0.1.3 - 2026-07-02
+## v0.1.3 - 2026-07-03
 
 Every builtin AI CLI now reports precise fleet status, the status bar gained
 model/context/rate-limit awareness, and `sloop new` launches an agent without
