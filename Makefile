@@ -1,4 +1,4 @@
-.PHONY: all build test proto gen fmt vet lint sec clean install run-daemon run-cli
+.PHONY: all build test e2e proto gen fmt vet lint sec clean install run-daemon run-cli githooks
 
 BINARY := sloop
 
@@ -36,6 +36,11 @@ sec:
 
 install:
 	go install ./cmd/sloop
+
+# Point git at the repo's committed hooks (pre-push: lint + test). Run once
+# per clone.
+githooks:
+	git config core.hooksPath scripts/githooks
 
 run-cli:
 	./bin/$(BINARY)

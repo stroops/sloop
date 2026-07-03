@@ -1,0 +1,19 @@
+#!/bin/sh
+# pre-push: mirror CI's lint-and-test job locally so basic failures never
+# reach the PR. Installed via `make githooks` (core.hooksPath); bypass in an
+# emergency with `git push --no-verify`.
+set -e
+
+if ! command -v golangci-lint >/dev/null 2>&1; then
+  echo "pre-push: golangci-lint not installed — refusing to push unlinted code." >&2
+  echo "  brew install golangci-lint   (or: git push --no-verify to bypass)" >&2
+  exit 1
+fi
+
+echo "pre-push: make lint…"
+make lint
+
+echo "pre-push: go test…"
+go test ./...
+
+echo "pre-push: all checks passed."
