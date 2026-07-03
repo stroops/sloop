@@ -40,8 +40,16 @@ func TestMain(m *testing.M) {
 			fmt.Fprintln(os.Stderr, "e2e: tmux tmpdir:", err)
 			os.Exit(1)
 		}
-		os.Setenv("TMUX_TMPDIR", dir)
-		os.Unsetenv("TMUX")
+		// Fail hard if isolation can't be established: without it the suite
+		// would silently run against the developer's real server.
+		if err := os.Setenv("TMUX_TMPDIR", dir); err != nil {
+			fmt.Fprintln(os.Stderr, "e2e: TMUX_TMPDIR:", err)
+			os.Exit(1)
+		}
+		if err := os.Unsetenv("TMUX"); err != nil {
+			fmt.Fprintln(os.Stderr, "e2e: unset TMUX:", err)
+			os.Exit(1)
+		}
 		cleanup = func() {
 			_ = exec.Command("tmux", "kill-server").Run()
 			_ = os.RemoveAll(dir)
